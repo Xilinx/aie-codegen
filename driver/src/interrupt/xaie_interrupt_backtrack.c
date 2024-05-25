@@ -57,6 +57,42 @@ static inline void _XAie_LIntrCtrlL2Enable(XAie_DevInst *DevInst,
 	_XAie_LPartWrite32(DevInst, RegAddr, ChannelBitMap);
 }
 
+
+/*****************************************************************************/
+/**
+*
+* This API Reads L2 Interrupt status register.
+*
+* @param        DevInst: Device Instance.
+* @param        StartCol: Column number from where status needs to read.
+* @param        L2Status: Value to be read from Status register.
+*
+* @return       XAIE_OK on success, error code on failure.
+*
+*
+******************************************************************************/
+u32 XAie_L2IntrCtrlStatus(XAie_DevInst *DevInst, u8 StartCol)
+{
+	u8 TType;
+	u64 RegAddr;
+
+	XAie_LocType Loc = XAie_TileLoc(StartCol, XAIE_SHIM_ROW);
+
+	/* As per the architecture, In phoenix, only col 0
+	doesn't have NOC connectivity, rest all Tiles have
+	Noc connectivity. For Strix all cols are connected to
+	Noc module. So all cols have L2 interrupt status register.*/
+	if((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE2IPU) ||
+		(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE2P)) {
+		if(StartCol == 0)
+			Loc.Col += 1;
+	}
+        RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
+                                XAIE_NOC_MOD_INTR_L2_STATUS;
+
+        return _XAie_LPartRead32(DevInst, RegAddr);
+}
+
 /*****************************************************************************/
 /**
 *

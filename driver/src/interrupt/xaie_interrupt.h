@@ -62,5 +62,5 @@ XAIE_AIG_EXPORT void XAie_ClearErrorInterrupts(u8 IrqId);
 XAIE_AIG_EXPORT u32 XAie_LIntrCtrlL2Status(XAie_LocType Loc);
 XAIE_AIG_EXPORT AieRC XAie_BacktrackErrorInterrupts(XAie_DevInst *DevInst,
 		XAie_ErrorMetaData *MData);
-
+XAIE_AIG_EXPORT u32 XAie_L2IntrCtrlStatus(XAie_DevInst *DevInst, u8 StartCol);
 #endif		/* end of protection macro */

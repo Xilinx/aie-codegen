@@ -556,17 +556,7 @@ static AieRC XAie_SocketIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 			return _XAie_SocketIO_NpiMaskPoll(IOInst,
 					Req->NpiRegOff, Req->Mask, Req->Val,
 					Req->TimeOutUs);
-		}
-		case XAIE_BACKEND_OP_REQUEST_RESOURCE:
-			return _XAie_RequestRscCommon(DevInst, Arg);
-		case XAIE_BACKEND_OP_RELEASE_RESOURCE:
-			return _XAie_ReleaseRscCommon(Arg);
-		case XAIE_BACKEND_OP_FREE_RESOURCE:
-			return _XAie_FreeRscCommon(Arg);
-		case XAIE_BACKEND_OP_REQUEST_ALLOCATED_RESOURCE:
-			return _XAie_RequestAllocatedRscCommon(DevInst, Arg);
-		case XAIE_BACKEND_OP_GET_RSC_STAT:
-			return _XAie_GetRscStatCommon(DevInst, Arg);
+		}		
 		case XAIE_BACKEND_OP_REQUEST_TILES:
 			return _XAie_PrivilegeRequestTiles(DevInst,
 					(XAie_BackendTilesArray *)Arg);

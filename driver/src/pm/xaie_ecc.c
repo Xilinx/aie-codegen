@@ -30,9 +30,7 @@
 
 #if defined(XAIE_FEATURE_PRIVILEGED_ENABLE) && \
 	defined(XAIE_FEATURE_PERFCOUNT_ENABLE) && \
-	defined(XAIE_FEATURE_EVENTS_ENABLE) && \
-	defined(XAIE_FEATURE_RSC_ENABLE)
-
+	defined(XAIE_FEATURE_EVENTS_ENABLE)
 /*****************************************************************************/
 /***************************** Macro Definitions *****************************/
 #define XAIE_BROADCAST_CHANNEL_6		6U
@@ -57,17 +55,7 @@
 ******************************************************************************/
 static AieRC _XAie_EccPerfCntConfig(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
-	AieRC RC;
-
-	/* Reserve perf counter 0 of Core Module for ECC */
-	XAie_UserRsc ReturnRsc = {Loc, (u32)XAIE_CORE_MOD, (u32)XAIE_PERFCNT_RSC,
-		XAIE_ECC_PERFCOUNTER_ID};
-	RC = XAie_RequestAllocatedPerfcnt(DevInst, 1U, &ReturnRsc);
-	if(RC != XAIE_OK) {
-		XAIE_ERROR("Unable to reserve perf counter for ECC\n");
-		return XAIE_ERR;
-	}
-
+	AieRC RC;	
 	/*
 	* Configure perf count event value register for core module's
 	* perf counter 0 with the decided ECC scrub clock count.
@@ -426,4 +414,4 @@ AieRC _XAie_EccOnMemTile(XAie_DevInst *DevInst, XAie_LocType Loc)
 }
 
 #endif /* XAIE_FEATURE_PRIVILEGED_ENABLE && XAIE_FEATURE_PERFCOUNT_ENABLE &&
-	* XAIE_FEATURE_EVENTS_ENABLE && XAIE_FEATURE_RSC_ENABLE */
+	* XAIE_FEATURE_EVENTS_ENABLE*/

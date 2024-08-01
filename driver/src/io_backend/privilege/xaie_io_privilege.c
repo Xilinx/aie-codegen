@@ -357,7 +357,7 @@ static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enab
 		    R < (DevInst->MemTileRowStart + DevInst->MemTileNumRows);
 		    R++) {
 			MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].MemCtrlMod;
-			RegAddr = MCtrlMod->MemCtrlRegOff +
+			RegAddr = MCtrlMod->MemInterleavingCtrlRegOff +
 					XAie_GetTileAddr(DevInst, R, C);
 			FldVal = XAie_SetField(Enable,
 					       MCtrlMod->MemInterleaving.Lsb,
@@ -482,7 +482,7 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 		}
 	}
 
-	if ((OptFlags & XAIE_PART_INIT_OPT_DISABLE_MEMINTERLEAVING) != 0U) {
+	if ((OptFlags & XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING) != 0U) {
 		RC = _XAie_PrivilegeConfigMemInterleaving(DevInst, XAIE_DISABLE);
 		if(RC != XAIE_OK) {
 			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
@@ -726,7 +726,7 @@ AieRC _XAie_PrivilegeConfigMemInterleavingLoc(XAie_DevInst *DevInst,
 
 	MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].MemCtrlMod;
 	for (i = 0; i < Args->NumTiles; i++) {
-		RegAddr = MCtrlMod->MemCtrlRegOff +
+		RegAddr = MCtrlMod->MemInterleavingCtrlRegOff +
 			XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
 		FldVal = XAie_SetField(Args->Enable ? XAIE_ENABLE : XAIE_DISABLE,
 				MCtrlMod->MemInterleaving.Lsb,

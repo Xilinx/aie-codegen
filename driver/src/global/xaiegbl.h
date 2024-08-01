@@ -59,11 +59,19 @@
 #define XAIE_PART_INIT_OPT_BLOCK_NOCAXIMMERR	(1U << 2)
 #define XAIE_PART_INIT_OPT_ISOLATE		(1U << 3)
 #define XAIE_PART_INIT_OPT_ZEROIZEMEM		(1U << 4)
-#define XAIE_PART_INIT_OPT_DISABLE_MEMINTERLEAVING	(1U << 6)
+#define XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING	(3U << 5)
+#define XAIE_PART_INIT_OPT_UC_MEM_PRIV		(1U << 7)
+#define XAIE_PART_INIT_OPT_APP_MODE			(3U << 8)
+#define XAIE_PART_INIT_OPT_L2_SPLIT			(31U << 10)
 #define XAIE_PART_INIT_OPT_DEFAULT	(XAIE_PART_INIT_OPT_COLUMN_RST | \
 		XAIE_PART_INIT_OPT_SHIM_RST | \
 		XAIE_PART_INIT_OPT_BLOCK_NOCAXIMMERR | \
+		XAIE_PART_INIT_OPT_UC_MEM_PRIV | \
 		XAIE_PART_INIT_OPT_ISOLATE)
+		
+/**************************** Constant Macros *******************************/
+#define XAIE_PART_INIT_APP_MODE(X)         ((X & 3U) << 8)
+#define XAIE_PART_INIT_L2_SPLIT(X)         ((X & 31U) << 10)		
 
 /* Migrated from AIE-CONTROLLER */
 #define OP_LIST(OP) \
@@ -81,7 +89,6 @@ typedef struct XAie_DmaMod XAie_DmaMod;
 typedef struct XAie_LockMod XAie_LockMod;
 typedef struct XAie_Backend XAie_Backend;
 typedef struct XAie_TxnCmd XAie_TxnCmd;
-typedef struct XAie_ResourceManager XAie_ResourceManager;
 
 /*
  * This typedef captures all the properties of a AIE Device
@@ -106,6 +113,16 @@ typedef enum {
 	XAIE_IO_BACKEND_CONTROLCODE,
 	XAIE_IO_BACKEND_MAX
 } XAie_BackendType;
+
+/*
+ * This typedef captures all the Application Modes supported by the driver
+ */
+typedef enum {
+	XAIE_DEVICE_SINGLE_APP_MODE, /* Single Application Mode */
+	XAIE_DEVICE_DUAL_APP_MODE_A,   /* Dual Application Mode , Application A */
+	XAIE_DEVICE_DUAL_APP_MODE_B,   /* Dual Application Mode, Application B */
+	XAIE_DEVICE_INVALID_MODE, /* Invalid Mode */
+} XAie_DeviceMode;
 
 /*
  * This typedef contains the attributes for an AIE partition properties.
@@ -144,6 +161,8 @@ typedef struct {
 	u8 AieTileNumRows;  /* Number of aie tile rows in the partition */
 	u8 IsReady;
 	u8 EccStatus;		/* Ecc On/Off status of the partition */
+	u8 AppMode;		/* 0 - Single Application,1 - Application A, 2 - Application B */
+	u8 L2Split;     /* Set L2 Split in Dual App Mode */
 	const XAie_Backend *Backend; /* Backend IO properties */
 	void *IOInst;	       /* IO Instance for the backend */
 	XAie_DevProp DevProp; /* Pointer to the device property. To be
@@ -217,17 +236,38 @@ typedef struct {
  * API.
  */
 typedef struct XAie_PartInitOpts {
-	XAie_LocType *Locs; /* Array of tiles locactions which will be used */
+	XAie_LocType *Locs; /* Array of tiles locations which will be used */
 	u32 NumUseTiles; /* Number of tiles to use */
 	u32 InitOpts; /* AI engine partition initialization options */
 } XAie_PartInitOpts;
+
+/*
+ * This typedef contains the attributes for an AIE POR initialization
+ * options. The structure is used by the AI engine POR initialization
+ * API.
+ */
+typedef struct XAie_PartPorOpts {
+	u8 ROW_OFFSET; /* Row offset to disable Compute tiles in a column and set them in pass through mode */
+	u8 ME_TOP_ROW; /* Top most Compute tile in a Column */
+} XAie_PartPorOpts;
+
+/*
+ * This typedef contains the attributes for an AIE SHIM DMA Register
+ * configuration
+ */
+typedef struct XAie_ShimOpts {
+	u32 SMID; /* SMID/PASID value for SHIM DMA channels */
+	u32 AxUSER; /* AxUSER Drive bits values. Bits [36:27] are reserved for future extension */
+	u32 Trusted_Keys; /* uC DMA Trusted_Keys value */
+} XAie_ShimOpts;
 
 /*
  * This enum contains all the Stream Switch Port types. These enums are used to
  * access the base address of stream switch configuration registers.
  */
 typedef enum{
-	CORE,
+	_512B_PORT_START,
+	CORE = _512B_PORT_START,
 	DMA,
 	CTRL,
 	FIFO,
@@ -237,7 +277,27 @@ typedef enum{
 	EAST,
 	TRACE,
 	UCTRLR,
-	SS_PORT_TYPE_MAX
+	NORTH_CTRL, /* Introduced from AIE4 */
+	SOUTH_CTRL, /* Introduced from AIE4 */
+	SWITCH_32b, /* Introduced from AIE4 */
+	DMA_CTRL, /* Introduced from AIE4 */
+	PL, /* Introduced from AIE4 */
+	_512B_PORT_END = PL,
+
+	/* AIE4 specific 32b switch PortTypes */
+	_32B_PORT_START,
+	_32B_CTRL = _32B_PORT_START,
+	_32B_TRACE,
+	_32B_SOUTH,
+	_32B_WEST,
+	_32B_NORTH,
+	_32B_EAST,
+	_32B_SWITCH_512b,
+	_32B_UCTRLR,
+	_32B_PL,
+	_32B_PORT_END = _32B_PL,
+
+	SS_PORT_TYPE_MAX,
 } StrmSwPortType;
 
 /* Data structures to capture data shape for dmas */
@@ -263,8 +323,8 @@ typedef struct {
 } XAie_DmaTensor;
 
 typedef struct {
-	u8 LockAcqId;
-	u8 LockRelId;
+	u16 LockAcqId;
+	u16 LockRelId;
 	u8 LockAcqEn;
 	s8 LockAcqVal;
 	u8 LockAcqValEn;
@@ -369,11 +429,13 @@ typedef struct {
 	u8 TlastSuppress;
 	u8 TileType;
 	u8 IsReady;
+	u8 DevGen;	/* Added from and for AIE4 */
+	u8 AppMode;	/* Added from and for AIE4 */
 } XAie_DmaDesc;
 
 typedef struct {
 	u32 RepeatCount;
-	u8 StartBd;
+	u16 StartBd;
 	u8 EnTokenIssue;
 	u8 OutOfOrder;
 } XAie_DmaQueueDesc;
@@ -391,6 +453,7 @@ typedef enum {
 typedef enum {
 	DMA_S2MM,
 	DMA_MM2S,
+	DMA_MM2S_CTRL, /* Added from AIE4 Shim DMA */
 	DMA_MAX
 } XAie_DmaDirection;
 
@@ -411,6 +474,29 @@ typedef enum {
 	DMA_ZERO_PADDING_BEFORE,
 	DMA_ZERO_PADDING_AFTER,
 } XAie_DmaZeroPaddingPos;
+
+/*
+ * This enum contains the application index to A & B mapping.
+ */
+typedef enum {
+        APPLICATION_A,
+        APPLICATION_B,
+} XAie_AppIndex;
+
+/*
+ * Data structure to capture HW Error Config.
+ */
+typedef struct {
+	uint8_t axi_errors:1;
+	uint8_t hw_ce_errors:1;
+	uint8_t hw_uc_errors:1;
+} XAie_HwErrCfgBits;
+
+typedef union {
+	XAie_HwErrCfgBits cfg_bits;
+	uint8_t cfg_val;
+} XAie_HwErrCfg;
+
 /*
  * This enum captures all the error codes from the driver
  */
@@ -442,6 +528,8 @@ typedef enum{
 	XAIE_INVALID_BACKEND,
 	XAIE_INSUFFICIENT_BUFFER_SIZE,
 	XAIE_INVALID_API_POINTER,
+	XAIE_NOT_SUPPORTED,
+	XAIE_INVALID_APP_MODE,
 	XAIE_ERR_MAX
 } AieRC;
 
@@ -463,9 +551,16 @@ typedef enum {
 	XAIE_RESETENABLE,
 } XAie_Reset;
 
+/* This enum is used to identify the different types of memories in uc module */
+typedef enum {
+        XAIE_PROGRAM_MEMORY,
+        XAIE_PRIVATE_DATA_MEMORY,
+        XAIE_MODULE_DATA_MEMORY,
+} XAie_UcMemType;
+
 /* Data structure to capture lock id and value */
 typedef struct {
-	u8 LockId;
+	u16 LockId; /* From AIE4 ID value is of 10bit size, so increased from u8 to u16 */
 	s8 LockVal;
 } XAie_Lock;
 
@@ -793,7 +888,7 @@ XAIE_AIG_EXPORT AieRC XAie_ConfigMemTilesMemInterleaving(XAie_DevInst *DevInst,
 * @note		None.
 *
 ******************************************************************************/
-static inline XAie_Lock XAie_LockInit(u8 Id, s8 Value)
+static inline XAie_Lock XAie_LockInit(u16 Id, s8 Value)
 {
 	XAie_Lock Lock = {Id, Value};
 	return Lock;

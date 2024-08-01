@@ -45,9 +45,10 @@
 *               Module data structure.
 *
 *****************************************************************************/
-AieRC _XAie_StrmSwCheckPortValidity(StrmSwPortType Slave, u8 SlvPortNum,
+AieRC _XAie_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortType Slave, u8 SlvPortNum,
 		StrmSwPortType Master, u8 MstrPortNum)
 {
+	(void)DevInst;
 	(void)Slave;
 	(void)SlvPortNum;
 	(void)Master;

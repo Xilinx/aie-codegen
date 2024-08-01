@@ -602,7 +602,7 @@ static AieRC _XAie_ConfigShimNocMux(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u32 FldVal;
 	u32 FldMask;
 	u64 RegAddr;
-	const XAie_PlIfMod *PlIfMod;
+	const XAie_NocMod *NocMod;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -631,12 +631,12 @@ static AieRC _XAie_ConfigShimNocMux(XAie_DevInst *DevInst, XAie_LocType Loc,
 		PortNum -= 2U;
 	}
 
-	PlIfMod = DevInst->DevProp.DevMod[TileType].PlIfMod;
+	NocMod = DevInst->DevProp.DevMod[TileType].NocMod;
 
-	FldVal = (u32)(InputConnectionType << PlIfMod->ShimNocMux[PortNum].Lsb);
-	FldMask = PlIfMod->ShimNocMux[PortNum].Mask;
+	FldVal = (u32)(InputConnectionType << NocMod->ShimNocMux[PortNum].Lsb);
+	FldMask = NocMod->ShimNocMux[PortNum].Mask;
 
-	RegAddr = PlIfMod->ShimNocMuxOff +
+	RegAddr = NocMod->ShimNocMuxOff +
 		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 
 	/* Mask write to the Mux register */
@@ -668,7 +668,7 @@ static AieRC _XAie_ConfigShimNocDeMux(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u32 FldVal;
 	u32 FldMask;
 	u64 RegAddr;
-	const XAie_PlIfMod *PlIfMod;
+	const XAie_NocMod *NocMod;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -692,12 +692,12 @@ static AieRC _XAie_ConfigShimNocDeMux(XAie_DevInst *DevInst, XAie_LocType Loc,
 	/* Map the port numbers to 0, 1, 2, 3 */
 	PortNum -= 2U;
 
-	PlIfMod = DevInst->DevProp.DevMod[TileType].PlIfMod;
+	NocMod = DevInst->DevProp.DevMod[TileType].NocMod;
 
-	FldVal = (u32)(OutputConnectionType << PlIfMod->ShimNocDeMux[PortNum].Lsb);
-	FldMask = PlIfMod->ShimNocDeMux[PortNum].Mask;
+	FldVal = (u32)(OutputConnectionType << NocMod->ShimNocDeMux[PortNum].Lsb);
+	FldMask = NocMod->ShimNocDeMux[PortNum].Mask;
 
-	RegAddr = PlIfMod->ShimNocDeMuxOff +
+	RegAddr = NocMod->ShimNocDeMuxOff +
 		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 
 	/* Mask write to the Mux register */

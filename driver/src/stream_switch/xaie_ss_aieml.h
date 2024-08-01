@@ -30,11 +30,11 @@
 
 /************************** Function Prototypes  *****************************/
 
-AieRC _XAieMl_AieTile_StrmSwCheckPortValidity(StrmSwPortType Slave,
+AieRC _XAieMl_AieTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortType Slave,
 		u8 SlvPortNum, StrmSwPortType Master, u8 MstrPortNum);
-AieRC _XAieMl_MemTile_StrmSwCheckPortValidity(StrmSwPortType Slave,
+AieRC _XAieMl_MemTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortType Slave,
                 u8 SlvPortNum, StrmSwPortType Master, u8 MstrPortNum);
-AieRC _XAieMl_ShimTile_StrmSwCheckPortValidity(StrmSwPortType Slave,
+AieRC _XAieMl_ShimTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortType Slave,
                 u8 SlvPortNum, StrmSwPortType Master, u8 MstrPortNum);
 
 #endif /* XAIE_SS_AIEML_H */

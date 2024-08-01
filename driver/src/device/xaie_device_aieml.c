@@ -30,8 +30,13 @@
 #include "xaiemlgbl_params.h"
 #ifdef XAIE_FEATURE_PRIVILEGED_ENABLE
 /***************************** Macro Definitions *****************************/
-/* set timeout to 1000us. */
-#define XAIEML_MEMZERO_POLL_TIMEOUT		1000
+/* Set the timeout to maximum zeroization cycles required for Memtile DM zeroization in Me-Simulator.
+   If polling timeout is less driver will return an error before zeroization is complete */
+#ifdef __AIESOCKET__
+	#define XAIEML_MEMZERO_POLL_TIMEOUT		150000
+#else
+	#define XAIEML_MEMZERO_POLL_TIMEOUT		1000
+#endif
 
 /************************** Function Definitions *****************************/
 /*****************************************************************************/
@@ -208,8 +213,8 @@ AieRC _XAieMl_PartMemZeroInit(XAie_DevInst *DevInst)
 			NumMods = DevInst->DevProp.DevMod[TileType].NumModules;
 			MCtrlMod = DevInst->DevProp.DevMod[TileType].MemCtrlMod;
 			for (u8 M = 0; M < NumMods; M++) {
-				RegAddr = MCtrlMod[M].MemCtrlRegOff +
-					XAie_GetTileAddr(DevInst, R, C);
+				RegAddr = MCtrlMod[M].MemZeroisationCtrlRegOff +
+					_XAie_GetTileAddr(DevInst, R, C);
 				FldVal = XAie_SetField(XAIE_ENABLE,
 					MCtrlMod[M].MemZeroisation.Lsb,
 					MCtrlMod[M].MemZeroisation.Mask);
@@ -224,8 +229,8 @@ AieRC _XAieMl_PartMemZeroInit(XAie_DevInst *DevInst)
 				if((C == DevInst->NumCols - 1U) &&
 						(R == DevInst->NumRows - 1U) &&
 						(M == NumMods - 1U)) {
-					RegAddr = MCtrlMod[M].MemCtrlRegOff +
-						XAie_GetTileAddr(DevInst,
+					RegAddr = MCtrlMod[M].MemZeroisationCtrlRegOff +
+						_XAie_GetTileAddr(DevInst,
 								Loc.Row,
 								Loc.Col);
 					return XAie_MaskPoll(DevInst, RegAddr,

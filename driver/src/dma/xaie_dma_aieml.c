@@ -265,7 +265,7 @@ static AieRC _XAieMl_DmaMemTileCheckPaddingConfig(XAie_DmaDesc *DmaDesc)
 *
 ******************************************************************************/
 AieRC _XAieMl_MemTileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 BdNum)
+		XAie_LocType Loc, u16 BdNum)
 {
 	AieRC RC;
 	u64 Addr;
@@ -406,7 +406,7 @@ AieRC _XAieMl_MemTileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 *
 ******************************************************************************/
 AieRC _XAieMl_MemTileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 BdNum)
+		XAie_LocType Loc, u16 BdNum)
 {
 	AieRC RC;
 	u64 Addr;
@@ -564,7 +564,7 @@ AieRC _XAieMl_MemTileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 *
 ******************************************************************************/
 AieRC _XAieMl_TileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 BdNum)
+		XAie_LocType Loc, u16 BdNum)
 {
 	u64 Addr;
 	u64 BdBaseAddr;
@@ -674,7 +674,7 @@ AieRC _XAieMl_TileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 *
 ******************************************************************************/
 AieRC _XAieMl_TileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 BdNum)
+		XAie_LocType Loc, u16 BdNum)
 {
 	AieRC RC;
 	u64 Addr;
@@ -803,7 +803,7 @@ AieRC _XAieMl_TileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 *
 ******************************************************************************/
 AieRC _XAieMl_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 BdNum)
+		XAie_LocType Loc, u16 BdNum)
 {
 	u64 Addr;
 	u64 BdBaseAddr;
@@ -939,7 +939,7 @@ AieRC _XAieMl_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 *
 ******************************************************************************/
 AieRC _XAieMl_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 BdNum)
+		XAie_LocType Loc, u16 BdNum)
 {
 	AieRC RC;
 	u64 Addr;
@@ -1329,7 +1329,7 @@ AieRC _XAieMl_MemTileDmaCheckBdChValidity(u8 BdNum, u8 ChNum)
 *		not operate on software descriptor.
 ******************************************************************************/
 AieRC _XAieMl_DmaUpdateBdLen(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-		XAie_LocType Loc, u32 Len, u8 BdNum)
+		XAie_LocType Loc, u32 Len, u16 BdNum)
 {
 	u64 RegAddr;
 	u32 RegVal, Mask;
@@ -1395,7 +1395,7 @@ AieRC _XAieMl_ShimDmaUpdateBdLen(XAie_DevInst *DevInst,
 *		not operate on software descriptor.
 ******************************************************************************/
 AieRC _XAieMl_DmaUpdateBdAddr(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-		XAie_LocType Loc, u64 Addr, u8 BdNum)
+		XAie_LocType Loc, u64 Addr, u16 BdNum)
 {
 	u64 RegAddr;
 	u32 RegVal, Mask;
@@ -1428,7 +1428,7 @@ AieRC _XAieMl_DmaUpdateBdAddr(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
 *		not operate on software descriptor.
 ******************************************************************************/
 AieRC _XAieMl_ShimDmaUpdateBdAddr(XAie_DevInst *DevInst,
-		const XAie_DmaMod *DmaMod, XAie_LocType Loc, u64 Addr, u8 BdNum)
+		const XAie_DmaMod *DmaMod, XAie_LocType Loc, u64 Addr, u16 BdNum)
 {
 	AieRC RC;
 	u64 RegAddr;

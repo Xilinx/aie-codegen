@@ -55,12 +55,16 @@ extern XAie_TileMod AieMlMod[XAIEGBL_TILE_TYPE_MAX];
 extern XAie_TileMod Aie2IpuMod[XAIEGBL_TILE_TYPE_MAX];
 extern XAie_TileMod Aie2PMod[XAIEGBL_TILE_TYPE_MAX];
 extern XAie_TileMod Aie2PSMod[XAIEGBL_TILE_TYPE_MAX];
+extern XAie_TileMod Aie4Mod[XAIEGBL_TILE_TYPE_MAX];
+extern XAie_TileMod Aie4MedusaMod[XAIEGBL_TILE_TYPE_MAX];
 
 extern XAie_DeviceOps AieDevOps;
 extern XAie_DeviceOps AieMlDevOps;
 extern XAie_DeviceOps Aie2IpuDevOps;
 extern XAie_DeviceOps Aie2PDevOps;
 extern XAie_DeviceOps Aie2PSDevOps;
+extern XAie_DeviceOps Aie4DevOps;
+extern XAie_DeviceOps Aie4MedusaDevOps;
 
 extern u8 XAieDevType;
 
@@ -78,6 +82,12 @@ extern u8 XAieDevType;
 #elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE
 #define XAIE_DEV_SINGLE_MOD AieMod
 #define XAIE_DEV_SINGLE_DEVOPS AieDevOps
+#elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4
+#define XAIE_DEV_SINGLE_MOD Aie4Mod
+#define XAIE_DEV_SINGLE_DEVOPS Aie4DevOps
+#elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA
+#define XAIE_DEV_SINGLE_MOD Aie4MedusaMod
+#define XAIE_DEV_SINGLE_DEVOPS Aie4MedusaDevOps
 #else
 #ifdef XAIE_DEV_SINGLE_GEN
 #error "Unsupported device defined."
@@ -188,7 +198,15 @@ AieRC XAie_CfgInitialize(XAie_DevInst *InstPtr, XAie_Config *ConfigPtr)
 	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE2P_STRIX_B0){
 		InstPtr->DevProp.DevMod = Aie2PMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE2P_STRIX_B0;
-		InstPtr->DevOps = &Aie2PDevOps;
+		InstPtr->DevOps = &Aie2PDevOps;	
+	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4) {
+		InstPtr->DevProp.DevMod = Aie4Mod;
+		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4;
+		InstPtr->DevOps = &Aie4DevOps;
+	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_MEDUSA) {
+		InstPtr->DevProp.DevMod = Aie4MedusaMod;
+		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_MEDUSA;
+		InstPtr->DevOps = &Aie4MedusaDevOps;
 #endif
 	} else {
 		XAIE_ERROR("Invalid device\n",

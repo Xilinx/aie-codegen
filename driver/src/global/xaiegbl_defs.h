@@ -52,6 +52,10 @@ typedef uint64_t		u64;
 #define XAIE_DEV_GEN_S200		7U
 #define XAIE_DEV_GEN_AIE2P_STRIX_A0	8U
 #define XAIE_DEV_GEN_AIE2P_STRIX_B0	9U
+#define XAIE_DEV_GEN_AIE4               40U
+#define XAIE_DEV_GEN_AIE4_MEDUSA        41U
+
+#define XAIE4_MASK_VALUE_APP_B	0x40000
 
 #define XAIE_COMPONENT_IS_READY		1U
 

@@ -167,6 +167,8 @@ typedef struct {
 typedef struct {
 	u8 NumPorts;
 	u32 PortBaseAddr;
+	u8 PortLogicalId;
+	u8 PortPhysicalId;
 } XAie_StrmPort;
 
 /*
@@ -226,8 +228,8 @@ typedef struct {
 	const XAie_StrmSwPortMap *SlavePortMap;
 	const XAie_StrmSwDetMerge *DetMerge;
 
-	AieRC (*PortVerify)(StrmSwPortType Slave, u8 SlvPortNum,
-			StrmSwPortType Master, u8 MstrPortNum);
+	AieRC (*PortVerify)(XAie_DevInst *DevInst, StrmSwPortType Slave,
+			u8 SlvPortNum, StrmSwPortType Master, u8 MstrPortNum);
 } XAie_StrmMod;
 
 /*
@@ -250,6 +252,7 @@ typedef struct XAie_CoreMod {
 	u32 DataMemSize;
 	u32 DataMemShift;
 	u32 EccEvntRegOff;
+	u32 EccScubPeriodRegOff;
 	u32 CorePCOff;
 	u32 CoreSPOff;
 	u32 CoreLROff;
@@ -273,10 +276,20 @@ typedef struct XAie_CoreMod {
 } XAie_CoreMod;
 
 /*
+ * The typedef contains the attributes of Core Internal Modules
+ */
+typedef struct XAie_CoreIntMod {
+	u32 ProgMemAddr;
+	u32 CorePCOff;
+	u32 CoreSPOff;
+	u32 CoreLROff;
+} XAie_CoreIntMod;
+/*
  * The typedef contains the attributes of uC Modules
  */
 typedef struct XAie_UcMod {
 	u8 IsCheckerBoard;
+	u32 BaseAddress;
 	u32 ProgMemAddr;
 	u32 ProgMemSize;
 	u32 ProgMemHostOffset;
@@ -284,6 +297,7 @@ typedef struct XAie_UcMod {
 	u32 PrivDataMemSize;
 	u32 DataMemAddr;
 	u32 DataMemSize;
+	u32 DataMemUcOffset;
 	const XAie_RegUcCoreCtrl *CoreCtrl;
 	const XAie_RegUcCoreSts *CoreSts;
 	AieRC (*Wakeup)(XAie_DevInst *DevInst, XAie_LocType Loc,
@@ -537,7 +551,8 @@ typedef struct {
  */
 struct XAie_DmaMod {
 	u8  NumBds;
-	u8  NumLocks;
+	u8  NumMm2sCtrlBds;
+	u16  NumLocks;
 	u8  ChIdxOffset;
 	u8  NumAddrDim;
 	u8  DoubleBuffering;
@@ -553,7 +568,10 @@ struct XAie_DmaMod {
 	u32 BaseAddr;
 	u32 IdxOffset;
 	u32 ChCtrlBase;
+	u32 ChCtrlOffset;
 	u8 NumChannels;
+	u8 NumMm2sChannels;
+	u8 NumMm2sCtrlChannels;
 	u32 ChStatusBase;
 	u32 ChStatusOffset;
 	u32 PadValueBase;
@@ -568,9 +586,9 @@ struct XAie_DmaMod {
 	AieRC (*SetBdIter) (XAie_DmaDesc *Desc, u32 StepSize, u8 Wrap,
 			u8 IterCurr);
 	AieRC (*WriteBd)(XAie_DevInst *DevInst, XAie_DmaDesc *Desc,
-			XAie_LocType Loc, u8 BdNum);
+			XAie_LocType Loc, u16 BdNum);
 	AieRC (*ReadBd)(XAie_DevInst *DevInst, XAie_DmaDesc *Desc,
-			XAie_LocType Loc, u8 BdNum);
+			XAie_LocType Loc, u16 BdNum);
 	AieRC (*PendingBd)(XAie_DevInst *DevInst, XAie_LocType Loc,
 			const XAie_DmaMod *DmaMod, u8 ChNum,
 			XAie_DmaDirection Dir, u8 *PendingBd);
@@ -582,9 +600,11 @@ struct XAie_DmaMod {
 			XAie_DmaDirection Dir, u32 TimeOutUs);
 	AieRC (*BdChValidity)(u8 BdNum, u8 ChNum);
 	AieRC (*UpdateBdLen)(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-			XAie_LocType Loc, u32 Len, u8 BdNum);
+			XAie_LocType Loc, u32 Len, u16 BdNum);
+	AieRC (*GetBdLen)(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
+			XAie_LocType Loc, u32 *Len, u16 BdNum);
 	AieRC (*UpdateBdAddr)(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-			XAie_LocType Loc, u64 Addr, u8 BdNum);
+			XAie_LocType Loc, u64 Addr, u16 BdNum);
 	AieRC (*GetChannelStatus)(XAie_DevInst *DevInst, XAie_LocType Loc,
 			const XAie_DmaMod *DmaMod, u8 ChNum,
 			XAie_DmaDirection Dir, u32 *Status);
@@ -598,6 +618,7 @@ typedef struct {
 	u32 Size;
 	u32 MemAddr;
 	u32 EccEvntRegOff;
+	u32 EccScubPeriodRegOff;
 } XAie_MemMod;
 
 /*
@@ -606,6 +627,7 @@ typedef struct {
 typedef struct {
 	u32 RegOff;
 	XAie_RegFldAttr RstCntr;
+	XAie_RegFldAttr RstCntr_B; /* Control Application reset for Application B in Dual App mode */
 	AieRC (*RstShims)(XAie_DevInst *DevInst, u32 StartCol, u32 NumCols);
 } XAie_ShimRstMod;
 
@@ -647,6 +669,7 @@ typedef struct {
 	XAie_RegFldAttr NocModClkEnable;
 } XAie_ShimModClkCntr1;
 
+#if 0
 /*
  * The typedef contains attributes of PL interface module
  */
@@ -676,6 +699,46 @@ typedef struct {
 	const XAie_ShimModClkCntr0 *ModClkCntr0; /* Module_Clock_Control_0  configuration */
 	const XAie_ShimModClkCntr1 *ModClkCntr1; /* Module_Clock_Control_1  configuration */
 } XAie_PlIfMod;
+#endif
+
+/*
+ * The typedef contains attributes of PL only interface module. This module doesn't have any functionality of NOC module
+ */
+typedef struct {
+	u32 UpSzrOff;
+	u32 DownSzrOff;
+	u32 DownSzrEnOff;
+	u32 DownSzrByPassOff;
+	u32 ColRstOff;
+	u8  NumUpSzrPorts;
+	u8  MaxByPassPortNum;
+	u8  NumDownSzrPorts;
+	const XAie_RegFldAttr	*UpSzr32_64Bit;
+	const XAie_RegFldAttr *UpSzr128Bit;
+	const XAie_RegFldAttr	*DownSzr32_64Bit;
+	const XAie_RegFldAttr *DownSzr128Bit;
+	const XAie_RegFldAttr *DownSzrEn;
+	const XAie_RegFldAttr *DownSzrByPass;
+	const XAie_ShimClkBufCntr *ClkBufCntr; /* Shim clock buffer control configuration */
+	XAie_RegFldAttr ColRst; /* Tile column reset configuration */
+	const XAie_ShimRstMod *ShimTileRst; /* SHIM tile reset enable configuration */
+	const XAie_ShimModClkCntr0 *ModClkCntr0; /* Module_Clock_Control_0  configuration */
+	const XAie_ShimModClkCntr1 *ModClkCntr1; /* Module_Clock_Control_1  configuration */
+    const XAie_ShimNocAxiMMConfig *ShimNocAxiMM; /* SHIM NOC AXI MM configuration */
+} XAie_PlIfMod;
+//XAie_PlOnlyMod;
+
+
+/*
+ * The typedef contains attributes of Noc module
+ */
+typedef struct {
+	u32 ShimNocMuxOff;
+	u32 ShimNocDeMuxOff;
+	const XAie_RegFldAttr *ShimNocMux;
+	const XAie_RegFldAttr *ShimNocDeMux;
+	const XAie_ShimNocAxiMMConfig *ShimNocAxiMM; /* SHIM NOC AXI MM configuration */
+} XAie_NocMod;
 
 /*
  * The typdef contains attributes of Lock modules.
@@ -723,9 +786,12 @@ typedef struct XAie_PerfMod {
 	u8 PerfCounterOffsetAdd;/* Add to calc perf cntrl offset for counter */
 	u32 PerfCtrlBaseAddr;   /* Perf counter ctrl register offset address */
 	u32 PerfCtrlOffsetAdd;  /* Add this val for next Perf counter ctrl reg*/
+	u32 PerfResetOffsetAdd;  /* Add this val for next Perf reset reg*/
 	u32 PerfCtrlResetBaseAddr;/* Perf counter ctrl offset addr for reset */
-	u32 PerfCounterBaseAddr; /* Offset addr for perf counter 0 */
+	u32 PerfCounterBaseAddr; /* Offset addr for perf counter 0 */	
 	u32 PerfCounterEvtValBaseAddr; /* Offset addr for perf counter evnt val*/
+	u32 PerfCounterSsBaseAddr; /* Offset addr for perf counter snapshot*/
+	u32 PerfCounterSsLoadEvttBaseAddr; /* Offset addr for perf counter snapshot load event*/
 	const XAie_RegFldAttr Start; /* lsb and mask for start event for ctr0 */
 	const XAie_RegFldAttr Stop; /* lsb and mask for stop event for ctr0 */
 	const XAie_RegFldAttr Reset; /* lsb and mask for reset event for ctr0 */
@@ -769,6 +835,8 @@ typedef struct XAie_EvntMod {
 	u8 PortIdOff;
 	u32 PortMstrSlvMask;
 	u8 PortMstrSlvOff;
+	u32 Port32b512bMask;
+	u8 Port32b512bOff;
 	u32 BaseDmaChannelSelectRegOff;
 	u8 NumDmaChannelSelectIds;
 	u8 DmaChannelIdOff;
@@ -789,6 +857,7 @@ typedef struct XAie_EvntMod {
 	u8 NumSwitches;
 	u32 BaseGroupEventRegOff;
 	u8 NumGroupEvents;
+	u8 GroupDmaRegSelect;
 	u32 DefaultGroupErrorMask;
 	const XAie_EventGroup *Group;
 	u32 BasePCEventRegOff;
@@ -870,28 +939,54 @@ typedef struct XAie_L2IntrMod {
 	u32 IrqRegOff;
 	u8 NumBroadcastIds;
 	u8 NumNoCIntr;
+	u8 MaxErrorBcIdsRvd;
 } XAie_L2IntrMod;
+
+/**
+ * Kotesh - TODO: Considering HW Err Config is a privileged operation.
+ * Need to check is this structure def is needed at all ?
+ */
+
+/*
+ * This structure captures all attributes related to HW Error interrupt
+ * controller.
+ */
+typedef struct XAie_HwErrIntrMod {
+	u32 EnableRegOff;
+	u32 DisableRegOff;
+	u32 IrqRegOff;
+	u8 NumNoCIntr;
+} XAie_HwErrIntrMod;
 
 /*
  * This typedef contains the attributes for Tile control Module
  */
 typedef struct XAie_TileCtrlMod{
 	u32 TileCtrlRegOff;
+	u32 TileCtrlAxiRegOff;
 	XAie_RegFldAttr IsolateEast;	  /**< Isolate from east */
 	XAie_RegFldAttr IsolateNorth;	  /**< Isolate from north */
 	XAie_RegFldAttr IsolateWest;	  /**< Isolate from west */
 	XAie_RegFldAttr IsolateSouth;	  /**< Isolate from south */
-	u8 IsolateDefaultOn;
+	XAie_RegFldAttr IsolateAxiEast;   /**< Isolate Axi-MM from East */
+	XAie_RegFldAttr IsolateAxiWest;   /**< Isolate Axi-MM from West */
+	XAie_RegFldAttr DualAppControl;
+	XAie_RegFldAttr L2SplitControl;
+	u8  IsolateDefaultOn;
+	u32 DualAppModeRegOff;
+	u32 L2SplitRegOff;
 } XAie_TileCtrlMod;
 
 /*
  * This typedef contains the attributes for memory control module
  */
 typedef struct XAie_MemCtrlMod{
-	u32 MemCtrlRegOff;		/**< memory control reg offset */
+	u32 MemZeroisationCtrlRegOff;		/**< memory control reg offset for Zeroisation*/
+	u32 MemPrivilegeCtrlRegOff;         /** <memory control reg for UC privilege memory> **/
+	u32 MemInterleavingCtrlRegOff;      /**< memory control reg offset for Interleaving */
 	XAie_RegFldAttr MemZeroisation;	/**< memory zeroisation field */
-	XAie_RegFldAttr MemInterleaving;	/**< memory interleaving field,
-						  This will be used only for memtile memory control register */
+	XAie_RegFldAttr MemInterleaving;	/**< memory interleaving field */
+	XAie_RegFldAttr MemPrivilegeCtrl;  /** <UC privilege memory field>**/
 } XAie_MemCtrlMod;
 
 /*
@@ -900,6 +995,7 @@ typedef struct XAie_MemCtrlMod{
 struct XAie_TileMod {
 	const u8 NumModules;
 	const XAie_CoreMod *CoreMod;
+	const XAie_CoreIntMod *CoreIntMod;
 	const XAie_StrmMod *StrmSw;
 	const XAie_DmaMod  *DmaMod;
 	const XAie_MemMod  *MemMod;
@@ -914,7 +1010,14 @@ struct XAie_TileMod {
 	const XAie_L2IntrMod *L2IntrMod;
 	const XAie_TileCtrlMod *TileCtrlMod;
 	const XAie_MemCtrlMod *MemCtrlMod;
+	const XAie_MemCtrlMod *MemCtrlMod_A;
+	const XAie_MemCtrlMod *MemCtrlMod_B;
+	const XAie_MemCtrlMod *MemCtrlInterLvMod;
+	const XAie_MemCtrlMod *MemCtrlUcMod;
+	const XAie_MemCtrlMod *MemCtrlUcMod_B;
 	const XAie_UcMod *UcMod;
+	const XAie_NocMod *NocMod;
+	const XAie_StrmMod *StrmSw32b;
 };
 
 
@@ -928,10 +1031,14 @@ struct XAie_DeviceOps {
 	AieRC (*SetPartColClockAfterRst)(XAie_DevInst *DevInst, u8 Enable);
 	AieRC (*SetPartIsolationAfterRst)(XAie_DevInst *DevInst);
 	AieRC (*PartMemZeroInit)(XAie_DevInst *DevInst);
+	AieRC (*PartMemL2Split)(XAie_DevInst *DevInst);
+	AieRC (*ZeroInitUcMem)(XAie_DevInst *DevInst);
+	AieRC (*SetUCMemoryPrivileged)(XAie_DevInst *DevInst, u8 Enable);
 	AieRC (*RequestTiles)(XAie_DevInst *DevInst,
 			XAie_BackendTilesArray *Args);
 	AieRC (*SetColumnClk)(XAie_DevInst *DevInst,
 			XAie_BackendColumnReq *Args);
+	AieRC (*SetAppMode)(XAie_DevInst *DevInst, XAie_BackendTilesArray *Args);
 };
 
 #endif

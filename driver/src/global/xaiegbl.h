@@ -872,7 +872,7 @@ XAIE_AIG_EXPORT AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char
 XAIE_AIG_EXPORT void XAie_CloseControlCodeFile(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_StartNextJob(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_PerfUtilization(XAie_DevInst *DevInst, XAie_PerfInst *PerfInst);
-XAIE_AIG_EXPORT AieRC XAie_ConfigMemTilesMemInterleaving(XAie_DevInst *DevInst,
+XAIE_AIG_EXPORT AieRC XAie_ConfigMemInterleaving(XAie_DevInst *DevInst,
 		XAie_LocType *Locs, u32 NumTiles, u8 Enable);
 /*****************************************************************************/
 /*

@@ -26,7 +26,6 @@
 
 /***************************** Include Files *********************************/
 #include "xaiegbl.h"
-#include "xaie_io_privilege.h"
 
 AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts);
 AieRC _XAie_PrivilegeTeardownPart(XAie_DevInst *DevInst);

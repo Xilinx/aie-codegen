@@ -27,7 +27,9 @@
 #include "xaie_clock.h"
 #include "xaie_reset_aie.h"
 #include "xaie_feature_config.h"
+#include "xaiegbl.h"
 #include "xaie_helper.h"
+#include "xaie_helper_internal.h"
 #include "xaie_io_privilege.h"
 #include "xaie_npi.h"
 
@@ -43,6 +45,13 @@
 #define XAIE_ISOLATE_ALL_MASK	((1U << 4) - 1)
 
 #define XAIE_ERROR_NPI_INTR_ID	0x1U
+#define XAIE_MIN_COLUMN_REQUEST 1U
+#define XAIE_APP_MODE_SHIFT     8U
+#define XAIE_L2_SPLIT_SHIFT     10U
+
+#define XAIE_MEMINTERLEAV_MODES_2	1U
+#define XAIE_MEMINTERLEAV_MODES_3	2U
+#define XAIE_MEMINTERLEAVE_SHIFT	5U
 /************************** Function Definitions *****************************/
 /*****************************************************************************/
 /**
@@ -137,12 +146,17 @@ static AieRC _XAie_PrivilegeRstPartShims(XAie_DevInst *DevInst)
 		return RC;
 	}
 
-	RC = _XAie_NpiSetShimReset(DevInst, XAIE_ENABLE);
-	if(RC != XAIE_OK) {
-		return RC;
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))) {
+		RC = _XAie_NpiSetShimReset(DevInst, XAIE_ENABLE);
+		if(RC != XAIE_OK) {
+			return RC;
+		}
+
+		return _XAie_NpiSetShimReset(DevInst, XAIE_DISABLE);
 	}
 
-	return _XAie_NpiSetShimReset(DevInst, XAIE_DISABLE);
+	//TODO : Note: Jignesh : Do we need to make outof reset equivalent to _XAie_LSetPartColShimReset(XAIE_DISABLE); ??
+	return DevInst->DevOps->SetPartColShimReset(DevInst, XAIE_DISABLE);
 }
 
 /*****************************************************************************/
@@ -171,12 +185,12 @@ static AieRC _XAie_PrivilegeSetBlockAxiMmNsuErr(XAie_DevInst *DevInst,
 	u8 TileType;
 	u32 FldVal;
 	u64 RegAddr;
-	const XAie_PlIfMod *PlIfMod;
+	const XAie_NocMod  *NocMod;
 	const XAie_ShimNocAxiMMConfig *ShimNocAxiMM;
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	PlIfMod = DevInst->DevProp.DevMod[TileType].PlIfMod;
-	ShimNocAxiMM = PlIfMod->ShimNocAxiMM;
+	NocMod = DevInst->DevProp.DevMod[TileType].NocMod;
+	ShimNocAxiMM = NocMod->ShimNocAxiMM;
 	RegAddr = ShimNocAxiMM->RegOff +
 		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 	FldVal = XAie_SetField(BlockSlvEnable,
@@ -332,6 +346,37 @@ static AieRC _XAie_PrivilegeSetL2ErrIrq(XAie_DevInst *DevInst)
 /*****************************************************************************/
 /**
 *
+* This API is to config interleaving mode in given reg address.
+*
+* @param	DevInst: Device Instance
+* @param	MCtrlMod: Pointer to Memory control module
+* @param	RegAddr: Register address in Tile
+* @param	Enable: memory interleaving mode
+*
+* @return       XAIE_OK on success, error code on failure
+*
+******************************************************************************/
+static AieRC _XAie_SetInterLeavingMode(XAie_DevInst *DevInst,
+	const XAie_MemCtrlMod *MCtrlMod, u64 RegAddr, u8 Enable)
+{
+	u32 FldVal;
+	AieRC RC;
+
+	FldVal = XAie_SetField(Enable,
+		MCtrlMod->MemInterleaving.Lsb,
+		MCtrlMod->MemInterleaving.Mask);
+	RC = XAie_MaskWrite32(DevInst, RegAddr,
+		MCtrlMod->MemInterleaving.Mask,
+		FldVal);
+	if (RC != XAIE_OK)
+		XAIE_ERROR("Failed to config memory interleaving for partition.\n");
+
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
 * This API Enable/Disable interleaving mode for all MemTiles of the partition.
 *
 * @param	DevInst: Device Instance
@@ -346,9 +391,8 @@ static AieRC _XAie_PrivilegeSetL2ErrIrq(XAie_DevInst *DevInst)
 ******************************************************************************/
 static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enable)
 {
-	AieRC RC;
+	AieRC RC = XAIE_OK;
 	u64 RegAddr;
-	u32 FldVal;
 	const XAie_MemCtrlMod *MCtrlMod;
 	u8 C, R;
 
@@ -356,19 +400,49 @@ static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enab
 		for(R = DevInst->MemTileRowStart;
 		    R < (DevInst->MemTileRowStart + DevInst->MemTileNumRows);
 		    R++) {
-			MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].MemCtrlMod;
-			RegAddr = MCtrlMod->MemInterleavingCtrlRegOff +
-					XAie_GetTileAddr(DevInst, R, C);
-			FldVal = XAie_SetField(Enable,
-					       MCtrlMod->MemInterleaving.Lsb,
-					       MCtrlMod->MemInterleaving.Mask);
-			RC = XAie_MaskWrite32(DevInst, RegAddr,
-					      MCtrlMod->MemInterleaving.Mask,
-					      FldVal);
-			if(RC != XAIE_OK) {
-				XAIE_ERROR("Failed to config memory interleaving"
-						" for partition.\n");
+			if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+				if (Enable > XAIE_MEMINTERLEAV_MODES_3) {
+					RC = XAIE_INVALID_ARGS;
+				} else {
+					MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].MemCtrlInterLvMod;
+					RegAddr = MCtrlMod->MemInterleavingCtrlRegOff;
+				}
+			} else {
+				if (Enable > XAIE_MEMINTERLEAV_MODES_2) {
+					RC = XAIE_INVALID_ARGS;
+				} else {
+					MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].MemCtrlMod;
+					RegAddr = MCtrlMod->MemZeroisationCtrlRegOff;
+				}
+			}
+			if (RC != XAIE_OK) {
+				XAIE_ERROR("Wrong Interleaving mode\n");
 				return RC;
+			}
+
+			RegAddr += _XAie_GetTileAddr(DevInst, R, C);
+			RC = _XAie_SetInterLeavingMode(DevInst, MCtrlMod, RegAddr, Enable);
+			if (RC != XAIE_OK)
+				return RC;
+		}
+
+		/* In >Aie4 architectures, AieTile supports memory interleaving for its PM,
+		 * Below code is to config the same
+		 */
+		if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+			if (Enable > XAIE_MEMINTERLEAV_MODES_2) {
+				XAIE_ERROR("Wrong Interleaving mode\n");
+				return XAIE_INVALID_ARGS;
+			}
+
+			for (R = DevInst->AieTileRowStart;
+			     R < (DevInst->AieTileRowStart + DevInst->AieTileNumRows);
+			     R++) {
+				MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_AIETILE].MemCtrlInterLvMod;
+				RegAddr = MCtrlMod->MemInterleavingCtrlRegOff + _XAie_GetTileAddr(DevInst, R, C);
+				RC = _XAie_SetInterLeavingMode(DevInst, MCtrlMod, RegAddr, Enable);
+				if (RC != XAIE_OK)
+					return RC;
 			}
 		}
 	}
@@ -401,13 +475,36 @@ static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enab
 AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 {
 	u32 OptFlags;
+	u8 AppMode;
+	XAie_BackendTilesArray TilesArray;
 	AieRC RC;
 
 	if(Opts != NULL) {
 		OptFlags = Opts->InitOpts;
+		AppMode = (OptFlags & XAIE_PART_INIT_OPT_APP_MODE) >> XAIE_APP_MODE_SHIFT;
+		TilesArray.NumTiles = Opts->NumUseTiles;
+		TilesArray.Locs = Opts->Locs;
 	} else {
 		OptFlags = XAIE_PART_INIT_OPT_DEFAULT;
+		AppMode = XAIE_DEVICE_SINGLE_APP_MODE;
 	}
+
+	/* Set Single or Dual App mode. In Dual App Mode set App A or App B */
+		if (_XAie_IsDeviceGenSupportDualApp(DevInst->DevProp.DevGen)) {
+			if (AppMode == XAIE_DEVICE_INVALID_MODE) {
+				XAIE_ERROR("App Mode is invalid\n");
+				return XAIE_INVALID_DEVICE;
+			}
+			if(DevInst->NumCols == XAIE_MIN_COLUMN_REQUEST || AppMode == XAIE_DEVICE_SINGLE_APP_MODE) {
+				DevInst->AppMode = AppMode;
+			} else {
+				XAIE_ERROR("Partition has more than one column, so dual app is not supported\n");
+				return XAIE_INVALID_DEVICE;
+			}
+		} else {
+			DevInst->AppMode = XAIE_DEVICE_SINGLE_APP_MODE;
+		}
+
 
 	RC = _XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_ENABLE);
 	if(RC != XAIE_OK) {
@@ -415,7 +512,18 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 		return RC;
 	}
 
-	if((OptFlags & XAIE_PART_INIT_OPT_COLUMN_RST) != 0U) {
+	if (_XAie_IsDeviceGenSupportDualApp(DevInst->DevProp.DevGen)) {
+		if(Opts != NULL && DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE){
+			RC = DevInst->DevOps->SetAppMode(DevInst, (void *)&TilesArray);
+			if(RC != XAIE_OK) {
+				XAIE_ERROR("Failed to initialize partition, unable to set Dual App Mode.\n");
+				return RC;
+			}
+		}
+	}
+
+	if(((OptFlags & XAIE_PART_INIT_OPT_COLUMN_RST) != 0U) &&
+			(!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)))) {
 		/* Gate all tiles before resetting columns to quiet traffic*/
 		RC = _XAie_PmSetPartitionClock(DevInst, XAIE_DISABLE);
 		if(RC != XAIE_OK) {
@@ -467,6 +575,17 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 		return RC;
 	}
 
+	if ((OptFlags & XAIE_PART_INIT_OPT_L2_SPLIT) != 0U) {
+		if(DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE) {
+			DevInst->L2Split = (OptFlags & XAIE_PART_INIT_OPT_L2_SPLIT) >> XAIE_L2_SPLIT_SHIFT;
+			RC = DevInst->DevOps->PartMemL2Split(DevInst);
+			if(RC != XAIE_OK) {
+				_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
+				return RC;
+			}
+		}
+	}
+
 	if ((OptFlags & XAIE_PART_INIT_OPT_ISOLATE) != 0U) {
 		RC = DevInst->DevOps->SetPartIsolationAfterRst(DevInst);
 		if(RC != XAIE_OK) {
@@ -482,8 +601,20 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 		}
 	}
 
-	if ((OptFlags & XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING) != 0U) {
-		RC = _XAie_PrivilegeConfigMemInterleaving(DevInst, XAIE_DISABLE);
+	if ((OptFlags & XAIE_PART_INIT_OPT_UC_MEM_PRIV) != 0U) {
+		if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+			RC = DevInst->DevOps->SetUCMemoryPrivileged(DevInst, XAIE_ENABLE);
+			if(RC != XAIE_OK) {
+				_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
+				return RC;
+			}
+		}
+	}
+
+	if (((OptFlags & XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING)) !=
+			(1U << XAIE_MEMINTERLEAVE_SHIFT)) {
+		RC = _XAie_PrivilegeConfigMemInterleaving(DevInst,
+			(OptFlags & XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING) >> XAIE_MEMINTERLEAVE_SHIFT);
 		if(RC != XAIE_OK) {
 			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
 			return RC;
@@ -510,11 +641,6 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 
 	/* Enable only the tiles requested in Opts parameter */
 	if(Opts != NULL) {
-		XAie_BackendTilesArray TilesArray;
-
-		TilesArray.NumTiles = Opts->NumUseTiles;
-		TilesArray.Locs = Opts->Locs;
-
 		RC = XAie_RunOp(DevInst, XAIE_BACKEND_OP_REQUEST_TILES,
 		(void *)&TilesArray);
 
@@ -559,11 +685,13 @@ AieRC _XAie_PrivilegeTeardownPart(XAie_DevInst *DevInst)
 		return RC;
 	}
 
-	RC = _XAie_PmSetPartitionClock(DevInst, XAIE_DISABLE);
-	if(RC != XAIE_OK) {
-		_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
-		return RC;
-	}
+	/* Column Reset is replaced by Application reset in AIE4 devices */
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))) {
+		RC = _XAie_PmSetPartitionClock(DevInst, XAIE_DISABLE);
+		if(RC != XAIE_OK) {
+			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
+			return RC;
+		}
 
 	RC = _XAie_PrivilegeSetPartColReset(DevInst, XAIE_ENABLE);
 	if(RC != XAIE_OK) {
@@ -581,6 +709,7 @@ AieRC _XAie_PrivilegeTeardownPart(XAie_DevInst *DevInst)
 	if(RC != XAIE_OK) {
 		_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
 		return RC;
+		}
 	}
 
 	RC = _XAie_PrivilegeRstPartShims(DevInst);
@@ -680,10 +809,14 @@ AieRC _XAie_PrivilegeSetColumnClk(XAie_DevInst *DevInst,
 			 return RC;
 		}
 	}
-
-	RC = DevInst->DevOps->SetColumnClk(DevInst, Args);
-	if(RC != XAIE_OK) {
-		XAIE_ERROR("Set Column Clock failed\n");
+	if(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIEML) {
+		RC = DevInst->DevOps->SetColumnClk(DevInst, Args);
+		if(RC != XAIE_OK) {
+			XAIE_ERROR("Set Column Clock failed\n");
+		}
+	} else {
+		XAIE_ERROR("Set Column Clock is not supported for AIE_GEN=%d\n",DevInst->DevProp.DevGen);
+		return XAIE_ERR;
 	}
 
 	if (DevInst->DevProp.DevGen != XAIE_DEV_GEN_AIE) {
@@ -711,9 +844,8 @@ AieRC _XAie_PrivilegeSetColumnClk(XAie_DevInst *DevInst,
 AieRC _XAie_PrivilegeConfigMemInterleavingLoc(XAie_DevInst *DevInst,
 		XAie_BackendTilesEnableArray *Args)
 {
-	AieRC RC;
-	u64 RegAddr;
-	u32 FldVal;
+	AieRC RC = XAIE_OK;
+	u64 RegAddr = 0;
 	const XAie_MemCtrlMod *MCtrlMod;
 	u32 i;
 
@@ -724,17 +856,32 @@ AieRC _XAie_PrivilegeConfigMemInterleavingLoc(XAie_DevInst *DevInst,
 		return RC;
 	}
 
-	MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].MemCtrlMod;
 	for (i = 0; i < Args->NumTiles; i++) {
-		RegAddr = MCtrlMod->MemInterleavingCtrlRegOff +
-			XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
-		FldVal = XAie_SetField(Args->Enable ? XAIE_ENABLE : XAIE_DISABLE,
-				MCtrlMod->MemInterleaving.Lsb,
-				MCtrlMod->MemInterleaving.Mask);
-		RC = XAie_MaskWrite32(DevInst, RegAddr,
-				MCtrlMod->MemInterleaving.Mask,
-				FldVal);
-		if(RC != XAIE_OK) {
+		if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+			u8 TileType = _XAie_GetTileTypefromLoc(DevInst, Args->Locs[i]);
+			if (((TileType == XAIEGBL_TILE_TYPE_AIETILE) && (Args->Enable > XAIE_MEMINTERLEAV_MODES_2)) ||
+			    ((TileType == XAIEGBL_TILE_TYPE_MEMTILE) && (Args->Enable > XAIE_MEMINTERLEAV_MODES_3)))
+				RC = XAIE_INVALID_ARGS;
+
+			MCtrlMod = DevInst->DevProp.DevMod[TileType].MemCtrlInterLvMod;
+			RegAddr = MCtrlMod->MemInterleavingCtrlRegOff;
+		} else {
+			if (Args->Enable > XAIE_MEMINTERLEAV_MODES_2)
+				RC = XAIE_INVALID_ARGS;
+			MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].MemCtrlMod;
+			RegAddr = MCtrlMod->MemZeroisationCtrlRegOff;
+		}
+
+		if (RC != XAIE_OK) {
+			XAIE_ERROR("Invalid interleaving mode\n");
+			_XAie_PrivilegeSetPartProtectedRegs(DevInst,
+				XAIE_DISABLE);
+			return RC;
+		}
+
+		RegAddr += _XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
+		RC = _XAie_SetInterLeavingMode(DevInst, MCtrlMod, RegAddr, Args->Enable);
+		if (RC != XAIE_OK) {
 			XAIE_ERROR("Failed to config memory interleaving, Loc (%d, %d)\n",
 					Args->Locs[i].Row, Args->Locs[i].Col);
 			_XAie_PrivilegeSetPartProtectedRegs(DevInst,

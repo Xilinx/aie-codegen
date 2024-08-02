@@ -1118,23 +1118,25 @@ AieRC XAie_PerfUtilization(XAie_DevInst *DevInst, XAie_PerfInst *PerfInst)
 /*****************************************************************************/
 /**
  *
- * This API is to enable/disable memory interleaving mode in all MemTiles of AI
- * engine partition.
+ * This API is to enable/disable memory interleaving mode in given tiles.
  *
  * @param	DevInst - Global AIE device instance pointer.
  * @param	Locs - Pointer to tiles locatations
  * @param	NumTiles - Number of tiles
- * @param	Enable - 0/1 to Disable/Enable memory interleaving.
+ * @param	Enable - 0 for Disable Interleaving mode
+ *		       - 1 for Enable Interleaving mode
+ *		       - 2 for setting skew storage interleaving mode (this mode is
+ *			   available only in >AIE4 architectures)
  *
  * @return	XAIE_OK on success and error code on failure.
  *
- * @note		None.
+ * @note	None.
  *
  ******************************************************************************/
-AieRC XAie_ConfigMemTilesMemInterleaving(XAie_DevInst *DevInst,
+AieRC XAie_ConfigMemInterleaving(XAie_DevInst *DevInst,
 		XAie_LocType *Locs, u32 NumTiles, u8 Enable)
 {
-	AieRC RC;
+	AieRC RC = XAIE_OK;
 	XAie_BackendTilesEnableArray Tiles;
 	u32 i;
 
@@ -1144,14 +1146,27 @@ AieRC XAie_ConfigMemTilesMemInterleaving(XAie_DevInst *DevInst,
 		return XAIE_INVALID_ARGS;
 	}
 
-	/* Verify Locations */
+	/* In All architectures MemTIle supports MemInterleaving,
+	 * BUT, in >AIE4 AieTile PM also supports MemInterleaving.
+	 * This loop will check for the same
+	 */
 	for (i = 0; i < NumTiles; i++) {
-		if ((Locs[i].Row < DevInst->MemTileRowStart) ||
-		    (Locs[i].Row > (DevInst->MemTileRowStart + DevInst->MemTileNumRows)) ||
-		    (Locs[i].Col > DevInst->NumCols)) {
+		u8 TileType = _XAie_GetTileTypefromLoc(DevInst, Locs[i]);
+		if (TileType >= XAIEGBL_TILE_TYPE_MAX)
+			RC = XAIE_INVALID_TILE;
+
+		if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+			if ((TileType != XAIEGBL_TILE_TYPE_MEMTILE) &&
+				(TileType != XAIEGBL_TILE_TYPE_AIETILE))
+				RC = XAIE_INVALID_TILE;
+		} else {
+			if (TileType != XAIEGBL_TILE_TYPE_MEMTILE)
+				RC = XAIE_INVALID_TILE;
+		}
+		if (RC != XAIE_OK) {
 			XAIE_ERROR("Wrong Location of tile Loc (%d, %d)\n",
-					Locs[i].Row, Locs[i].Col);
-			return XAIE_INVALID_TILE;
+				Locs[i].Row, Locs[i].Col);
+			return RC;
 		}
 	}
 
@@ -1159,8 +1174,7 @@ AieRC XAie_ConfigMemTilesMemInterleaving(XAie_DevInst *DevInst,
 	Tiles.NumTiles = NumTiles;
 	Tiles.Enable = Enable;
 
-	RC = XAie_RunOp(DevInst, XAIE_BACKEND_OP_CONFIG_MEM_INTRLVNG,
-			(void *)&Tiles);
+	RC = XAie_RunOp(DevInst, XAIE_BACKEND_OP_CONFIG_MEM_INTRLVNG, (void *)&Tiles);
 	if (RC != XAIE_OK) {
 		XAIE_ERROR("Failed to configure memory interleaving.\n");
 		return RC;

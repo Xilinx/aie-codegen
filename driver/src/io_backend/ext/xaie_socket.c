@@ -583,6 +583,43 @@ static AieRC XAie_SocketIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 	return XAIE_OK;
 }
 
+static XAie_MemInst* XAie_SocketMemAllocate(XAie_DevInst *DevInst, u64 Size,
+		XAie_MemCacheProp Cache)
+{
+	XAie_MemInst *MemInst;
+
+	(void)Cache;
+	MemInst = (XAie_MemInst *)malloc(sizeof(*MemInst));
+	if(MemInst == NULL) {
+		XAIE_ERROR("memory allocation failed\n");
+		return NULL;
+	}
+
+	MemInst->VAddr = (void *)malloc(Size);
+	if(MemInst->VAddr == NULL) {
+		XAIE_ERROR("malloc failed\n");
+		free(MemInst);
+		return NULL;
+	}
+	MemInst->DevAddr = (u64)MemInst->VAddr;
+	MemInst->Size = Size;
+	MemInst->DevInst = DevInst;
+	/*
+	 * TODO: Cache is not handled at the moment for socket. The allocated
+	 * memory is always cached.
+	 */
+
+	return MemInst;
+}
+
+static AieRC XAie_SocketMemFree(XAie_MemInst *MemInst)
+{
+	free(MemInst->VAddr);
+	free(MemInst);
+
+	return XAIE_OK;
+}
+
 #else
 
 static AieRC XAie_SocketIO_Finish(void *IOInst)
@@ -679,8 +716,6 @@ static AieRC XAie_SocketIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 	return XAIE_FEATURE_NOT_SUPPORTED;
 }
 
-#endif /* __AIESOCKET__ */
-
 static XAie_MemInst* XAie_SocketMemAllocate(XAie_DevInst *DevInst, u64 Size,
 		XAie_MemCacheProp Cache)
 {
@@ -695,6 +730,8 @@ static AieRC XAie_SocketMemFree(XAie_MemInst *MemInst)
 	(void)MemInst;
 	return XAIE_ERR;
 }
+
+#endif /* __AIESOCKET__ */
 
 static AieRC XAie_SocketMemSyncForCPU(XAie_MemInst *MemInst)
 {

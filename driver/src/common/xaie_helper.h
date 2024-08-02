@@ -138,32 +138,6 @@ typedef struct {
 /*****************************************************************************/
 /**
 *
-* Calculates the Tile Address from Row, Col of the AIE array/partition
-*
-* @param	DevInst: Device Instance
-* @param	R: Row
-* @param	C: Column
-* @return	TileAddr
-*
-* @note		Internal API only.
-*
-******************************************************************************/
-static inline u64 XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C)
-{
-	return (((u64)R & 0xFFU) << DevInst->DevProp.RowShift) |
-		(((u64)C & 0xFFU) << DevInst->DevProp.ColShift);
-}
-
-
-
-static inline u64 _XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C)
-{
-	return XAie_GetTileAddr(DevInst, R, C);
-}
-
-/*****************************************************************************/
-/**
-*
 * Calculates the index value of first set bit. Indexing starts with a value of
 * 1.
 *
@@ -200,6 +174,7 @@ XAIE_AIG_EXPORT AieRC XAie_GetUngatedLocsInPartition(XAie_DevInst *DevInst, u32 
 		XAie_LocType *Locs);
 XAIE_AIG_EXPORT u32 XAie_GetNumRows(XAie_DevInst *DevInst, u8 TileType);
 XAIE_AIG_EXPORT u32 XAie_GetStartRow(XAie_DevInst *DevInst, u8 TileType);
+XAIE_AIG_EXPORT u64 XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C);
 
 /* this below  Functions will be removed , once other teams migrate to above listed functions  */
 XAIE_AIG_EXPORT u8 _XAie_GetTileTypefromLoc(XAie_DevInst *DevInst, XAie_LocType Loc);
@@ -209,6 +184,7 @@ XAIE_AIG_EXPORT AieRC _XAie_GetUngatedLocsInPartition(XAie_DevInst *DevInst, u32
 		XAie_LocType *Locs);
 XAIE_AIG_EXPORT u32 _XAie_GetNumRows(XAie_DevInst *DevInst, u8 TileType);
 XAIE_AIG_EXPORT u32 _XAie_GetStartRow(XAie_DevInst *DevInst, u8 TileType);
+XAIE_AIG_EXPORT u64 _XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C);
 
 /*Public functions. Need to by discussed why it should be public */
 AieRC XAie_Read32(XAie_DevInst *DevInst, u64 RegOff, u32 *Data);

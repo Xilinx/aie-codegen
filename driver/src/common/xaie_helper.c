@@ -35,6 +35,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "xaie_helper.h"
 #include "xaie_helper_internal.h"
@@ -47,6 +48,8 @@
 #define XAIE_TXN_INSTANCE_EXPORTED	0b10U
 #define XAIE_TXN_INST_EXPORTED_MASK XAIE_TXN_INSTANCE_EXPORTED
 #define XAIE_TXN_AUTO_FLUSH_MASK XAIE_TRANSACTION_ENABLE_AUTO_FLUSH
+#define XAIE_DEV_GEN_AIE4_AIE_TILE_SHIFT_OFFSET 4U
+#define XAIE_DEV_GEN_AIE4_MEM_TILE_SHIFT_OFFSET 5U
 
 #define TX_DUMP_ENABLE 0
 /************************** Variable Definitions *****************************/
@@ -2710,6 +2713,280 @@ AieRC XAie_StatusDump(XAie_DevInst *DevInst, XAie_ColStatus *Status)
 		}
 	}
 	return (AieRC)RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API provides information whether a particular device is AIE4 device or not
+*
+* @param	DevGen: device generation value.
+*
+* @return	true : if the device is AIE4 device
+* 			false : if the device is legacy device.
+*
+* @note
+*
+*******************************************************************************/
+u8 _XAie_IsDeviceGenAIE4(u8 DevGen)
+{
+	switch(DevGen) {
+	case XAIE_DEV_GEN_AIE4:
+	case XAIE_DEV_GEN_AIE4_MEDUSA:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/*****************************************************************************/
+/**
+*
+* This API provides information whether a particular device support dual application
+* mode at column level or not?
+*
+* @param	DevGen: device generation value.
+*
+* @return	true : if the device supports dual application mode
+* 			false : if the device doesn't support dual application mode
+*
+* @note
+*
+*******************************************************************************/
+u8 _XAie_IsDeviceGenSupportDualApp(u8 DevGen)
+{
+	if(_XAie_IsDeviceGenAIE4(DevGen)) {
+		switch(DevGen){
+		case XAIE_DEV_GEN_AIE4:
+		case XAIE_DEV_GEN_AIE4_MEDUSA:
+			return true;
+		default:
+			return false;
+		}
+	} else {
+		return false;
+	}
+}
+
+/*****************************************************************************/
+/**
+*
+* This API provides information whether a particular tile resources are present in dual address space
+*
+* @param	DevInst: device generation value.
+* @param	TileType: Type of the Tile
+*
+* @return	true : if the tile resources are present in dual address space
+* 			false : Otherwise
+*
+* @note		This api doesn't check any input parameter for the invalid values.
+* 			It is assumed that all parameters are valid for this.
+*
+*******************************************************************************/
+u8 _XAie_IsTileResourceInSharedAddrSpace(u8 DevGen, u8 TileType)
+{
+	if (_XAie_IsDeviceGenAIE4(DevGen)) {
+		switch(TileType) {
+			case XAIEGBL_TILE_TYPE_AIETILE:
+				return false;
+
+			case XAIEGBL_TILE_TYPE_SHIMNOC:
+			case XAIEGBL_TILE_TYPE_MEMTILE:
+				return true;
+
+			default:
+				return false;
+		}
+	} else {
+		return false;
+	}
+}
+
+/*****************************************************************************/
+/**
+*
+* This API provides the maximum number of elements a particular device supports
+* for given tile type and module type
+*
+* @param	DevGen: device generation value.
+* @param	TileType: Type of tile aiecore tile, memtile or shimnoc tile
+* @param	elementValue: resource value for corresponding tile
+* @param	AppMode: device appmode value.
+
+* @return	None.
+*
+* @note		This api doesn't check any input parameter for the invalid values.
+* 			It is asssumed that all parameters are valid for this function
+*
+*******************************************************************************/
+s8 _XAie_GetMaxElementValue(u8 DevGen, u8 TileType, u8 AppMode, s8 elementValue)
+{
+	if(_XAie_IsDeviceGenAIE4(DevGen) &&
+			(AppMode == XAIE_DEVICE_SINGLE_APP_MODE) && 
+			_XAie_IsTileResourceInSharedAddrSpace(DevGen, TileType)) {
+		return elementValue * 2;
+	} else {
+		return elementValue;
+	}		
+}
+
+/*****************************************************************************/
+/**
+*
+* This API provides the mask value of the register space for App B space for
+* AIE4+ architecture
+* This api returns zero, if the device generation doesn't support
+* dual address space
+*
+* @param	devGen t: device generation/name
+*
+* @return	Mask value required to modify the register offset.
+*
+* @note
+*
+*******************************************************************************/
+static inline u32 XAie_Mask_Value(u8 devGen)
+{
+	switch(devGen) {
+	case XAIE_DEV_GEN_AIE4:
+	case XAIE_DEV_GEN_AIE4_MEDUSA:
+		return XAIE4_MASK_VALUE_APP_B;
+
+	default:
+		return 0;
+	}
+}
+
+/*****************************************************************************/
+/**
+*
+* This API provides the register offset in App B space for AIE4+ architecture
+* This api returns the same offset, if the device generation doesn't support
+* dual adress space
+*
+* @param	devGen t: device generation/name
+* @param	regOffset: Type of tile aiecore tile, memtile or shimnoc tile
+*
+* @return	regOffset: Modified or same register offset
+*
+* @note
+*
+*******************************************************************************/
+u32 _XAie_ChangeRegisterSpace(u8 devGen, u32 regOffset)
+{
+	return (regOffset | XAie_Mask_Value(devGen));
+}
+
+/*****************************************************************************/
+/**
+* This function is used to check for invalid configuration of 
+* module and tiletype combination for AIE4 devices before calling eventmodule .
+*
+* @param        DevInst: Device Instance
+* @param        Loc: Location of the AIE tile.
+* @param	Module:	XAIE_MEM_MOD - memory module
+* 			XAIE_CORE_MOD - core module
+* 			XAIE_PL_MOD - pl module
+* @return       XAIE_OK for correct combination of Module and tile type
+* 		XAIE_INVALID_ARGS for incorrect combination of module and tile
+* 		type
+*
+* @note         Internal API only.
+*
+*******************************************************************************/
+AieRC _XAie_IsTileTypeAndModuleSupportForEvents(XAie_DevInst* DevInst,
+	XAie_LocType Loc, XAie_ModuleType Module)
+{
+	u8 TileType;
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+		 ((TileType == XAIEGBL_TILE_TYPE_AIETILE) && (Module == XAIE_MEM_MOD))) {
+			XAIE_ERROR("Invalid Module configuration for AIE4\n");
+			return XAIE_INVALID_ARGS;
+	}
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+ *
+ * Calculates the Tile Address from Row, Col of the AIE array/partition
+ *
+ * @param	DevInst: Device Instance
+ * @param	R: Row
+ * @param	C: Column
+ * @return	TileAddr
+ *
+ * @note		Internal API only.
+ *
+ ******************************************************************************/
+u64 XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C)
+{
+	XAie_LocType Loc = { R, C };
+	u8 TileType = _XAie_GetTileTypefromLoc(DevInst,Loc);
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		switch(TileType) {
+		case XAIEGBL_TILE_TYPE_SHIMNOC:
+		case XAIEGBL_TILE_TYPE_SHIMPL:	
+			/* TBD - Implement Shim Row South and North Handling */
+			break;
+		case XAIEGBL_TILE_TYPE_AIETILE:
+			R += (DevInst->MemTileNumRows * XAIE_DEV_GEN_AIE4_AIE_TILE_SHIFT_OFFSET);
+			break;
+		case XAIEGBL_TILE_TYPE_MEMTILE:
+			if(R != DevInst->MemTileRowStart) {
+				R = (R * XAIE_DEV_GEN_AIE4_MEM_TILE_SHIFT_OFFSET) - XAIE_DEV_GEN_AIE4_AIE_TILE_SHIFT_OFFSET;
+			}
+			break;
+		default:
+			XAIE_ERROR("Invalid Tiletype\n");
+			return 0;
+		}
+	}
+	return (((u64)R & 0xFFU) << DevInst->DevProp.RowShift) |
+			(((u64)C & 0xFFU) << DevInst->DevProp.ColShift);
+}
+
+/*****************************************************************************/
+/**
+ *
+ * Calculates the Tile Address from Row, Col of the AIE array/partition
+ *
+ * @param	DevInst: Device Instance
+ * @param	R: Row
+ * @param	C: Column
+ * @return	TileAddr
+ *
+ * @note		Internal API only.
+ *
+ ******************************************************************************/
+u64 _XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C)
+{
+	return XAie_GetTileAddr(DevInst, R, C);
+}
+
+
+/*****************************************************************************/
+/**
+*
+* This routine is used to check if the shim tile has uc module.
+*
+* @param	DevInst: Device Instance.
+* @param	TileType: Type of the tile.
+*
+* @return	1 if uc module is present and 0 otherwise.
+*
+* @note		Internal API only.
+*
+*******************************************************************************/
+u8 _XAie_IsUcModulePresent(XAie_DevInst* DevInst, u8 TileType) {
+	if ((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
+			TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
+		return 1;
+	}
+	return 0;
 }
 
 /** @} */

@@ -3872,10 +3872,10 @@ static const  XAie_LockMod Aie4TileLockMod =
 	.LockSetValBase = XAIE4GBL_MEMORY_MODULE_LOCK0_VALUE,
 	.LockSetValOff = 0x10,
 	.LockInit = &Aie4TileLockInit,
-	.Acquire = NULL,
-	.Release = NULL,
-	.SetValue = NULL,
-	.GetValue = NULL,
+	.Acquire = &_XAie4_LockAcquire,
+	.Release = &_XAie4_LockRelease,
+	.SetValue = &_XAie4_LockSetValue,
+	.GetValue = &_XAie4_LockGetValue,
 };
 
 static const XAie_RegFldAttr Aie4ShimNocLockInit =
@@ -3897,10 +3897,10 @@ static const  XAie_LockMod Aie4ShimNocLockMod =
 	.LockSetValBase = XAIE4GBL_NOC_MODULE_LOCK0_VALUE,
 	.LockSetValOff = 0x10,
 	.LockInit = &Aie4ShimNocLockInit,
-	.Acquire = NULL,
-	.Release = NULL,
-	.SetValue = NULL,
-	.GetValue = NULL,
+	.Acquire = &_XAie4_LockAcquire,
+	.Release = &_XAie4_LockRelease,
+	.SetValue = &_XAie4_LockSetValue,
+	.GetValue = &_XAie4_LockGetValue,
 };
 
 static const XAie_RegFldAttr Aie4MemTileLockInit =
@@ -3922,10 +3922,10 @@ static const  XAie_LockMod Aie4MemTileLockMod =
 	.LockSetValBase = XAIE4GBL_MEM_TILE_MODULE_LOCK0_VALUE,
 	.LockSetValOff = 0x10,
 	.LockInit = &Aie4MemTileLockInit,
-	.Acquire = NULL,
-	.Release = NULL,
-	.SetValue = NULL,
-	.GetValue = NULL,
+	.Acquire = &_XAie4_LockAcquire,
+	.Release = &_XAie4_LockRelease,
+	.SetValue = &_XAie4_LockSetValue,
+	.GetValue = &_XAie4_LockGetValue,
 };
 #endif /* XAIE_FEATURE_LOCK_ENABLE */
 

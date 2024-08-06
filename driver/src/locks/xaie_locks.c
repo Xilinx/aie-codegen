@@ -24,6 +24,7 @@
 /***************************** Include Files *********************************/
 #include "xaie_feature_config.h"
 #include "xaie_helper.h"
+#include "xaie_helper_internal.h"
 #include "xaie_locks.h"
 #include "xaiegbl_defs.h"
 
@@ -58,6 +59,8 @@ AieRC XAie_LockAcquire(XAie_DevInst *DevInst, XAie_LocType Loc, XAie_Lock Lock,
 {
 	u8  TileType;
 	const XAie_LockMod *LockMod;
+	u8 MaxLockId;
+	s8 LockValUpperBound, LockValLowerBound;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -73,13 +76,16 @@ AieRC XAie_LockAcquire(XAie_DevInst *DevInst, XAie_LocType Loc, XAie_Lock Lock,
 
 	LockMod = DevInst->DevProp.DevMod[TileType].LockMod;
 
-	if(Lock.LockId > LockMod->NumLocks) {
+	MaxLockId = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, LockMod->NumLocks);
+	LockValUpperBound = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, LockMod->LockValUpperBound);
+	LockValLowerBound = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, LockMod->LockValLowerBound);
+   
+	if(Lock.LockId > MaxLockId) {
 		XAIE_ERROR("Invalid Lock Id\n");
 		return XAIE_INVALID_LOCK_ID;
 	}
-
-	if((Lock.LockVal > LockMod->LockValUpperBound) ||
-			(Lock.LockVal < LockMod->LockValLowerBound)) {
+	if((Lock.LockVal > LockValUpperBound) ||
+			(Lock.LockVal < LockValLowerBound)) {
 		XAIE_ERROR("Lock value out of range\n");
 		return XAIE_INVALID_LOCK_VALUE;
 	}
@@ -115,6 +121,8 @@ AieRC XAie_LockRelease(XAie_DevInst *DevInst, XAie_LocType Loc, XAie_Lock Lock,
 {
 	u8  TileType;
 	const XAie_LockMod *LockMod;
+	u8 MaxLockId;
+	s8 LockValUpperBound, LockValLowerBound;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -130,13 +138,17 @@ AieRC XAie_LockRelease(XAie_DevInst *DevInst, XAie_LocType Loc, XAie_Lock Lock,
 
 	LockMod = DevInst->DevProp.DevMod[TileType].LockMod;
 
-	if(Lock.LockId > LockMod->NumLocks) {
+	MaxLockId = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, LockMod->NumLocks);
+	LockValUpperBound = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, LockMod->LockValUpperBound);
+	LockValLowerBound = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, LockMod->LockValLowerBound);
+      
+	if(Lock.LockId > MaxLockId) {
 		XAIE_ERROR("Invalid Lock Id\n");
 		return XAIE_INVALID_LOCK_ID;
 	}
 
-	if((Lock.LockVal > LockMod->LockValUpperBound) ||
-			(Lock.LockVal < LockMod->LockValLowerBound)) {
+	if((Lock.LockVal > LockValUpperBound) ||
+			(Lock.LockVal < LockValLowerBound)) {
 		XAIE_ERROR("Lock value out of range\n");
 		return XAIE_INVALID_LOCK_VALUE;
 	}
@@ -162,6 +174,7 @@ AieRC XAie_LockSetValue(XAie_DevInst *DevInst, XAie_LocType Loc, XAie_Lock Lock)
 {
 	u8  TileType;
 	const XAie_LockMod *LockMod;
+    u8 MaxLockId;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -177,7 +190,9 @@ AieRC XAie_LockSetValue(XAie_DevInst *DevInst, XAie_LocType Loc, XAie_Lock Lock)
 
 	LockMod = DevInst->DevProp.DevMod[TileType].LockMod;
 
-	if(Lock.LockId > LockMod->NumLocks) {
+	MaxLockId = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, LockMod->NumLocks);
+ 
+	if(Lock.LockId > MaxLockId) {
 		XAIE_ERROR("Invalid Lock Id\n");
 		return XAIE_INVALID_LOCK_ID;
 	}
@@ -205,6 +220,7 @@ AieRC XAie_LockGetValue(XAie_DevInst *DevInst, XAie_LocType Loc, XAie_Lock Lock,
 {
 	u8  TileType;
 	const XAie_LockMod *LockMod;
+    u8 MaxLocKId;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -220,7 +236,9 @@ AieRC XAie_LockGetValue(XAie_DevInst *DevInst, XAie_LocType Loc, XAie_Lock Lock,
 
 	LockMod = DevInst->DevProp.DevMod[TileType].LockMod;
 
-	if(Lock.LockId > LockMod->NumLocks) {
+	MaxLocKId = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, LockMod->NumLocks);        
+
+	if(Lock.LockId > MaxLocKId) {
 		XAIE_ERROR("Invalid Lock Id\n");
 		return XAIE_INVALID_LOCK_ID;
 	}

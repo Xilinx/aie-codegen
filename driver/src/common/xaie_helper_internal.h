@@ -15,6 +15,12 @@
 #define XAIE_HELPER_INTERNAL_H
 
 /***************************** Include Files *********************************/
+#include <limits.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
 /***************************** Macro Definitions *****************************/
 /************************** Function Definitions *****************************/
 AieRC _XAie_GetSlaveIdx(const XAie_StrmMod *StrmMod, StrmSwPortType Slave,
@@ -37,10 +43,13 @@ AieRC _XAie_ClearTransaction(XAie_DevInst* DevInst);
 AieRC _XAie_TxnFree(XAie_TxnInst *Inst);
 void _XAie_TxnResourceCleanup(XAie_DevInst *DevInst);
 void _XAie_FreeTxnPtr(void *Ptr);
+
+/* Below are aie4 specific internal APIs*/
 u8 _XAie_IsDeviceGenAIE4(u8 DevGen);
 u8 _XAie_IsDeviceGenSupportDualApp(u8 DevGen);
 u8 _XAie_IsTileResourceInSharedAddrSpace(u8 DevGen, u8 TileType);
 s8 _XAie_GetMaxElementValue(u8 DevGen, u8 TileType, u8 AppMode,
 		s8 elementValue);
+u32 _XAie_ChangeRegisterSpace(u8 devGen, u32 regOffset);
 u8 _XAie_IsUcModulePresent(XAie_DevInst* DevInst, u8 TileType);
 #endif

@@ -31,12 +31,6 @@
 *
 ******************************************************************************/
 /***************************** Include Files *********************************/
-#include <limits.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-
 #include "xaie_helper.h"
 #include "xaie_helper_internal.h"
 #include "xaie_reset_aie.h"

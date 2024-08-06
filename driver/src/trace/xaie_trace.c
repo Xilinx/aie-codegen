@@ -25,6 +25,7 @@
 /***************************** Include Files *********************************/
 #include "xaie_feature_config.h"
 #include "xaie_helper.h"
+#include "xaie_helper_internal.h"
 #include "xaie_trace.h"
 
 #ifdef XAIE_FEATURE_TRACE_ENABLE
@@ -84,6 +85,11 @@ AieRC XAie_TraceEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
 	} else {
 		TraceMod = &DevInst->DevProp.DevMod[TileType].TraceMod[Module];
+		if((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
+			(TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
+				Module = XAIE_CORE_MOD;
+		}
+
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
@@ -167,6 +173,11 @@ AieRC XAie_TraceStartEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
 	} else {
 		TraceMod = &DevInst->DevProp.DevMod[TileType].TraceMod[Module];
+                if((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
+                        (TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
+                                Module = XAIE_CORE_MOD;
+                }
+
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
@@ -243,6 +254,10 @@ AieRC XAie_TraceStopEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
 	} else {
 		TraceMod = &DevInst->DevProp.DevMod[TileType].TraceMod[Module];
+                if((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
+                        (TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
+                                Module = XAIE_CORE_MOD;
+                }
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
@@ -585,6 +600,10 @@ AieRC XAie_TraceControlConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
 	} else {
 		TraceMod = &DevInst->DevProp.DevMod[TileType].TraceMod[Module];
+                if((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
+                        (TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
+                                Module = XAIE_CORE_MOD;
+                }
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 

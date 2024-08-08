@@ -1174,7 +1174,7 @@ AieRC XAie_PerfCounterSnapshotSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	/* check for module and tiletype combination */
-	RC = _XAie_CheckModule(DevInst, Loc, Module);
+	RC = XAie_CheckModule(DevInst, Loc, Module);
 	if(RC != XAIE_OK) {
 		return XAIE_INVALID_ARGS;
 	}
@@ -1282,7 +1282,7 @@ AieRC XAie_PerfCounterSnapshotLoadEventSet(XAie_DevInst *DevInst, XAie_LocType L
 	}
 
 	/* check for module and tiletype combination */
-	RC = _XAie_CheckModule(DevInst, Loc, Module);
+	RC = XAie_CheckModule(DevInst, Loc, Module);
 	if(RC != XAIE_OK) {
 		return XAIE_INVALID_ARGS;
 	}

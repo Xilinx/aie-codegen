@@ -1151,7 +1151,7 @@ AieRC XAie_ConfigMemInterleaving(XAie_DevInst *DevInst,
 	 * This loop will check for the same
 	 */
 	for (i = 0; i < NumTiles; i++) {
-		u8 TileType = _XAie_GetTileTypefromLoc(DevInst, Locs[i]);
+		u8 TileType = XAie_GetTileTypefromLoc(DevInst, Locs[i]);
 		if (TileType >= XAIEGBL_TILE_TYPE_MAX)
 			RC = XAIE_INVALID_TILE;
 

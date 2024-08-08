@@ -202,9 +202,9 @@ static const XAie_UcMod Aie4UcMod =
 	.DataMemUcOffset = 0x20000,
 	.CoreCtrl = &Aie4UcCoreCtrlReg,
 	.CoreSts = &Aie4UcCoreStsReg,
-	.Wakeup = NULL,
-	.Sleep = NULL,
-	.GetCoreStatus = NULL
+	.Wakeup = &_XAie_UcCoreWakeup,
+	.Sleep = &_XAie_UcCoreSleep,
+	.GetCoreStatus = &_XAie_UcCoreGetStatus
 };
 #endif /* XAIE_FEATURE_UC_ENABLE */
 

@@ -214,7 +214,7 @@ AieRC _XAieMl_PartMemZeroInit(XAie_DevInst *DevInst)
 			MCtrlMod = DevInst->DevProp.DevMod[TileType].MemCtrlMod;
 			for (u8 M = 0; M < NumMods; M++) {
 				RegAddr = MCtrlMod[M].MemZeroisationCtrlRegOff +
-					_XAie_GetTileAddr(DevInst, R, C);
+					XAie_GetTileAddr(DevInst, R, C);
 				FldVal = XAie_SetField(XAIE_ENABLE,
 					MCtrlMod[M].MemZeroisation.Lsb,
 					MCtrlMod[M].MemZeroisation.Mask);
@@ -230,7 +230,7 @@ AieRC _XAieMl_PartMemZeroInit(XAie_DevInst *DevInst)
 						(R == DevInst->NumRows - 1U) &&
 						(M == NumMods - 1U)) {
 					RegAddr = MCtrlMod[M].MemZeroisationCtrlRegOff +
-						_XAie_GetTileAddr(DevInst,
+						XAie_GetTileAddr(DevInst,
 								Loc.Row,
 								Loc.Col);
 					return XAie_MaskPoll(DevInst, RegAddr,

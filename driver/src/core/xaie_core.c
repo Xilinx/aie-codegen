@@ -516,7 +516,7 @@ AieRC XAie_CoreGetPCValue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	if(CoreIntMod!=NULL)
 	{
 		RegAddr = CoreIntMod->CorePCOff +
-			_XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
+			XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 	}
 	else
 	{
@@ -571,7 +571,7 @@ AieRC XAie_CoreGetSPValue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	{
 		CoreMod = DevInst->DevProp.DevMod[TileType].CoreMod;
 		RegAddr = CoreMod->CoreSPOff +
-			_XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
+			XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 	}
 
 	return  XAie_Read32(DevInst, RegAddr, SPValue);
@@ -614,7 +614,7 @@ AieRC XAie_CoreGetLRValue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	if(CoreIntMod!=NULL)
 	{
 		RegAddr = CoreIntMod->CoreLROff +
-			_XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
+			XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 	}
 	else
 	{

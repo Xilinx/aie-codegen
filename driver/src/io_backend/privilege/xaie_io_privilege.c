@@ -420,7 +420,7 @@ static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enab
 				return RC;
 			}
 
-			RegAddr += _XAie_GetTileAddr(DevInst, R, C);
+			RegAddr += XAie_GetTileAddr(DevInst, R, C);
 			RC = _XAie_SetInterLeavingMode(DevInst, MCtrlMod, RegAddr, Enable);
 			if (RC != XAIE_OK)
 				return RC;
@@ -439,7 +439,7 @@ static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enab
 			     R < (DevInst->AieTileRowStart + DevInst->AieTileNumRows);
 			     R++) {
 				MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_AIETILE].MemCtrlInterLvMod;
-				RegAddr = MCtrlMod->MemInterleavingCtrlRegOff + _XAie_GetTileAddr(DevInst, R, C);
+				RegAddr = MCtrlMod->MemInterleavingCtrlRegOff + XAie_GetTileAddr(DevInst, R, C);
 				RC = _XAie_SetInterLeavingMode(DevInst, MCtrlMod, RegAddr, Enable);
 				if (RC != XAIE_OK)
 					return RC;
@@ -858,7 +858,7 @@ AieRC _XAie_PrivilegeConfigMemInterleavingLoc(XAie_DevInst *DevInst,
 
 	for (i = 0; i < Args->NumTiles; i++) {
 		if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
-			u8 TileType = _XAie_GetTileTypefromLoc(DevInst, Args->Locs[i]);
+			u8 TileType = XAie_GetTileTypefromLoc(DevInst, Args->Locs[i]);
 			if (((TileType == XAIEGBL_TILE_TYPE_AIETILE) && (Args->Enable > XAIE_MEMINTERLEAV_MODES_2)) ||
 			    ((TileType == XAIEGBL_TILE_TYPE_MEMTILE) && (Args->Enable > XAIE_MEMINTERLEAV_MODES_3)))
 				RC = XAIE_INVALID_ARGS;
@@ -879,7 +879,7 @@ AieRC _XAie_PrivilegeConfigMemInterleavingLoc(XAie_DevInst *DevInst,
 			return RC;
 		}
 
-		RegAddr += _XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
+		RegAddr += XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
 		RC = _XAie_SetInterLeavingMode(DevInst, MCtrlMod, RegAddr, Args->Enable);
 		if (RC != XAIE_OK) {
 			XAIE_ERROR("Failed to config memory interleaving, Loc (%d, %d)\n",

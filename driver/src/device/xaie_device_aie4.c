@@ -107,7 +107,7 @@ AieRC _XAie4_ZeroInitUcMemory(XAie_DevInst *DevInst) {
 		MemCtrlUcMod_B = DevInst->DevProp.DevMod[TileType].MemCtrlUcMod_B;
 		Loc = XAie_TileLoc(C, 0U);
 		if(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) {
-			RegAddr = MemCtrlUcMod->MemZeroisationCtrlRegOff + _XAie_GetTileAddr(DevInst, 0U, C);
+			RegAddr = MemCtrlUcMod->MemZeroisationCtrlRegOff + XAie_GetTileAddr(DevInst, 0U, C);
 			FldVal =  XAie_SetField(XAIE_ENABLE, MemCtrlUcMod->MemZeroisation.Lsb,MemCtrlUcMod->MemZeroisation.Mask);
 			RC = XAie_MaskWrite32(DevInst, RegAddr,
 					MemCtrlUcMod->MemZeroisation.Mask,
@@ -115,7 +115,7 @@ AieRC _XAie4_ZeroInitUcMemory(XAie_DevInst *DevInst) {
 			if(RC != XAIE_OK) {
 				return RC;
 			}
-			RegAddr = MemCtrlUcMod_B->MemZeroisationCtrlRegOff + _XAie_GetTileAddr(DevInst, 0U, C);
+			RegAddr = MemCtrlUcMod_B->MemZeroisationCtrlRegOff + XAie_GetTileAddr(DevInst, 0U, C);
 			FldVal =  XAie_SetField(XAIE_ENABLE, MemCtrlUcMod_B->MemZeroisation.Lsb,MemCtrlUcMod_B->MemZeroisation.Mask);
 			RC = XAie_MaskWrite32(DevInst, RegAddr,
 					MemCtrlUcMod->MemZeroisation.Mask,
@@ -124,7 +124,7 @@ AieRC _XAie4_ZeroInitUcMemory(XAie_DevInst *DevInst) {
 				return RC;
 			}
 		} else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
-			RegAddr = MemCtrlUcMod->MemZeroisationCtrlRegOff + _XAie_GetTileAddr(DevInst, 0U, C);
+			RegAddr = MemCtrlUcMod->MemZeroisationCtrlRegOff + XAie_GetTileAddr(DevInst, 0U, C);
 			FldVal =  XAie_SetField(XAIE_ENABLE, MemCtrlUcMod->MemZeroisation.Lsb,MemCtrlUcMod->MemZeroisation.Mask);
 			RC = XAie_MaskWrite32(DevInst, RegAddr,
 					MemCtrlUcMod->MemZeroisation.Mask,
@@ -133,7 +133,7 @@ AieRC _XAie4_ZeroInitUcMemory(XAie_DevInst *DevInst) {
 				return RC;
 			}
 		} else {
-			RegAddr = MemCtrlUcMod_B->MemZeroisationCtrlRegOff + _XAie_GetTileAddr(DevInst, 0U, C);
+			RegAddr = MemCtrlUcMod_B->MemZeroisationCtrlRegOff + XAie_GetTileAddr(DevInst, 0U, C);
 			FldVal =  XAie_SetField(XAIE_ENABLE, MemCtrlUcMod_B->MemZeroisation.Lsb,MemCtrlUcMod_B->MemZeroisation.Mask);
 			RC = XAie_MaskWrite32(DevInst, RegAddr,
 					MemCtrlUcMod_B->MemZeroisation.Mask,
@@ -147,12 +147,12 @@ AieRC _XAie4_ZeroInitUcMemory(XAie_DevInst *DevInst) {
 		*/
 		if(C == DevInst->NumCols - 1U){
 			if(DevInst->AppMode != XAIE_DEVICE_DUAL_APP_MODE_B) {
-				RegAddr = MemCtrlUcMod->MemZeroisationCtrlRegOff +_XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
+				RegAddr = MemCtrlUcMod->MemZeroisationCtrlRegOff + XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 				return XAie_MaskPoll(DevInst, RegAddr,
 						MemCtrlUcMod->MemZeroisation.Mask,
 						0, XAIE4_MEMZERO_POLL_TIMEOUT);
 			} else {
-				RegAddr = MemCtrlUcMod_B->MemZeroisationCtrlRegOff + _XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
+				RegAddr = MemCtrlUcMod_B->MemZeroisationCtrlRegOff + XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 				return XAie_MaskPoll(DevInst, RegAddr,
 						MemCtrlUcMod_B->MemZeroisation.Mask,
 						0, XAIE4_MEMZERO_POLL_TIMEOUT);
@@ -196,7 +196,7 @@ static AieRC _XAie4_PmSetColumnClockBuffer(XAie_DevInst *DevInst,
 	ClkBufCntr = PlIfMod->ClkBufCntr;
 
 	RegAddr = ClkBufCntr->RegOff +
-			_XAie_GetTileAddr(DevInst, 0U, Loc.Col);
+			XAie_GetTileAddr(DevInst, 0U, Loc.Col);
 	FldVal = XAie_SetField(Enable, ClkBufCntr->ClkBufEnable.Lsb,
 			ClkBufCntr->ClkBufEnable.Mask);
 
@@ -226,7 +226,7 @@ AieRC _XAie4_SetUCMemoryPrivileged(XAie_DevInst *DevInst, u8 Enable) {
 
 	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		MemCtrlUcMod = DevInst->DevProp.DevMod[TileType].MemCtrlUcMod;
-		RegAddr = MemCtrlUcMod->MemPrivilegeCtrlRegOff + _XAie_GetTileAddr(DevInst, 0U, C);
+		RegAddr = MemCtrlUcMod->MemPrivilegeCtrlRegOff + XAie_GetTileAddr(DevInst, 0U, C);
 		FldVal =  XAie_SetField(Enable, MemCtrlUcMod->MemPrivilegeCtrl.Lsb,MemCtrlUcMod->MemPrivilegeCtrl.Mask);
 		RC = XAie_MaskWrite32(DevInst, RegAddr,
 							MemCtrlUcMod->MemPrivilegeCtrl.Mask,
@@ -264,7 +264,7 @@ AieRC _XAie4_SetDualAppModePrivileged(XAie_DevInst *DevInst, XAie_BackendTilesAr
 		if (Args->Locs[i].Row == DevInst->ShimRow) {
 			TCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_SHIMNOC].TileCtrlMod;
 			RegAddr = TCtrlMod->DualAppModeRegOff +
-						_XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
+						XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
 			Mask = TCtrlMod->DualAppControl.Mask;
 			if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A || DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B ) {
 				FldVal = XAie_SetField(XAIE_ENABLE,
@@ -282,7 +282,7 @@ AieRC _XAie4_SetDualAppModePrivileged(XAie_DevInst *DevInst, XAie_BackendTilesAr
 		} else if(Args->Locs[i].Row == DevInst->MemTileRowStart) {
 			TCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].TileCtrlMod;
 			RegAddr = TCtrlMod->DualAppModeRegOff +
-						_XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
+						XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
 			Mask = TCtrlMod->DualAppControl.Mask;
 			if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A || DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
 				FldVal = XAie_SetField(XAIE_ENABLE,
@@ -300,7 +300,7 @@ AieRC _XAie4_SetDualAppModePrivileged(XAie_DevInst *DevInst, XAie_BackendTilesAr
 		} else if (Args->Locs[i].Row >= DevInst->AieTileRowStart ) {
 			TCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_AIETILE].TileCtrlMod;
 			RegAddr = TCtrlMod->DualAppModeRegOff +
-						_XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
+						XAie_GetTileAddr(DevInst, Args->Locs[i].Row, Args->Locs[i].Col);
 			Mask = TCtrlMod->DualAppControl.Mask;
 			if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
 				if(Args->Locs[i].Row == ((DevInst->AieTileRowStart + DevInst->AieTileNumRows) - XAIE_MIN_AIE_TILE_REQUEST)) {
@@ -379,7 +379,7 @@ AieRC _XAie4_PartMemZeroInit(XAie_DevInst *DevInst)
 			}
 			for (u8 M = 0; M < NumMods; M++) {
 				RegAddr = MCtrlMod[M].MemZeroisationCtrlRegOff +
-					_XAie_GetTileAddr(DevInst, R, C);
+					XAie_GetTileAddr(DevInst, R, C);
 				FldVal = XAie_SetField(XAIE_ENABLE,
 					MCtrlMod[M].MemZeroisation.Lsb,
 					MCtrlMod[M].MemZeroisation.Mask);
@@ -395,7 +395,7 @@ AieRC _XAie4_PartMemZeroInit(XAie_DevInst *DevInst)
 						(R == DevInst->NumRows - 1U) &&
 						(M == NumMods - 1U)) {
 					RegAddr = MCtrlMod[M].MemZeroisationCtrlRegOff +
-						_XAie_GetTileAddr(DevInst,
+						XAie_GetTileAddr(DevInst,
 								Loc.Row,
 								Loc.Col);
 					return XAie_MaskPoll(DevInst, RegAddr,
@@ -536,7 +536,7 @@ AieRC _XAie4_SetPartIsolationAfterRst(XAie_DevInst *DevInst)
 			if(DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE && R == DevInst->ShimRow) {
 				TCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_SHIMNOC].TileCtrlMod;
 				RegAddr = TCtrlMod->TileCtrlAxiRegOff +
-							_XAie_GetTileAddr(DevInst, R, C);
+							XAie_GetTileAddr(DevInst, R, C);
 				Mask = TCtrlMod->IsolateAxiEast.Mask | TCtrlMod->IsolateAxiWest.Mask;
 				FldVal = XAie_SetField(Dir,
 							TCtrlMod->IsolateAxiWest.Lsb, Mask);
@@ -591,7 +591,7 @@ AieRC _XAie4_SetPartApplicationReset(XAie_DevInst *DevInst, u8 Enable)
 		ShimTileRst = PlIfMod->ShimTileRst;
 
 		RegAddr = ShimTileRst->RegOff +
-				_XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
+				XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 		if(DevInst->AppMode != XAIE_DEVICE_DUAL_APP_MODE_B) {
 			FldVal = XAie_SetField(Enable,
 					ShimTileRst->RstCntr.Lsb, ShimTileRst->RstCntr.Mask);
@@ -632,7 +632,7 @@ AieRC _XAie4_PartInitL2Split(XAie_DevInst *DevInst) {
 	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		for(u8 R = DevInst->MemTileRowStart; R <= DevInst->MemTileNumRows; R++) {
 			TCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].TileCtrlMod;
-			RegAddr = TCtrlMod->L2SplitRegOff + _XAie_GetTileAddr(DevInst, R, C);
+			RegAddr = TCtrlMod->L2SplitRegOff + XAie_GetTileAddr(DevInst, R, C);
 			Mask = TCtrlMod->L2SplitControl.Mask;
 			FldVal = XAie_SetField(DevInst->L2Split, TCtrlMod->DualAppControl.Lsb, Mask);
 			RC = XAie_Write32(DevInst, RegAddr, FldVal);

@@ -31,6 +31,7 @@
 #include "xaie_events.h"
 #include "xaie_feature_config.h"
 #include "xaie_helper.h"
+#include "xaie_helper_internal.h"
 #include "xaie_timer.h"
 #include "xaiegbl.h"
 
@@ -92,6 +93,15 @@ AieRC XAie_SetTimerTrigEventVal(XAie_DevInst *DevInst, XAie_LocType Loc,
 	RC = XAie_CheckModule(DevInst, Loc, Module);
 	if(RC != XAIE_OK) {
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* In AIE4, there is only one timer in AIE tile Core module for Core
+	   and MEM module. So below condition will return error to avoid
+	   un necessary processing further. */
+	if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		if((TileType == XAIEGBL_TILE_TYPE_AIETILE) &&
+			(Module == XAIE_MEM_MOD))
+			return XAIE_INVALID_ARGS;
 	}
 
 	if(Module == XAIE_PL_MOD) {
@@ -159,6 +169,15 @@ AieRC XAie_ResetTimer(XAie_DevInst *DevInst, XAie_LocType Loc,
 	RC = XAie_CheckModule(DevInst, Loc, Module);
 	if(RC != XAIE_OK) {
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* In AIE4, there is only one timer in AIE tile Core module for Core
+	   and MEM module. So below condition will return error to avoid
+	   un necessary processing further. */
+	if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		if((TileType == XAIEGBL_TILE_TYPE_AIETILE) &&
+			(Module == XAIE_MEM_MOD))
+			return XAIE_INVALID_ARGS;
 	}
 
 	if(Module == XAIE_PL_MOD) {
@@ -234,6 +253,15 @@ AieRC XAie_SetTimerResetEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return XAIE_INVALID_ARGS;
 	}
 
+	/* In AIE4, there is only one timer in AIE tile Core module for Core
+	   and MEM module. So below condition will return error to avoid
+	   un necessary processing further. */
+	if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		if((TileType == XAIEGBL_TILE_TYPE_AIETILE) &&
+			(Module == XAIE_MEM_MOD))
+			return XAIE_INVALID_ARGS;
+	}
+
 	if(Module == XAIE_PL_MOD) {
 		TimerMod = &DevInst->DevProp.DevMod[TileType].TimerMod[0U];
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
@@ -241,6 +269,11 @@ AieRC XAie_SetTimerResetEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	else {
 		TimerMod = &DevInst->DevProp.DevMod[TileType].TimerMod[Module];
+                if((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
+                        (TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
+                                Module = XAIE_CORE_MOD;
+                }
+
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
@@ -320,6 +353,15 @@ AieRC XAie_ReadTimer(XAie_DevInst *DevInst, XAie_LocType Loc,
                 return XAIE_INVALID_ARGS;
 	}
 
+	/* In AIE4, there is only one timer in AIE tile Core module for Core
+	   and MEM module. So below condition will return error to avoid
+	   un necessary processing further. */
+	if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		if((TileType == XAIEGBL_TILE_TYPE_AIETILE) &&
+			(Module == XAIE_MEM_MOD))
+			return XAIE_INVALID_ARGS;
+	}
+
 	if(Module == XAIE_PL_MOD) {
 		TimerMod = &DevInst->DevProp.DevMod[TileType].TimerMod[0U];
 	}
@@ -393,6 +435,15 @@ AieRC XAie_WaitCycles(XAie_DevInst *DevInst, XAie_LocType Loc,
 	RC = XAie_CheckModule(DevInst, Loc, Module);
 	if(RC != XAIE_OK) {
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* In AIE4, there is only one timer in AIE tile Core module for Core
+	   and MEM module. So below condition will return error to avoid
+	   un necessary processing further. */
+	if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		if((TileType == XAIEGBL_TILE_TYPE_AIETILE) &&
+			(Module == XAIE_MEM_MOD))
+			return XAIE_INVALID_ARGS;
 	}
 
 	if(CycleCnt > XAIE_WAIT_CYCLE_MAX_VAL) {
@@ -469,8 +520,14 @@ static XAie_Events _XAie_GetBroadcastEventfromRscId(XAie_DevInst *DevInst,
 
 	if(Mod == XAIE_PL_MOD)
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
-	else
+	else {
+                if((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
+                        (TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
+                                Mod = XAIE_CORE_MOD;
+                }
+
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Mod];
+	}
 
 	return EvntMod->BroadcastEventMap->Event + RscId;
 }
@@ -609,15 +666,8 @@ static AieRC _XAie_SetupTimerConfig(XAie_DevInst *DevInst, u32 NumTiles,
 					DevInst, Locs[i], XAIE_MEM_MOD,
 					BcastId);
 			RC = XAie_SetTimerResetEvent(DevInst, Locs[i],
-					XAIE_CORE_MOD, BcastEvent,
-					XAIE_RESETDISABLE);
-		} else if(TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
-			BcastEvent = _XAie_GetBroadcastEventfromRscId(
-					DevInst, Locs[i], XAIE_MEM_MOD,
-					BcastId);
-			RC = XAie_SetTimerResetEvent(DevInst, Locs[i],
-					XAIE_MEM_MOD, BcastEvent,
-					XAIE_RESETDISABLE);
+				XAIE_MEM_MOD, BcastEvent,
+				XAIE_RESETDISABLE);
 		} else {
 			BcastEvent = _XAie_GetBroadcastEventfromRscId(
 					DevInst, Locs[i], XAIE_PL_MOD,

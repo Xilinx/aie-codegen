@@ -1041,22 +1041,24 @@ static inline AieRC _XAie_LPartDataMemZeroInit(XAie_DevInst *DevInst)
 	u32 AppModVal = 0;
 
 	for(u8 C = 0; C < DevInst->NumCols; C++) {
-		for (u8 R = XAIE_MEM_TILE_ROW_START;
+		if(DevInst->L2PreserveMem == 0) {
+			for (u8 R = XAIE_MEM_TILE_ROW_START;
 					R < XAIE_AIE_TILE_ROW_START; R++) {
-			if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A ||
+				if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A ||
 						DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE ) {
-				RegAddr = _XAie_LGetTileAddr(R, C) +
-								XAIE_MEM_TILE_MOD_MEM_CNTR_REGOFF;
+					RegAddr = _XAie_LGetTileAddr(R, C) +
+						XAIE_MEM_TILE_MOD_MEM_CNTR_REGOFF;
 				} else if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
 					RegAddr = _XAie_LGetTileAddr(R, C) +
-								XAIE_MEM_TILE_MOD_MEM_CNTR_REGOFF_B;
+						XAIE_MEM_TILE_MOD_MEM_CNTR_REGOFF_B;
 				} else {
 					XAIE_ERROR("Invalid App Mode\n");
 					return XAIE_INVALID_APP_MODE;
 				}
-			_XAie_LPartMaskWrite32(DevInst, RegAddr,
-					XAIE_MEM_TILE_MEM_CNTR_ZEROISATION_MASK,
-					XAIE_MEM_TILE_MEM_CNTR_ZEROISATION_MASK);
+				_XAie_LPartMaskWrite32(DevInst, RegAddr,
+						XAIE_MEM_TILE_MEM_CNTR_ZEROISATION_MASK,
+						XAIE_MEM_TILE_MEM_CNTR_ZEROISATION_MASK);
+			}
 		}
 
 		for (u8 R = XAIE_AIE_TILE_ROW_START;

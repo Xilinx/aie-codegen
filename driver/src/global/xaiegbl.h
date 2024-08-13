@@ -163,6 +163,7 @@ typedef struct {
 	u8 EccStatus;		/* Ecc On/Off status of the partition */
 	u8 AppMode;		/* 0 - Single Application,1 - Application A, 2 - Application B */
 	u8 L2Split;     /* Set L2 Split in Dual App Mode */
+	u8 L2PreserveMem;    /*Set or Clear to preserve L2 Memory Data */
 	const XAie_Backend *Backend; /* Backend IO properties */
 	void *IOInst;	       /* IO Instance for the backend */
 	XAie_DevProp DevProp; /* Pointer to the device property. To be

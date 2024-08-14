@@ -113,6 +113,7 @@ static inline u32 _XAie_LIntrCtrlL2Mask(XAie_DevInst *DevInst, XAie_LocType Loc)
 	return _XAie_LPartRead32(DevInst, RegAddr);
 }
 
+#if !DEV_GEN_AIE4
 /*****************************************************************************/
 /**
 *
@@ -160,6 +161,7 @@ static inline void _XAie_LIntrCtrlL1Ack(XAie_DevInst *DevInst,
 				XAIE_PL_MOD_INTR_L1_SW_REGOFF;
 	_XAie_LPartWrite32(DevInst, RegAddr, ChannelBitMap);
 }
+#endif
 
 /*****************************************************************************/
 /**
@@ -186,11 +188,16 @@ static inline u8 _XAie_LEventReadStatus(XAie_DevInst *DevInst,
 	if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
 		RegOff = XAIE_MEM_TILE_BASE_EVENT_STATUS;
 	} else if (TType == XAIEGBL_TILE_TYPE_AIETILE) {
-		if (Module == XAIE_CORE_MOD) {
-			RegOff = XAIE_CORE_MOD_BASE_EVENT_STATUS;
-		} else {
-			RegOff = XAIE_MEM_MOD_BASE_EVENT_STATUS;
+#if DEV_GEN_AIE4
+	(void)Module;
+	RegOff = XAIE_CORE_MOD_BASE_EVENT_STATUS;
+#else
+	if (Module == XAIE_CORE_MOD) {
+		RegOff = XAIE_CORE_MOD_BASE_EVENT_STATUS;
+	} else {
+		RegOff = XAIE_MEM_MOD_BASE_EVENT_STATUS;
 		}
+#endif
 	} else {
 		RegOff = XAIE_PL_MOD_BASE_EVENT_STATUS;
 	}
@@ -226,11 +233,16 @@ static inline void _XAie_LEventClearStatus(XAie_DevInst *DevInst,
 	if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
 		RegOff = XAIE_MEM_TILE_BASE_EVENT_STATUS;
 	} else if (TType == XAIEGBL_TILE_TYPE_AIETILE) {
-		if (Module == XAIE_CORE_MOD) {
-			RegOff = XAIE_CORE_MOD_BASE_EVENT_STATUS;
-		} else {
-			RegOff = XAIE_MEM_MOD_BASE_EVENT_STATUS;
-		}
+#if DEV_GEN_AIE4
+	(void)Module;
+	RegOff = XAIE_CORE_MOD_BASE_EVENT_STATUS;
+#else
+	if (Module == XAIE_CORE_MOD) {
+		RegOff = XAIE_CORE_MOD_BASE_EVENT_STATUS;
+	} else {
+		RegOff = XAIE_MEM_MOD_BASE_EVENT_STATUS;
+	}
+#endif
 	} else {
 		RegOff = XAIE_PL_MOD_BASE_EVENT_STATUS;
 	}
@@ -263,14 +275,28 @@ static inline u32 _XAie_LReadArrayErrorBroadcastEvent(XAie_DevInst *DevInst,
 	u32 RegOff;
 
 	u8 TType = _XAie_LGetTTypefromLoc(DevInst, Loc);
-	if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
+	if (TType == XAIEGBL_TILE_TYPE_AIETILE) {
+#if DEV_GEN_AIE4
+	(void)Module;
+	RegOff = XAIE_CORE_MOD_BASE_EVENT_BROADCAST;
+#else
+	if (Module == XAIE_CORE_MOD) {
+		RegOff = XAIE_CORE_MOD_BASE_EVENT_BROADCAST;
+	} else {
+		RegOff = XAIE_MEM_MOD_BASE_EVENT_BROADCAST;
+	}
+#endif
+	} else if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
 		RegOff = XAIE_MEM_TILE_BASE_EVENT_BROADCAST;
 	} else {
-		if (Module == XAIE_CORE_MOD) {
-			RegOff = XAIE_CORE_MOD_BASE_EVENT_BROADCAST;
-		} else {
-			RegOff = XAIE_MEM_MOD_BASE_EVENT_BROADCAST;
-		}
+		/**
+		 * In AIE4 which dosnot have L1 interrupt controller.
+		 * SHIM error info needs to be xtracted from event bc.
+		 *
+		 * Kotesh(TODO): Cross verify this macro name.
+		 * We want to read the internal events of SHIM tile.
+		 */
+		RegOff = XAIE_PL_MOD_EVENT_BROADCAST0;
 	}
 
 	RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + RegOff +
@@ -278,6 +304,7 @@ static inline u32 _XAie_LReadArrayErrorBroadcastEvent(XAie_DevInst *DevInst,
 	return _XAie_LPartRead32(DevInst, RegAddr);
 }
 
+#if !DEV_GEN_AIE4
 /*****************************************************************************/
 /**
 *
@@ -307,6 +334,7 @@ static inline u32 _XAie_LReadShimErrorBroadcastEvent(XAie_DevInst *DevInst,
 	RegValue = _XAie_LPartRead32(DevInst, RegAddr);
 	return XAie_GetField(RegValue, Lsb, Mask);
 }
+#endif
 
 /*****************************************************************************/
 /**
@@ -329,8 +357,19 @@ static inline u32 _XAie_ReadErrorBroadcastEvent(XAie_DevInst *DevInst,
 		 XAie_LocType Loc, XAie_ModuleType Module, u8 BroadcastId)
 {
 	if (Loc.Row == XAIE_SHIM_ROW) {
-		return _XAie_LReadShimErrorBroadcastEvent(DevInst, Loc,
-				BroadcastId);
+		/**
+	 	* Note:
+	 	* Unlike AIE2PS and earlier generations there is not L1 interrupt controller.
+	 	* And hence for AIE4 SHIM tile internal broadcast events needs to be used for
+	 	* Shim error identification.
+	 	*/
+#if !DEV_GEN_AIE4
+	return _XAie_LReadShimErrorBroadcastEvent(DevInst, Loc,
+			BroadcastId);
+#else
+	return _XAie_LReadArrayErrorBroadcastEvent(DevInst, Loc, Module,
+			BroadcastId);
+#endif
 	} else {
 		return _XAie_LReadArrayErrorBroadcastEvent(DevInst, Loc, Module,
 				BroadcastId);
@@ -360,13 +399,19 @@ static inline u8 _XAie_LMapGroupErrorsToEventId(XAie_DevInst *DevInst,
 	if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
 		return XAIE_MEM_TILE_EVENT_GROUP_ERROR0 + GroupErrorIndex;
 	} else if (TType == XAIEGBL_TILE_TYPE_AIETILE) {
-		if (Module == XAIE_CORE_MOD) {
-			return XAIE_CORE_MOD_EVENT_GROUP_ERROR0 +
-					GroupErrorIndex;
-		} else {
-			return XAIE_MEM_MOD_EVENT_GROUP_ERROR0 +
-					GroupErrorIndex;
-		}
+#if DEV_GEN_AIE4
+	(void)Module;
+	return XAIE_CORE_MOD_EVENT_GROUP_ERROR0 +
+			GroupErrorIndex;
+#else
+	if (Module == XAIE_CORE_MOD) {
+		return XAIE_CORE_MOD_EVENT_GROUP_ERROR0 +
+				GroupErrorIndex;
+	} else {
+		return XAIE_MEM_MOD_EVENT_GROUP_ERROR0 +
+				GroupErrorIndex;
+	}
+#endif
 	} else {
 		return XAIE_PL_MOD_EVENT_GROUP_ERROR0 + GroupErrorIndex;
 	}
@@ -396,11 +441,16 @@ static inline u32 _XAie_LReadGroupErrors(XAie_DevInst *DevInst,
 	if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
 		RegOff = XAIE_MEM_TILE_GROUP_ERROR0_ENABLE;
 	} else if (TType == XAIEGBL_TILE_TYPE_AIETILE) {
-		if (Module == XAIE_CORE_MOD) {
-			RegOff = XAIE_CORE_MOD_GROUP_ERROR0_ENABLE;
-		} else {
-			RegOff = XAIE_MEM_MOD_GROUP_ERROR0_ENABLE;
-		}
+#if DEV_GEN_AIE4
+	(void)Module;
+	RegOff = XAIE_CORE_MOD_GROUP_ERROR0_ENABLE;
+#else
+	if (Module == XAIE_CORE_MOD) {
+		RegOff = XAIE_CORE_MOD_GROUP_ERROR0_ENABLE;
+	} else {
+		RegOff = XAIE_MEM_MOD_GROUP_ERROR0_ENABLE;
+	}
+#endif
 	} else {
 		RegOff = XAIE_PL_MOD_GROUP_ERROR0_ENABLE;
 	}
@@ -435,11 +485,16 @@ static inline void _XAie_LGroupErrorControl(XAie_DevInst *DevInst,
 	if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
 		RegOff = XAIE_MEM_TILE_GROUP_ERROR0_ENABLE;
 	} else if (TType == XAIEGBL_TILE_TYPE_AIETILE) {
-		if (Module == XAIE_CORE_MOD) {
-			RegOff = XAIE_CORE_MOD_GROUP_ERROR0_ENABLE;
-		} else {
-			RegOff = XAIE_MEM_MOD_GROUP_ERROR0_ENABLE;
-		}
+#if DEV_GEN_AIE4
+	(void)Module;
+	RegOff = XAIE_CORE_MOD_GROUP_ERROR0_ENABLE;
+#else
+	if (Module == XAIE_CORE_MOD) {
+		RegOff = XAIE_CORE_MOD_GROUP_ERROR0_ENABLE;
+	} else {
+		RegOff = XAIE_MEM_MOD_GROUP_ERROR0_ENABLE;
+	}
+#endif
 	} else {
 		RegOff = XAIE_PL_MOD_GROUP_ERROR0_ENABLE;
 	}
@@ -523,6 +578,7 @@ static AieRC _XAie_LBacktrackTile(XAie_DevInst *DevInst,
 	return XAIE_OK;
 }
 
+#if !DEV_GEN_AIE4
 /*****************************************************************************/
 /**
 *
@@ -693,7 +749,7 @@ AieRC XAie_BacktrackErrorInterruptsIPU(XAie_DevInst *DevInst,
 	/* Return success upon successful backtrack. */
 	return XAIE_OK;
 }
-
+#endif
 /*****************************************************************************/
 /**
 *
@@ -735,6 +791,7 @@ AieRC XAie_BacktrackErrorInterrupts(XAie_DevInst *DevInst,
 #ifdef __AIEIPU__
 	return XAie_BacktrackErrorInterruptsIPU(DevInst, MData);
 #endif
+#if !DEV_GEN_AIE4
 	XAIE_ERROR_RETURN((DevInst == NULL || DevInst->NumCols > XAIE_NUM_COLS),
 			XAIE_INVALID_ARGS,
 			XAIE_ERROR_MSG("Error interrupt backtracking failed, invalid partition instance\n"));
@@ -798,6 +855,11 @@ AieRC XAie_BacktrackErrorInterrupts(XAie_DevInst *DevInst,
 
 	/* Return success upon successful backtrack. */
 	return XAIE_OK;
+#else
+(void)DevInst;
+(void)MData;
+return XAIE_OK;
+#endif
 }
 
 #endif /* XAIE_FEATURE_INTR_BTRK_ENABLE */

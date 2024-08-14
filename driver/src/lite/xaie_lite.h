@@ -37,6 +37,16 @@
 		.NumRows = (XAIE_NUM_ROWS), \
 	}
 
+/* Macro for Initialization of AIE4 Device Instance */
+#define XAie_LDeclareAie4DevInst(DevInst, _BaseAddr, _StartCol, _NumCols, _AppMode) \
+	XAie_DevInst DevInst = { \
+		.BaseAddr = (_BaseAddr), \
+		.StartCol = (_StartCol), \
+		.NumCols = (_NumCols), \
+		.NumRows = (XAIE_NUM_ROWS), \
+		.AppMode = (_AppMode), \
+	}
+
 #if XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE
 #include "xaie_lite_aie.h"
 #include "xaie_lite_shim_aie.h"
@@ -52,6 +62,10 @@
 		(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE2P_STRIX_B0))
 #include "xaie_lite_aieml.h"
 #include "xaie_lite_shim_aie2p.h"
+#elif ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
+	 	(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA))
+#include "xaie_lite_aie4.h"
+#include "xaie_lite_shim_aie4.h"
 #else
 #include <xaie_custom_device.h>
 #endif
@@ -79,6 +93,11 @@ XAIE_AIG_EXPORT AieRC XAie_IsPartitionIdle(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_ClearPartitionContext(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_SetColumnClk(XAie_DevInst *DevInst, u8 Enable);
 XAIE_AIG_EXPORT AieRC XAie_ClearCoreReg(XAie_DevInst *DevInst);
+XAIE_AIG_EXPORT AieRC XAie_NpiSetPartProtectedReg(XAie_DevInst *DevInst, u8 enable);
+XAIE_AIG_EXPORT AieRC XAie_PowerOnReset(XAie_DevInst *DevInst, XAie_PartPorOpts *PorOptions);
+XAIE_AIG_EXPORT AieRC XAie_TileClockControl(XAie_DevInst *DevInst, XAie_LocType *Locs,u8 NumTiles, u8 Enable);
+XAIE_AIG_EXPORT AieRC XAie_ConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie_ShimOpts *ShimOptions);
+
 
 /************************** Function Definitions *****************************/
 /*****************************************************************************/

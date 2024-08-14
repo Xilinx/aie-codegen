@@ -46,6 +46,20 @@
 #define XAIE_NPI_PROT_REG_CNTR_LASTCOL_MSK		0x00007F00U
 #define XAIE_NPI_PROT_REG_CNTR_LASTCOL_LSB		8U
 
+#define XAIE_NPI_PCSR_MASK_ME_IPOR_LSB			24U
+#define XAIE_NPI_PCSR_MASK_ME_IPOR_MASK      0x01000000U
+#define XAIE_NPI_PCSR_MASK_ME_ARRAY_RESET_LSB 26U
+#define XAIE_NPI_PCSR_MASK_ME_ARRAY_RESET_MASK 0x04000000U
+#define XAIE_NPI_PROT_REG_ME_TOP_ROW	0x00000148U
+#define XAIE_NPI_PROT_REG_PCSR_INITSTATE_MASK  0x00000040U
+#define XAIE_NPI_PROT_REG_ME_SECURE_REG    0x00000208U
+#define XAIE_NPI_PROT_REG_ME_SMID_REG    0x00000204U
+#define XAIE_NPI_PROT_REG_ME_RAM_EMA_CTRL    0x00000160U
+#define XAIE_NPI_PROT_REG_ME_RAM_EMA_RESET_VALUE 0Xd8bU
+
+#define XAie_ClearBitField(Val, Lsb, Mask)	(((u32)~((Val) << (Lsb))) & (Mask))
+#define XAie_SetBitField(Val, Lsb, Mask)	(((u32)((Val) << (Lsb))) | (Mask))
+
 /***************************** Include Files *********************************/
 #include "xaie_lite_io.h"
 #include "xaiegbl_defs.h"
@@ -158,6 +172,53 @@ static inline void _XAie_LNpiSetShimReset(u8 RstEnable)
 			XAIE_NPI_PCSR_CONTROL_SHIM_RESET_MSK);
 
 	_XAie_LNpiWritePcsr(RegVal, XAIE_NPI_PCSR_CONTROL_SHIM_RESET_MSK);
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the NPI function to set ME_IPOR Assert/Deassert and release Array Reset
+*
+* @param	DevInst : AI engine device pointer
+* @param	RstEnable : XAIE_ENABLE to assert reset, and XAIE_DISABLE to
+*			    deassert reset.
+*
+* @return	XAIE_OK for success, and error value for failure
+*
+* @note		This function is internal.
+*
+*******************************************************************************/
+static inline void _XAie_LNpiSetMeIporReset(u8 RstEnable)
+{
+	u32 RegVal;
+
+	RegVal = XAie_SetBitField(RstEnable, XAIE_NPI_PCSR_MASK_ME_IPOR_LSB,
+			XAIE_NPI_PCSR_MASK_ME_IPOR_MASK);
+
+	_XAie_LNpiWriteCheck32(XAIE_NPI_PCSR_MASK_REG, RegVal);
+
+	RegVal = XAie_ClearBitField(RstEnable, XAIE_NPI_PCSR_MASK_ME_IPOR_LSB,
+			XAIE_NPI_PCSR_MASK_ME_IPOR_MASK);
+
+	_XAie_LNpiWriteCheck32(XAIE_NPI_PCSR_CONTROL_REG, RegVal);
+
+	/* Release Init State */
+	RegVal = XAie_SetBitField(RstEnable, XAIE_NPI_PCSR_MASK_ME_IPOR_LSB,
+			XAIE_NPI_PROT_REG_PCSR_INITSTATE_MASK);
+	_XAie_LNpiWriteCheck32(XAIE_NPI_PCSR_MASK_REG, RegVal);
+
+	RegVal = XAie_ClearBitField(RstEnable, XAIE_NPI_PCSR_MASK_ME_IPOR_LSB,
+				XAIE_NPI_PROT_REG_PCSR_INITSTATE_MASK);
+	_XAie_LNpiWriteCheck32(XAIE_NPI_PCSR_CONTROL_REG, RegVal);
+
+	/* Release Array Reset */
+	RegVal = XAie_SetBitField(RstEnable, XAIE_NPI_PCSR_MASK_ME_ARRAY_RESET_LSB,
+			XAIE_NPI_PCSR_MASK_ME_ARRAY_RESET_MASK);
+	_XAie_LNpiWriteCheck32(XAIE_NPI_PCSR_MASK_REG, RegVal);
+
+	RegVal = XAie_ClearBitField(RstEnable, XAIE_NPI_PCSR_MASK_ME_ARRAY_RESET_LSB,
+			XAIE_NPI_PCSR_MASK_ME_ARRAY_RESET_MASK);
+	_XAie_LNpiWriteCheck32(XAIE_NPI_PCSR_MASK_REG, RegVal);
 }
 
 #endif		/* end of protection macro */

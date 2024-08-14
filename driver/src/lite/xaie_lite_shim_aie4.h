@@ -1,27 +1,28 @@
 /******************************************************************************
-* Copyright (C) 2021 - 2022 Xilinx, Inc.  All rights reserved.
+* Copyright (C) 2023 - 2024 Xilinx, Inc.  All rights reserved.
 * SPDX-License-Identifier: MIT
 ******************************************************************************/
 
 
 /*****************************************************************************/
 /**
-* @file xaie_lite_shim_aie2ipu.h
+* @file xaie_lite_shim_aie4.h
 * @{
 *
-* This header file defines a lite shim interface for AIE2IPU type devices.
+* This header file defines a lite shim interface for AIE4 type devices.
 *
-* <pre>
+** <pre>
 * MODIFICATION HISTORY:
 *
 * Ver   Who     Date     Changes
 * ----- ------  -------- -----------------------------------------------------
-* 1.0   Nishad   06/23/2022  Initial creation
+* 1.0   Ramakant   27/12/2023  Initial creation
 * </pre>
 *
 ******************************************************************************/
-#ifndef XAIE_LITE_SHIM_AIE2IPU_H
-#define XAIE_LITE_SHIM_AIE2IPU_H
+
+#ifndef XAIE_LITE_SHIM_AIE4_H_
+#define XAIE_LITE_SHIM_AIE4_H_
 
 /***************************** Include Files *********************************/
 #include "xaie_lite_hwcfg.h"
@@ -29,20 +30,9 @@
 #include "xaiegbl.h"
 
 /************************** Constant Definitions *****************************/
-#define UPDT_NEXT_NOC_TILE_LOC(Loc)	\
-({					\
-	if ((Loc).Col == 0)		\
-		(Loc).Col = 1;		\
-	else				\
-		(Loc).Col++;		\
-})
-
-#define IS_TILE_NOC_TILE(Loc)		\
-({					\
-	(Loc).Col ? 1: 0;		\
-})
-
-#define XAIE_MAX_NUM_NOC_INTR		4U
+#define XAIE_MAX_NUM_NOC_INTR				3U
+#define IS_TILE_NOC_TILE(Loc)				1
+#define UPDT_NEXT_NOC_TILE_LOC(Loc)			(Loc).Col++
 
 /************************** Function Prototypes  *****************************/
 /*****************************************************************************/
@@ -54,7 +44,7 @@
 * @param	DevInst: Device Instance
 * @param	Loc: Location of the AIE tile.
 *
-* @return	TileType SHIMPL/SHIMNOC.
+* @return	TileType SHIMPL/SHIMNOC./
 *
 * @note		Internal only.
 *
@@ -62,42 +52,10 @@
 static inline u8 _XAie_LGetShimTTypefromLoc(XAie_DevInst *DevInst,
 			XAie_LocType Loc)
 {
-	if((DevInst->StartCol + Loc.Col) == 0U)
-		return XAIEGBL_TILE_TYPE_SHIMPL;
+	(void) DevInst;
+	(void) Loc;
 
 	return XAIEGBL_TILE_TYPE_SHIMNOC;
-}
-
-/*****************************************************************************/
-/**
-*
-* This API maps L2 status bit to its L1 switch.
-*
-* @param	DevInst: Device Instance.
-* @param	Index: Set bit position in L2 status.
-* 		For IPU, Col < 2, Index 0 to 3 is valid.
-* 		For Col >= 2, Index 0 to 1 is valid.
-* @param	L2Col: Location of L2 column.
-* @param	L1Col: Mapped value of L1 column.
-* @param	Switch: Broadcast switch.
-*
-* @return	None.
-*
-* @note		Internal only.
-*
-******************************************************************************/
-static inline void _XAie_MapL2MaskToL1(XAie_DevInst *DevInst, u32 Index,
-			u8 L2Col, u8 *L1Col, XAie_BroadcastSw *Switch)
-{
-	(void) DevInst;
-
-	if (L2Col < 2) {
-		*L1Col = Index / 2;
-		*Switch = Index % 2;
-	} else {
-	        *L1Col = L2Col;
-	        *Switch= Index % 2;
-	}
 }
 
 /*****************************************************************************/
@@ -116,10 +74,17 @@ static inline void _XAie_MapL2MaskToL1(XAie_DevInst *DevInst, u32 Index,
 static inline XAie_Range _XAie_MapIrqIdToCols(u8 IrqId)
 {
 	XAie_Range _MapIrqIdToCols[] = {
+#if XAIE_DEV_SINGLEGEN == XAIE_DEV_GEN_AIE2P_STRIX_B0
 		{.Start = 0, .Num = 2},
+		{.Start = 2, .Num = 2},
+		{.Start = 4, .Num = 2},
+		{.Start = 6, .Num = 2},
+#else
+		{.Start = 0, .Num = 1},
+		{.Start = 1, .Num = 1},
 		{.Start = 2, .Num = 1},
 		{.Start = 3, .Num = 1},
-		{.Start = 4, .Num = 1},
+#endif
 	};
 
 	return _MapIrqIdToCols[IrqId];
@@ -142,11 +107,33 @@ static inline u8 _XAie_MapColToIrqId(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 AbsCol = DevInst->StartCol + Loc.Col;
 
-	if (AbsCol < 2) {
-		return 0;
-	} else {
-		return AbsCol - 1;
-	}
+	return AbsCol / (XAIE_NUM_COLS / XAIE_MAX_NUM_NOC_INTR);
+}
+
+/*****************************************************************************/
+/**
+*
+* This is API returns the HW Err IRQ ID for a given column.
+*
+* @param	DevInst: Device Instance
+* @param	Loc: Location of the AIE tile.
+*
+* @return	HW Err IRQ ID.
+*
+* @note		Internal only.
+*
+******************************************************************************/
+static inline u8 _XAie_MapColToHWErrIrqId(XAie_DevInst *DevInst,
+		XAie_LocType Loc)
+{
+	(void)DevInst;
+	(void)Loc;
+
+	/**
+         * As per spec recomendation.
+         * The HW error should be triggering NPI IRQ 1.
+         */
+	return 1;
 }
 
 /*****************************************************************************/
@@ -175,11 +162,6 @@ static inline void _XAie_PrivilegeSetShimClk(XAie_DevInst *DevInst,
 	FldVal |= XAie_SetField(Enable,
 			XAIE_SHIM_TILE_MOD_CLOCK_CONTROL_0_PL_INTERFACE_CLOCK_ENABLE_LSB,
 			XAIE_SHIM_TILE_MOD_CLOCK_CONTROL_0_PL_INTERFACE_CLOCK_ENABLE_MASK);
-	FldVal |= XAie_SetField(Enable,
-			XAIE_SHIM_TILE_MOD_CLOCK_CONTROL_0_STREAM_SWITCH_CLOCK_ENABLE_LSB,
-			XAIE_SHIM_TILE_MOD_CLOCK_CONTROL_0_STREAM_SWITCH_CLOCK_ENABLE_MASK);
-
-
 
 	_XAie_LPartMaskWrite32(DevInst, RegAddr,
 		XAIE_SHIM_TILE_MOD_CLOCK_CONTROL_0_MASK, FldVal);
@@ -195,10 +177,36 @@ static inline void _XAie_PrivilegeSetShimClk(XAie_DevInst *DevInst,
 
 }
 
+/*****************************************************************************/
+/**
+* This API modifies(enable or disable) the uc memory_privileged register for all
+* cols in the partition.
+*
+* @param        DevInst: Device Instance
+* @param        Enable: XAIE_ENABLE to enable the uc memory_privileged,
+*                       XAIE_DISABLE to disable.
+* @note         Modifying the uc.memory_privileged register while the uc core is
+* 		enabled results in undefined behaviour.
+* 		It is job of the caller to make sure the UC core is in sleep.
+*
+******************************************************************************/
 static inline void _XAie_PrivilegeSetUCMemoryPrivileged(XAie_DevInst *DevInst,
 							u8 Enable)
 {
+	u64 RegAddr;
+	u32 Val;
+	int i;
+
+	for (i = 0; i < DevInst->NumCols; i++) {
+		RegAddr = _XAie_LGetTileAddr(0, i) +
+				XAIE_UC_MODULE_MEMORY_PRIVILEGED;
+		Val = XAie_SetField(Enable,
+				XAIE_UC_MODULE_MEMORY_PRIVILEGED_MEMORY_PRIVILEGED_LSB,
+				XAIEGBL_UC_MODULE_MEMORY_PRIVILEGED_MEMORY_PRIVILEGED_MASK);
+		_XAie_LPartMaskWrite32(DevInst, RegAddr,
+				XAIEGBL_UC_MODULE_MEMORY_PRIVILEGED_MEMORY_PRIVILEGED_MASK,
+				       Val);
+	}
 }
 
-#endif		/* end of protection macro */
-/** @} */
+#endif /* XAIE_LITE_SHIM_AIE4_H_ */

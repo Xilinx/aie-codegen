@@ -45,6 +45,10 @@
 		(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE2P_STRIX_B0))
 #include "xaie_lite_aieml.h"
 #include "xaie_lite_shim_aie2p.h"
+#elif ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
+	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA))
+#include "xaie_lite_aie4.h"
+#include "xaie_lite_shim_aie4.h"
 #else
 #include <xaie_custom_device.h>
 #endif
@@ -65,6 +69,15 @@
 #else
 #define XAIE_ERROR_RETURN(...)
 #endif
+
+#define DEV_GEN_AIE4 ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
+						(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA))
+
+#define DEV_GEN_DUAL_APP ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
+						(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA))
+
+#define _XAie_LIsDeviceGenAIE4() DEV_GEN_AIE4
+#define _XAie_LIsDeviceGenSupportDualApp() DEV_GEN_DUAL_APP
 
 /************************** Function Definitions *****************************/
 /*****************************************************************************/

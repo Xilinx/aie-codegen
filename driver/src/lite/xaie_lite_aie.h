@@ -332,5 +332,118 @@ static inline void _XAie_ClearCoreReg(XAie_DevInst *DevInst)
 {
 	(void)DevInst;
 }
+
+/*****************************************************************************/
+/**
+*
+* This API sets Single App or Dual App mode.
+*
+* @param	DevInst: Device Instance
+* @param	XAie_PartInitOpts: Partition init options
+*
+* @return	None.
+*
+* @note		Internal only. Not Applicable for AIE architecture
+*
+******************************************************************************/
+static inline AieRC _XAie_LSetDualAppModePrivileged (XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
+{
+        (void)DevInst;
+        (void)Opts;
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+ *
+ * This API sets the L2 Memory split in Dual Application Mode
+ * By setting L2 Split Control Register MemTile memory is divided between
+ * Application A and B
+ *
+ * @param	DevInst: Device Instance
+ *
+ * @return	None.
+ *
+ * @note	None.
+ *
+ * @note	Internal only. Not Applicable for AIE architecture
+ *
+ *****************************************************************************/
+static inline void _XAie_LSetPartL2Split(XAie_DevInst *DevInst)
+{
+	(void)DevInst;
+}
+
+/*****************************************************************************/
+/**
+ *
+ * This API configures the registers following POR sequence. It Unlock ME PCSR,
+ * Sets ME_IPOR, Sets top row and Row Offset, Releases ARRAY resets, Configures
+ * NPI registers, un-gates column clock and reset/un-reset Application reset for each column,
+ * disable isolation in entire array.
+ *
+ * @param	DevInst: Device Instance
+ * @param	PorOptions: contains options for ME_TOP_ROW and ROW_OFFSET
+ *
+ * @return	None.
+ *
+ * @note	None.
+ *
+ * @note	Internal only. Not Applicable for AIE architecture
+ *
+ *****************************************************************************/
+static inline AieRC _XAie_LAiePorConfiguration(XAie_DevInst *DevInst, XAie_PartPorOpts *PorOptions)
+{
+	(void)DevInst;
+	(void)PorOptions;
+
+	return XAIE_NOT_SUPPORTED;
+}
+
+/*****************************************************************************/
+/**
+* This API Enables/Disables clock in Individual AIE Tiles
+*
+* @param	DevInst: AI engine partition device instance pointer
+* @param	Locs: Locations of Tiles to Enable/Disable Module Clock
+* @param	NumTiles: Number of tiles for clock Gate/Ungate
+* @param	Enable: Enable/Disable Tile Module clock
+*
+* @return   XAIE_OK on success, error code on failure
+*
+* @note		Internal only. Not Applicable for AIE architecture
+*
+*******************************************************************************/
+static inline AieRC _XAie_LTileClockControl(XAie_DevInst *DevInst, XAie_LocType *Loc,u8 NumTiles, u8 Enable)
+{
+	(void)DevInst;
+	(void)Loc;
+	(void)NumTiles;
+	(void)Enable;
+
+	return XAIE_NOT_SUPPORTED;
+}
+
+/*****************************************************************************/
+/**
+* This API Sets SMID, AxUSER_A or B and Trusted_Keys registers in Shim Tile for each
+* application
+*
+* @param	DevInst: AI engine partition device instance pointer
+* @param	XAie_ShimOpts: Values for SMID, AxUSER_A or B, Trusted_Keys
+*
+* @return   XAIE_OK on success, error code on failure
+*
+* @note		Internal only. Not Applicable for AIE architecture
+*
+*******************************************************************************/
+static inline AieRC _XAie_LConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie_ShimOpts *ShimOptions)
+{
+	(void)DevInst;
+	(void)ShimOptions;
+
+	return XAIE_NOT_SUPPORTED;
+}
 #endif		/* end of protection macro */
 /** @} */

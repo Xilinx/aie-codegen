@@ -178,5 +178,10 @@ static inline void _XAie_PrivilegeSetShimClk(XAie_DevInst *DevInst,
 }
 #endif /* XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE */
 
+static inline void _XAie_PrivilegeSetUCMemoryPrivileged(XAie_DevInst *DevInst,
+							u8 Enable)
+{
+}
+
 #endif		/* end of protection macro */
 /** @} */

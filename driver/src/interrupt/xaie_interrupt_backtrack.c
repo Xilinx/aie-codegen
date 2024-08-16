@@ -47,6 +47,11 @@
 * @return	None.
 *
 * @note		Internal Only.
+* 
+* In AIE4 switching between the two instances of L2 Interrupt Controller
+* hardware based on application A or B when in dual app mode of operation.
+* Is managed by the use of partition baseaddress member of DevInst structure
+* representing the partition.
 *
 ******************************************************************************/
 static inline void _XAie_LIntrCtrlL2Enable(XAie_DevInst *DevInst,
@@ -54,6 +59,7 @@ static inline void _XAie_LIntrCtrlL2Enable(XAie_DevInst *DevInst,
 {
 	u64 RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
 				XAIE_NOC_MOD_INTR_L2_ENABLE;
+
 	_XAie_LPartWrite32(DevInst, RegAddr, ChannelBitMap);
 }
 
@@ -105,11 +111,17 @@ u32 XAie_L2IntrCtrlStatus(XAie_DevInst *DevInst, u8 StartCol)
 *
 * @note		Internal Only.
 *
+* In AIE4 switching between the two instances of L2 Interrupt Controller
+* hardware based on application A or B when in dual app mode of operation.
+* Is managed by the use of partition baseaddress member of DevInst structure
+* representing the partition.
+*
 ******************************************************************************/
 static inline u32 _XAie_LIntrCtrlL2Mask(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u64 RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
 				XAIE_NOC_MOD_INTR_L2_MASK;
+
 	return _XAie_LPartRead32(DevInst, RegAddr);
 }
 
@@ -177,6 +189,9 @@ static inline void _XAie_LIntrCtrlL1Ack(XAie_DevInst *DevInst,
 *
 * @note		Internal only.
 *
+* In AIE4 with comparision to previous generation, the two event broadcast
+* switches in AIE Tile are merged into single switch.
+*
 ******************************************************************************/
 static inline u8 _XAie_LEventReadStatus(XAie_DevInst *DevInst,
 		XAie_LocType Loc, XAie_ModuleType Module, u8 Event)
@@ -222,6 +237,9 @@ static inline u8 _XAie_LEventReadStatus(XAie_DevInst *DevInst,
 *
 * @note		Internal only.
 *
+* In AIE4 with comparision to previous generation, the two event broadcast
+* switches in AIE Tile are merged into single switch.
+*
 ******************************************************************************/
 static inline void _XAie_LEventClearStatus(XAie_DevInst *DevInst,
 		XAie_LocType Loc, XAie_ModuleType Module, u8 Event)
@@ -266,6 +284,9 @@ static inline void _XAie_LEventClearStatus(XAie_DevInst *DevInst,
 * @return	Event: Physical event ID.
 *
 * @note		Internal only.
+*
+* In AIE4 with comparision to previous generation, the two event broadcast
+* switches in AIE Tile are merged into single switch.
 *
 ******************************************************************************/
 static inline u32 _XAie_LReadArrayErrorBroadcastEvent(XAie_DevInst *DevInst,
@@ -390,6 +411,9 @@ static inline u32 _XAie_ReadErrorBroadcastEvent(XAie_DevInst *DevInst,
 *
 * @note		Internal only.
 *
+* In AIE4 with comparision to previous generation, the two event broadcast
+* switches in AIE Tile are merged into single switch.
+*
 ******************************************************************************/
 static inline u8 _XAie_LMapGroupErrorsToEventId(XAie_DevInst *DevInst,
 			XAie_LocType Loc, XAie_ModuleType Module,
@@ -429,6 +453,9 @@ static inline u8 _XAie_LMapGroupErrorsToEventId(XAie_DevInst *DevInst,
 * @return	Bitmap of enabled group errors.
 *
 * @note		Internal only.
+*
+* In AIE4 with comparision to previous generation, the two event broadcast
+* switches in AIE Tile are merged into single switch.
 *
 ******************************************************************************/
 static inline u32 _XAie_LReadGroupErrors(XAie_DevInst *DevInst,
@@ -473,6 +500,9 @@ static inline u32 _XAie_LReadGroupErrors(XAie_DevInst *DevInst,
 * @return	Bitmap of enabled group errors.
 *
 * @note		Internal only.
+*
+* In AIE4 with comparision to previous generation, the two event broadcast
+* switches in AIE Tile are merged into single switch.
 *
 ******************************************************************************/
 static inline void _XAie_LGroupErrorControl(XAie_DevInst *DevInst,
@@ -520,7 +550,7 @@ static inline void _XAie_LGroupErrorControl(XAie_DevInst *DevInst,
 ******************************************************************************/
 static AieRC _XAie_LBacktrackTile(XAie_DevInst *DevInst,
 		XAie_ErrorMetaData *MData, XAie_LocType Loc,
-		XAie_ModuleType Module)
+		XAie_ModuleType Module, u8 BroadcastId)
 {
 	XAie_ErrorPayload *Buffer = MData->ErrInfo->Payload;
 	u32 *Count = &(MData->ErrInfo->ErrorCount);
@@ -530,7 +560,7 @@ static AieRC _XAie_LBacktrackTile(XAie_DevInst *DevInst,
 
 	/* Read event being broadcast on error channel */
 	GroupEvent = _XAie_ReadErrorBroadcastEvent(DevInst, Loc, Module,
-			XAIE_ERROR_BROADCAST_ID);
+			BroadcastId);
 
 	if (!_XAie_LEventReadStatus(DevInst, Loc, Module, GroupEvent))
 		return XAIE_OK;
@@ -608,8 +638,10 @@ static AieRC _XAie_LBacktrackIntrCtrlL1(XAie_DevInst *DevInst,
 		_XAie_LIntrCtrlL1Ack(DevInst, Loc, Switch,
 				XAIE_ERROR_SHIM_INTR_MASK);
 
-		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, XAIE_PL_MOD);
+		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, XAIE_PL_MOD,
+						XAIE_ERROR_BROADCAST_ID);
 		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE)
+			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
 			return RC;
 	}
 
@@ -626,7 +658,8 @@ static AieRC _XAie_LBacktrackIntrCtrlL1(XAie_DevInst *DevInst,
 		if (_XAie_LPmIsTileRequested(DevInst, Loc) == XAIE_DISABLE)
 			continue;
 
-		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, XAIE_MEM_MOD);
+		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, XAIE_MEM_MOD,
+						XAIE_ERROR_BROADCAST_ID);
 		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE) {
 			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
 			return RC;
@@ -660,9 +693,12 @@ static AieRC _XAie_LBacktrackIntrCtrlL1(XAie_DevInst *DevInst,
 		if (_XAie_LPmIsTileRequested(DevInst, Loc) == XAIE_DISABLE)
 			continue;
 
-		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, Module);
-		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE)
+		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, Module,
+						XAIE_ERROR_BROADCAST_ID);
+		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE) {
+			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
 			return RC;
+		}
 
 		/*
 		 * Skip backtracking above array tiles if no broadcast signal
@@ -678,7 +714,7 @@ static AieRC _XAie_LBacktrackIntrCtrlL1(XAie_DevInst *DevInst,
 	return XAIE_OK;
 }
 
-/* l1 bruteforce backtrack for IPU.
+/* l1 bruteforce backtrack for IPU for architecture prior to AIE4.
  * This is a temporary fix for IPU.
  */
 AieRC XAie_BacktrackErrorInterruptsIPU(XAie_DevInst *DevInst,
@@ -750,6 +786,187 @@ AieRC XAie_BacktrackErrorInterruptsIPU(XAie_DevInst *DevInst,
 	return XAIE_OK;
 }
 #endif
+
+/*****************************************************************************/
+/**
+*
+* This API backtracks the source of error interrupt within a column in AIE4
+* using L2 interrupt controller.
+*
+* @param	DevInst: Device Instance.
+* @param	MData: Error metadata.
+* @param	Loc: Location of AIE tile.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		Internal only.
+*
+******************************************************************************/
+static AieRC _XAie_LBacktrackIntrCtrlL2(XAie_DevInst *DevInst,
+		XAie_ErrorMetaData *MData, XAie_LocType Loc)
+{
+	AieRC RC;
+	u32 Status;
+    XAie_AppIndex AppId;
+
+	if((DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B)) {
+		AppId = APPLICATION_B;
+	} else{
+		AppId = APPLICATION_A;
+	}
+
+	Status = _XAie_LIntrCtrlL2Status(Loc, AppId);
+
+	/* Backtrack shim's uC events */
+	if (Status & XAIE_ERROR_SHIM_INTR_MASK) {
+		_XAie_LIntrCtrlL2Ack(Loc, AppId, XAIE_ERROR_SHIM_INTR_MASK);
+
+		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, XAIE_PL_MOD,
+						XAIE_ERROR_BROADCAST_ID);
+		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE)
+			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
+			return RC;
+	}
+
+	/* Backtrack shim's internal events */
+	if (Status & XAIE_ERROR_BROADCAST_MASK) {
+		_XAie_LIntrCtrlL2Ack(Loc, AppId, XAIE_ERROR_BROADCAST_MASK);
+
+		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, XAIE_PL_MOD,
+						XAIE_ERROR_BROADCAST_ID);
+		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE)
+			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
+			return RC;
+	}
+
+	/* Backtrack array tile's internal events. */
+	if (!(Status & XAIE_ERROR_BROADCAST_MASK))
+		return XAIE_OK;
+
+	_XAie_LIntrCtrlL2Ack(Loc, AppId, XAIE_ERROR_BROADCAST_MASK);
+
+	for (Loc.Row = XAIE_MEM_TILE_ROW_START;
+	     Loc.Row < (XAIE_MEM_TILE_ROW_START + XAIE_MEM_TILE_NUM_ROWS);
+	     Loc.Row++)
+	{
+		if (_XAie_LPmIsTileRequested(DevInst, Loc) == XAIE_DISABLE)
+			continue;
+
+		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, XAIE_MEM_MOD, 
+						XAIE_ERROR_BROADCAST_ID);
+		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE) {
+			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
+			return RC;
+		}
+
+		/*
+		 * TODO: In SystemC model, incoming broadcast status bit
+		 *	 reported is off by a bit position. For switch A, skip
+		 *	 backtracking above array tiles when this bug is fixed.
+		 */
+		_XAie_LEventClearStatus(DevInst, Loc, XAIE_MEM_MOD,
+					 XAIE_MEM_TILE_EVENT_BROADCAST0);
+	}
+
+	for (Loc.Row = XAIE_AIE_TILE_ROW_START;
+	     Loc.Row < (XAIE_AIE_TILE_ROW_START + XAIE_AIE_TILE_NUM_ROWS);
+	     Loc.Row++)
+	{
+		XAie_ModuleType Module = XAIE_CORE_MOD;
+		u8 Event = XAIE_CORE_MOD_EVENT_BROADCAST0;
+
+		if (_XAie_LPmIsTileRequested(DevInst, Loc) == XAIE_DISABLE)
+			continue;
+
+		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, Module,
+						XAIE_ERROR_BROADCAST_ID);
+		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE) {
+			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
+			return RC;
+		}
+
+		/*
+		 * Skip backtracking above array tiles if no broadcast signal
+		 * was received and the last backtrack operation was successful.
+		 */
+		if (!(_XAie_LEventReadStatus(DevInst, Loc, Module, Event) )) {
+			return XAIE_OK;
+		}
+
+		_XAie_LEventClearStatus(DevInst, Loc, Module, Event);
+	}
+
+	return XAIE_OK;
+}
+
+/* l1 bruteforce backtrack for IPU for architecture AIE4.
+ * This is a temporary fix for IPU.
+ */
+AieRC XAie_BacktrackErrorInterruptsIPU_Aie4(XAie_DevInst *DevInst,
+		XAie_ErrorMetaData *MData)
+{
+	XAIE_ERROR_RETURN((DevInst == NULL || DevInst->NumCols > XAIE_NUM_COLS),
+			XAIE_INVALID_ARGS,
+			XAIE_ERROR_MSG("Error interrupt backtracking failed, invalid partition instance\n"));
+
+	XAIE_ERROR_RETURN(MData->Payload == NULL || MData->ArraySize == 0U,
+			XAIE_INVALID_ARGS,
+			XAIE_ERROR_MSG("Invalid error payload buffer or size\n"));
+
+	XAIE_ERROR_RETURN(MData->Cols.Num == 0U || (MData->Cols.Start +
+			  MData->Cols.Num) > XAIE_NUM_COLS, XAIE_INVALID_ARGS,
+			  XAIE_ERROR_MSG("Invalid range of columns\n"));
+
+	AieRC RC;
+	XAie_Range Cols = MData->Cols;
+	int col;
+	u32 Size = MData->ArraySize;
+
+	/*
+	 * Checking the boundry condition for Size. If passed buffer size is
+	 * less then the required Error payload to be stored,
+	 * just return error to avoid further processing.
+	 */
+	if(Size < ((sizeof(XAie_ErrorInfo)) + sizeof(XAie_ErrorPayload))) {
+			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
+			return XAIE_INSUFFICIENT_BUFFER_SIZE;
+	}
+	else {
+			MData->ArraySize = ((Size - (sizeof(XAie_ErrorInfo)))/sizeof(XAie_ErrorPayload));
+	}
+
+
+	/* Backward compatibility to support single channel interrupts */
+	if (Cols.Num == 0) {
+		XAIE_DBG("Backtrack column range undefined. Backtracking (%d, %d).\n",
+				Cols.Start, Cols.Start + Cols.Num);
+		Cols.Num = DevInst->NumCols;
+		MData->Cols.Start = 0;
+	}
+
+	/* Reset the total error count from previous backtrack. */
+	MData->ErrInfo->ErrorCount = 0U;
+	for (col = 0; col < Cols.Num; col++) {
+		XAie_LocType loc;
+
+		loc.Row = 0;
+		loc.Col = col;
+
+		RC = _XAie_LBacktrackIntrCtrlL2(DevInst, MData, loc);
+		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE) {
+			_XAie_LIntrCtrlL2Enable(DevInst, loc, XAIE_ERROR_L2_ENABLE);
+			return RC;
+		}
+
+		if (col)
+			_XAie_LIntrCtrlL2Enable(DevInst, loc, XAIE_ERROR_L2_ENABLE);
+
+	}
+
+	/* Return success upon successful backtrack. */
+	return XAIE_OK;
+}
+
 /*****************************************************************************/
 /**
 *
@@ -789,7 +1006,11 @@ AieRC XAie_BacktrackErrorInterrupts(XAie_DevInst *DevInst,
 		XAie_ErrorMetaData *MData)
 {
 #ifdef __AIEIPU__
-	return XAie_BacktrackErrorInterruptsIPU(DevInst, MData);
+	if(!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))) {
+		return XAie_BacktrackErrorInterruptsIPU(DevInst, MData);
+	} else {
+		return XAie_BacktrackErrorInterruptsIPU_Aie4(DevInst, MData);
+	}
 #endif
 #if !DEV_GEN_AIE4
 	XAIE_ERROR_RETURN((DevInst == NULL || DevInst->NumCols > XAIE_NUM_COLS),

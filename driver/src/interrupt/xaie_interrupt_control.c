@@ -11,6 +11,16 @@
 *
 * This file implements routine for disabling AIE interrupts.
 *
+*
+* Note:
+* In AIE4 switching between the two instances of L2 Interrupt Controller
+* hardware based on application A or B in dual mode of operation. Is
+* managed by the use of partition baseaddress member of DevInst structure
+* representing the partition, Since all the functions in this file are
+* invoked without reference to partition info (DevInst). The responsibility
+* to access the correct configuration registers based on application A or B
+* is with driver API. Hence the functions in this file are handling the same.
+*
 * <pre>
 * MODIFICATION HISTORY:
 *
@@ -40,17 +50,39 @@
 *
 * @return	Status: Status second-level interrupt controller.
 *
+* @note		Internal only.
+*
 ******************************************************************************/
-u32 XAie_LIntrCtrlL2Status(XAie_LocType Loc)
+u32 _XAie_LIntrCtrlL2Status(XAie_LocType Loc, XAie_AppIndex Id)
 {
 	u64 RegAddr;
 
-	if (!IS_TILE_NOC_TILE(Loc)) {
-		UPDT_NEXT_NOC_TILE_LOC(Loc);
+#if DEV_GEN_AIE4
+	/**
+	 * Based on the DevGen and Application Mode select the correct
+	 * register to read the L2 IRQ status
+	 */
+	if (Id == APPLICATION_B) {
+		/**
+		 * Dev-Gen: AIE4 and derivatives
+		 * App-Mode: DUAL APP MODE B
+		 */
+		RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
+				XAIE_NOC_MOD_INTR_L2_APP_B_STATUS;
+	} else {
+#endif
+		/**
+		 * Dev-Gen: AIE AIE2 AIE2P AIE4 and derivatives
+		 * App-Mode: SINGLE APP MODE (or) DUAL APP MODE A
+		 */
+		RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
+				XAIE_NOC_MOD_INTR_L2_STATUS;
+#if DEV_GEN_AIE4
 	}
+#else
+(void)Id;
+#endif
 
-	RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
-                                XAIE_NOC_MOD_INTR_L2_STATUS;
 	return _XAie_LRead32(RegAddr);
 }
 
@@ -70,10 +102,37 @@ u32 XAie_LIntrCtrlL2Status(XAie_LocType Loc)
 * @note		Internal only.
 *
 ******************************************************************************/
-static inline void _XAie_LIntrCtrlL2Ack(XAie_LocType Loc, u32 ChannelBitMap)
+void _XAie_LIntrCtrlL2Ack(XAie_LocType Loc, XAie_AppIndex Id,
+					u32 ChannelBitMap)
 {
-	u64 RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
+	u64 RegAddr;
+
+#if DEV_GEN_AIE4
+	/**
+	 * Based on the DevGen and Application Mode select the correct
+	 * register to clear the L2 IRQ status
+	 */
+	if (Id == APPLICATION_B) {
+		/**
+		 * Dev-Gen: AIE4 and derivatives
+		 * App-Mode: DUAL APP MODE B
+		 */
+		RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
+				XAIE_NOC_MOD_INTR_L2_APP_B_STATUS;
+	} else {
+#endif
+		/**
+		 * Dev-Gen: AIE AIE2 AIE2P AIE4 and derivatives
+		 * App-Mode: SINGLE APP MODE (or) DUAL APP MODE A
+		 */
+		RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
 				XAIE_NOC_MOD_INTR_L2_STATUS;
+#if DEV_GEN_AIE4
+	}
+#else
+(void)Id;
+#endif
+
 	_XAie_LWrite32(RegAddr, ChannelBitMap);
 }
 
@@ -90,10 +149,37 @@ static inline void _XAie_LIntrCtrlL2Ack(XAie_LocType Loc, u32 ChannelBitMap)
 * @note		Internal Only.
 *
 ******************************************************************************/
-static inline void _XAie_LIntrCtrlL2Disable(XAie_LocType Loc, u32 ChannelBitMap)
+static inline void _XAie_LIntrCtrlL2Disable(XAie_LocType Loc, XAie_AppIndex Id,
+					    u32 ChannelBitMap)
 {
-	u64 RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
+	u64 RegAddr;
+
+#if DEV_GEN_AIE4
+	/**
+	 * Based on the DevGen and Application Mode select the correct
+	 * register to disable the L2 IRQ status
+	 */
+	if (Id == APPLICATION_B) {
+		/**
+		 * Dev-Gen: AIE4 and derivatives
+		 * App-Mode: DUAL APP MODE B
+		 */
+		RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
+				XAIE_NOC_MOD_INTR_L2_APP_B_DISABLE;
+	} else {
+#endif
+		/**
+		 * Dev-Gen: AIE AIE2 AIE2P AIE4 and derivatives
+		 * App-Mode: SINGLE APP MODE (or) DUAL APP MODE A
+		 */
+		RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) +
 				XAIE_NOC_MOD_INTR_L2_DISABLE;
+#if DEV_GEN_AIE4
+	}
+#else
+(void)Id;
+#endif
+
 	_XAie_LWrite32(RegAddr, ChannelBitMap);
 }
 
@@ -125,13 +211,28 @@ void XAie_DisableErrorInterrupts(u8 IrqId)
 	while (Loc.Col < Cols.Start + Cols.Num) {
 		u32 Status;
 
-		Status = XAie_LIntrCtrlL2Status(Loc);
+		/**
+		 * Dev-Gen: AIE AIE2 AIE2P AIE4 and derivatives
+		 * App-Mode: SINGLE APP MODE (or) DUAL APP MODE A
+		 */
+		Status = _XAie_LIntrCtrlL2Status(Loc, APPLICATION_A);
 
 		/* Only disable L2s that are reporting errors. */
 		if (Status) {
-			_XAie_LIntrCtrlL2Disable(Loc, Status);
+			_XAie_LIntrCtrlL2Disable(Loc, APPLICATION_A, Status);
 		}
+#if DEV_GEN_AIE4
+		/**
+		 * Dev-Gen: AIE4 and derivatives
+		 * App-Mode: DUAL APP MODE B
+		 */
+		Status = _XAie_LIntrCtrlL2Status(Loc, APPLICATION_B);
 
+		/* Only disable L2 IRQ lines that are reporting errors. */
+		if (Status) {
+			_XAie_LIntrCtrlL2Disable(Loc, APPLICATION_B, Status);
+		}
+#endif
 		UPDT_NEXT_NOC_TILE_LOC(Loc);
 	}
 }
@@ -159,12 +260,29 @@ void XAie_ClearErrorInterrupts(u8 ColNum)
 
 	u32 Status;
 
-	Status = XAie_LIntrCtrlL2Status(Loc);
+	/**
+	 * Dev-Gen: AIE AIE2 AIE2P AIE4 and derivatives
+	 * App-Mode: SINGLE APP MODE (or) DUAL APP MODE A
+	 */
+	Status = _XAie_LIntrCtrlL2Status(Loc, APPLICATION_A);
 
 	/* Only Clear L2s that are reporting errors. */
 	if (Status) {
-		_XAie_LIntrCtrlL2Ack(Loc, Status);
+		_XAie_LIntrCtrlL2Ack(Loc, APPLICATION_A, Status);
 	}
+
+#if DEV_GEN_AIE4
+		/**
+		 * Dev-Gen: AIE4 and derivatives
+		 * App-Mode: DUAL APP MODE B
+		 */
+		Status = _XAie_LIntrCtrlL2Status(Loc, APPLICATION_B);
+
+		/* Only disable L2 IRQ lines that are reporting errors. */
+		if (Status) {
+			_XAie_LIntrCtrlL2Ack(Loc, APPLICATION_B, Status);
+		}
+#endif
 }
 
 #endif /* XAIE_FEATURE_INTR_CTRL_ENABLE */

@@ -512,26 +512,45 @@ static AieRC _XAie_GroupErrorInit(XAie_DevInst *DevInst)
 				continue;
 			}
 
-			GroupErrorEnableMask = _XAie_GetFatalGroupErrors(DevInst,
-							Loc, XAIE_MEM_MOD);
-			RC = XAie_EventGroupControl(DevInst, Loc, XAIE_MEM_MOD,
-					XAIE_EVENT_GROUP_ERRORS_MEM,
-					GroupErrorEnableMask);
-			if(RC != XAIE_OK) {
-				XAIE_ERROR("Failed to configure group errors in memory module\n");
-				return RC;
+			/**
+			 * In AIE4, the event broadcast switches (core and mem modules of core tile)
+			 * have been merged into one single switch referred as event switch of core
+			 * tile. Hence the below if is enabled only for pre AIE4 device generations.
+			 *
+			 * Configuring a given Event Switch (Core and Memory tiles) involves programming:
+			 *		- The Event Group mask to filter the unwanted events from the group.
+			 *		- The Event Braodcast ID on which Event Group needs to be propogated.
+			 */
+			if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))){
+
+				/**
+				 * Core Tile : Memory Module Event switch
+				 */
+				GroupErrorEnableMask = _XAie_GetFatalGroupErrors(DevInst,
+						Loc, XAIE_MEM_MOD);
+				RC = XAie_EventGroupControl(DevInst, Loc, XAIE_MEM_MOD,
+						XAIE_EVENT_GROUP_ERRORS_MEM,
+						GroupErrorEnableMask);
+				if(RC != XAIE_OK) {
+					XAIE_ERROR("Failed to configure group errors in memory module\n");
+					return RC;
+				}
+
+				RC = XAie_EventBroadcast(DevInst, Loc, XAIE_MEM_MOD,
+						XAIE_ERROR_BROADCAST_ID,
+						XAIE_EVENT_GROUP_ERRORS_MEM);
+				if(RC != XAIE_OK) {
+					XAIE_ERROR("Failed to setup error broadcast for memory module\n");
+					return RC;
+				}
 			}
 
-			RC = XAie_EventBroadcast(DevInst, Loc, XAIE_MEM_MOD,
-					XAIE_ERROR_BROADCAST_ID,
-					XAIE_EVENT_GROUP_ERRORS_MEM);
-			if(RC != XAIE_OK) {
-				XAIE_ERROR("Failed to setup error broadcast for memory module\n");
-				return RC;
-			}
-
+			/**
+			 * Core Tile : Core Module Event switch
+			 */
 			GroupErrorEnableMask = _XAie_GetFatalGroupErrors(DevInst,
 							Loc, XAIE_CORE_MOD);
+
 			RC = XAie_EventGroupControl(DevInst, Loc, XAIE_CORE_MOD,
 					XAIE_EVENT_GROUP_ERRORS_0_CORE,
 					GroupErrorEnableMask);
@@ -556,8 +575,21 @@ static AieRC _XAie_GroupErrorInit(XAie_DevInst *DevInst)
 				continue;
 			}
 
+			/**
+			 * Memory Tile : Event switch
+			 * 
+			 * In  AIE4, there are two event broadcast switches, one for
+			 * each application A and B supported in dual app mode operation.
+			 * 
+			 * The logic of programming the correct configuration registers
+			 * based one application number A or B will be handled by the means
+			 * of baseaddress field of the DevInst structure that will be
+			 * populated by IPUFW during DevInst structure initialization for
+			 * a given partition prior to patition initialization.
+			 */
 			GroupErrorEnableMask = _XAie_GetFatalGroupErrors(DevInst,
 							Loc, XAIE_MEM_MOD);
+
 			RC = XAie_EventGroupControl(DevInst, Loc, XAIE_MEM_MOD,
 					XAIE_EVENT_GROUP_ERRORS_MEM_TILE,
 					GroupErrorEnableMask);
@@ -576,13 +608,15 @@ static AieRC _XAie_GroupErrorInit(XAie_DevInst *DevInst)
 		}
 
 		/*
-		 * Shim tile only needs to setup error notification with first
-		 * level interrupt controller.
+		 * Configuring a Event Switch of SHIM tile differs based on Dev Generation.
+		 * 		- In AIE4 it is same as the core and mem tiles.
+		 *		- In AIE2PS and earlier Shim tile only needs to setup error
+		 *        notification with first level interrupt controller.
 		 */
-
 		Loc = XAie_TileLoc(Col, DevInst->ShimRow);
 		GroupErrorEnableMask = _XAie_GetFatalGroupErrors(DevInst, Loc,
 								XAIE_PL_MOD);
+
 		RC = XAie_EventGroupControl(DevInst, Loc, XAIE_PL_MOD,
 					(XAie_Events)GroupEvent,
 					GroupErrorEnableMask);
@@ -591,12 +625,43 @@ static AieRC _XAie_GroupErrorInit(XAie_DevInst *DevInst)
 			return RC;
 		}
 
-		RC = XAie_IntrCtrlL1Event(DevInst, Loc, XAIE_EVENT_SWITCH_A,
+		switch (DevInst->DevProp.DevGen) {
+		
+		case XAIE_DEV_GEN_AIE4:
+		case XAIE_DEV_GEN_AIE4_MEDUSA:
+			/**
+			 * In AIE4, L1 interrupt controller has been removed.
+			 * Hence using the event broadcast switch logic to
+			 * configure SHIM tile events on broadcast channel 0
+			 * i.e. XAIE_ERROR_BROADCAST_ID.
+			 *
+			 * Also in AIE4, the shim tile specific group errors
+			 * and uc specific group errors have been merged into
+			 * single group unlike in AIE2PS. Hence no need to
+			 * broadcast uc group errors on differnt broadcast
+			 * channel.
+			 */
+
+			/* Enable AIE SHIM Tile Error Group 0 Events */
+			RC = XAie_EventBroadcast(DevInst, Loc, XAIE_PL_MOD,
+						 XAIE_ERROR_BROADCAST_ID,
+						 GroupEvent);
+			if (RC != XAIE_OK) {
+				XAIE_ERROR("Failed to setup error broadcasr for shim tile: [%d, %d]: %d\n", Loc.Col, Loc.Row, RC);
+				return RC;
+			}
+			break;
+
+		default:
+		    /* Dev Gen prior to AIP2PS */
+			RC = XAie_IntrCtrlL1Event(DevInst, Loc, XAIE_EVENT_SWITCH_A,
 				XAIE_ERROR_BROADCAST_ID,
 				(XAie_Events)GroupEvent);
-		if(RC != XAIE_OK) {
-			XAIE_ERROR("Failed to setup L1 internal error interrupt in shim tile\n");
-			return RC;
+			if(RC != XAIE_OK) {
+				XAIE_ERROR("Failed to setup L1 internal error interrupt in shim tile\n");
+				return RC;
+			}
+			break;
 		}
 	}
 
@@ -674,32 +739,33 @@ static AieRC _XAie_FindNextNoCTile(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 /*****************************************************************************/
 /**
- *
- * This API configures broadcast network to deliver error events as interrupts in
- * NPI. When error occurs, interrupt is raised on NPI interrupt line #5. Also it
- * configure error halt register, to put core in halt if any group error0 occurs
- *
- * @param        DevInst: Device Instance
- *
- * @return       XAIE_OK on success, error code on failure.
- *
- * @note         This API assumes the whole AIE as a single partition and the
- *               following broadcast channels to be available. To avoid conflicts,
- *               it is the user's responsibility to make sure none of the below
- *               channels are being used.
- *                       * Broadcast channel #0 in AIE array tiles.
- *                       * Switch A L1 IRQ 16.
- *                       * NPI interrupt line #5.
- *               Currently, this API only supports CDO, and debug
- *               backends.
- *
- *               This function is internal only.
- ******************************************************************************/
+*
+* This API configures broadcast network to deliver error events as interrupts in
+* NPI. When error occurs, interrupt is raised on NPI interrupt line #5. Also it
+* configure error halt register, to put core in halt if any group error0 occurs
+*
+* @param	DevInst: Device Instance
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		This API assumes the whole AIE as a single partition and the
+*		following broadcast channels to be available. To avoid conflicts,
+*		it is the user's responsibility to make sure none of the below
+*		channels are being used.
+*			* Broadcast channel #0 in AIE array tiles.
+*			* Switch A L1 IRQ 16.
+*			* NPI interrupt line #5.
+*		Currently, this API only supports CDO, and debug
+*		backends.
+*
+*		This function is internal only.
+******************************************************************************/
 static AieRC _XAie_ErrorHandlingInitAie(XAie_DevInst *DevInst)
 {
 	AieRC RC;
-	u8 TileType, L1BroadcastIdSwA, L1BroadcastIdSwB, MemTileStart,
-	   MemTileEnd, AieRowStart, AieRowEnd, BroadcastDirSwA, BroadcastDirSwB;
+	u8 TileType, L1BroadcastIdSwA, MemTileStart, MemTileEnd,
+	  AieRowStart, AieRowEnd, BroadcastDirSwA, BroadcastDirSwB;
+	u32 L1BroadcastIdSwB;
 	XAie_LocType Loc;
 	const XAie_L1IntrMod *L1IntrMod;
 
@@ -921,32 +987,259 @@ static AieRC _XAie_ErrorHandlingInitAie(XAie_DevInst *DevInst)
 			return RC;
 		}
 	}
-
 	return XAIE_OK;
-
 }
 
 /*****************************************************************************/
 /**
  *
  * This API configures broadcast network to deliver error events as interrupts in
- * NPI. When error occurs, interrupt is raised on NPI interrupt line #5-7. Also it
- * configure error halt register, to put core in halt if any group error0 occurs
- *
- * @param        DevInst: Device Instance
- *
- * @return       XAIE_OK on success, error code on failure.
- *
- * @note         This API assumes the whole AIE as a single partition and the
- *               following broadcast channels to be available. To avoid conflicts,
- *               it is the user's responsibility to make sure none of the below
- *               channels are being used.
- *                       * Broadcast channel #0 in AIE1&2 array tiles.
- *                       * Switch A L1 IRQ 16. For AIE1&2
- *                       * NPI interrupt line #5 for AIE1 and 2
- *               Currently, this API only supports CDO, and debug
- *               backends.
- ******************************************************************************/
+******************************************************************************/
+/**
+*
+* This API configures broadcast network for AIE tile in AIE4.
+*
+* @param	DevInst: Device Instance
+*
+* @Loc		Location of AIE tile.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		internal only
+*
+******************************************************************************/
+static AieRC _XAie_ErrorHandlingInitAie4AieTile(XAie_DevInst *DevInst, XAie_LocType Loc)
+{
+	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	u32 BroadcastBlockDir;
+	AieRC RC;
+
+	if (TileType != XAIEGBL_TILE_TYPE_AIETILE) {
+		XAIE_ERROR("Not a aietile.\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	/**
+	 *  Propogate BC0 (Broadcast-0) in south direction only.
+	 *  So that the BC0 contents can be delivered to SHIM tile.
+	 */
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_EAST |
+			    XAIE_EVENT_BROADCAST_WEST;
+
+	RC = XAie_EventBroadcastBlockDir(DevInst, Loc,
+		   XAIE_CORE_MOD, XAIE_EVENT_SWITCH_A,
+		   XAIE_ERROR_BROADCAST_ID, BroadcastBlockDir);
+	if(RC != XAIE_OK) {
+		XAIE_ERROR("Failed to block broadcasts in core module\n");
+		return RC;
+	}
+
+	return 0;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API configures broadcast network for Mem tile in AIE4.
+*
+* @param	DevInst: Device Instance
+*
+* @Loc		Location of Mem tile.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		internal only
+*
+******************************************************************************/
+static AieRC _XAie_ErrorHandlingInitAie4MemTile(XAie_DevInst *DevInst, XAie_LocType Loc)
+{
+	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	u32 BroadcastBlockDir;
+	AieRC RC;
+
+	if (TileType != XAIEGBL_TILE_TYPE_MEMTILE) {
+		XAIE_ERROR("Not a memtile.\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	/**
+	 *  Propogate BC0 (Broadcast-Channel-0) in south direction only.
+	 *  So that the BC0 contents can be delivered to SHIM tile.
+	 */
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_EAST |
+			    XAIE_EVENT_BROADCAST_WEST;
+
+	RC = XAie_EventBroadcastBlockDir(DevInst, Loc,
+		   XAIE_MEM_MOD, XAIE_EVENT_SWITCH_A,
+		   XAIE_ERROR_BROADCAST_ID, BroadcastBlockDir);
+	if(RC != XAIE_OK) {
+		XAIE_ERROR("Failed to block broadcasts in mem tile switch A\n");
+		return RC;
+	}
+
+	return 0;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API configures broadcast network for SHIM tile.
+*
+* @param	DevInst: Device Instance
+*
+* @Loc		Location of SHIM tile.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		internal only
+*
+******************************************************************************/
+static AieRC _XAie_ErrorHandlingInitAie4ShimTile(XAie_DevInst *DevInst, XAie_LocType Loc)
+{
+	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	u32 BroadcastBitMap, BroadcastBlockDir;
+	AieRC RC;
+
+	if ((TileType != XAIEGBL_TILE_TYPE_SHIMNOC) &&
+	    (TileType != XAIEGBL_TILE_TYPE_SHIMPL)) {
+		XAIE_ERROR("Not a shimtile\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	/* In AIE4 each SHIM tile has a noc module.
+	 * And two L2 controller connected to both event switches.
+	 * Switch A connects to L2 controller for App A &
+	 * Switch B connects to L2 controller for App B.
+	 * So no need to broadcast to adjacent tiles.
+	 */
+	BroadcastBitMap = BIT(XAIE_ERROR_BROADCAST_ID);
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_ALL;
+
+	RC = XAie_EventBroadcastBlockMapDir(DevInst, Loc,
+			XAIE_PL_MOD, XAIE_EVENT_SWITCH_A,
+			BroadcastBitMap,
+			BroadcastBlockDir);
+
+	if (RC != XAIE_OK) {
+		XAIE_ERROR("Failed to block broadcasts Loc: [%d, %d]: %d\n", Loc.Col, Loc.Row, RC);
+		return RC;
+	}
+
+	return 0;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API configures broadcast network to deliver error events as interrupts in
+* NPI. When error occurs, interrupt is raised on NPI interrupt line #5, 6, 7, 8.
+*
+* @param	DevInst: Device Instance
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		This function is internal only
+******************************************************************************/
+static AieRC _XAie_ErrorHandlingInitAie4(XAie_DevInst *DevInst)
+{
+	AieRC RC;
+	u8 TileType;
+	XAie_LocType Loc;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid device instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	/**
+	 * Traversing through each Column and Row of a the partition represented by DevInst.
+	 * Configure each tile for error handling (core, mem and shim).
+	 **/
+	for (Loc.Col = 0; Loc.Col < DevInst->NumCols; Loc.Col++) {
+		for (Loc.Row = 0; Loc.Row < DevInst->NumRows; Loc.Row++) {
+
+			// Check if the given Tile is used or not ?
+			if (_XAie_PmIsTileRequested(DevInst, Loc) == XAIE_DISABLE) {
+				continue;
+			}
+
+			// Get tile type
+			TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+
+			/*
+			 * Based on the tile type do specific programing
+			 * 	Enable L2 Intr Ctrl only if it is SHIM Tile.
+			 * 	Program the Event Broadcast Switch to enable Error handling for every tile.
+			 */
+			switch (TileType) {
+			case XAIEGBL_TILE_TYPE_SHIMNOC:
+			case XAIEGBL_TILE_TYPE_SHIMPL:
+				/** 
+				 * TODO(Kotesh): 
+				 * Check is anything else needs to be done for connecting Event Broadcast to
+				 * L2 interrupt controller. Equivalent to _XAie_ErrorHandlingInitAie2psL1Ctrl
+				 * in AIE2PS.
+				 */
+				RC = XAie_IntrCtrlL2Enable(DevInst, Loc,
+						XAIE_ERROR_L2_ENABLE);
+				if(RC != XAIE_OK) {
+					XAIE_ERROR("[SHIM INTR CTRL] Failed to enable interrupts to L2\n");
+					return RC;
+				}
+
+				RC = _XAie_ErrorHandlingInitAie4ShimTile(DevInst, Loc);
+				if(RC != XAIE_OK) {
+					XAIE_ERROR("[SHIM TILE] Event broadcast switch config failed for error handling.\n");
+					return RC;
+				}
+				break;
+			case XAIEGBL_TILE_TYPE_AIETILE:
+				RC = _XAie_ErrorHandlingInitAie4AieTile(DevInst, Loc);
+				if(RC != XAIE_OK) {
+					XAIE_ERROR("[AIE TILE] Event broadcast switch config failed for error handling.\n");
+					return RC;
+				}
+				break;
+			case XAIEGBL_TILE_TYPE_MEMTILE:
+				RC = _XAie_ErrorHandlingInitAie4MemTile(DevInst, Loc);
+				if (RC != XAIE_OK) {
+					XAIE_ERROR("[MEM TILE] Event broadcast switch config failed for error handling.\n");
+					return RC;
+				}
+				break;
+			}
+		}
+	}
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API configures broadcast network to deliver error events as interrupts in
+* NPI. When error occurs, interrupt is raised on NPI interrupt line #5-7. Also it
+* configure error halt register, to put core in halt if any group error0 occurs
+*
+* @param	DevInst: Device Instance
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		This API assumes the whole AIE as a single partition and the
+*		following broadcast channels to be available. To avoid conflicts,
+*		it is the user's responsibility to make sure none of the below
+*		channels are being used.
+*			* Broadcast channel #0 in array tiles.
+*			* Broadcast channel #0,1,2 in AIE2PS.
+*			* Switch A L1 IRQ 16. For AIE1&2
+*			* NPI interrupt line #5 for AIE1 and 2
+*			* NPI interrupt line #5, 6, 7, 8. for AIE2PS.
+*		Currently, this API only supports CDO, and debug
+*		backends.
+******************************************************************************/
 AieRC XAie_ErrorHandlingInit(XAie_DevInst *DevInst)
 {
 	AieRC RC;
@@ -957,7 +1250,15 @@ AieRC XAie_ErrorHandlingInit(XAie_DevInst *DevInst)
 		return XAIE_INVALID_ARGS;
 	}
 
-	RC = _XAie_ErrorHandlingInitAie(DevInst);
+	switch (DevInst->DevProp.DevGen) {	
+	case XAIE_DEV_GEN_AIE4:
+	case XAIE_DEV_GEN_AIE4_MEDUSA:
+		RC = _XAie_ErrorHandlingInitAie4(DevInst);
+		break;
+	default:
+		RC = _XAie_ErrorHandlingInitAie(DevInst);
+		break;
+	}
 	if (RC != XAIE_OK) {
 		XAIE_ERROR("Failed to set Broadcast network: %d\n", RC);
 		return RC;
@@ -969,9 +1270,9 @@ AieRC XAie_ErrorHandlingInit(XAie_DevInst *DevInst)
 		return RC;
 	}
 
-	RC = _XAie_ErrorHandlingEventHaltCore(DevInst);
-	if(RC != XAIE_OK) {
-		XAIE_ERROR("Failed to initialize Error Halt Event Register\n");
+    RC = _XAie_ErrorHandlingEventHaltCore(DevInst);
+        if(RC != XAIE_OK) {
+                XAIE_ERROR("Failed to initialize Error Halt Event Register\n");
 		return RC;
 	}
 

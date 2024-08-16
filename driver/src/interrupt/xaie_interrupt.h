@@ -32,14 +32,33 @@
 #include "xaie_core.h"
 
 /**************************** Type Definitions *******************************/
-#define XAIE_ERROR_BROADCAST_ID			0x0U
-#define XAIE_ERROR_BROADCAST_MASK		0x1U
-#define XAIE_ERROR_SHIM_INTR_ID			0x10U
-#define XAIE_ERROR_SHIM_INTR_MASK		0x10000U
-#define XAIE_ERROR_NPI_INTR_ID			0x1U
-#define XAIE_ERROR_L2_ENABLE			0x3FU
+#define XAIE_ERROR_BROADCAST_ID					0x0U
+#define XAIE_ERROR_BROADCAST_MASK				0x1U
 
+#define XAIE_ERROR_BROADCAST_ID_UC_EVENT		0x1U
+#define XAIE_ERROR_BROADCAST_ID_USER_EVENT1		0x2U
+
+#define XAIE_ERROR_SHIM_INTR_ID					0x10U
+#define XAIE_ERROR_SHIM_INTR_MASK				0x10000U
+#define XAIE_ERROR_NPI_INTR_ID					0x1U
+
+#if ((XAIE_DEV_SINGLE_GEN != XAIE_DEV_GEN_AIE4) && \
+      (XAIE_DEV_SINGLE_GEN != XAIE_DEV_GEN_AIE4_MEDUSA))
+#define XAIE_ERROR_L2_ENABLE					0x3FU
+#else
+/**
+ * (Kotesh)TODO : Fix it as per AIE4 requirement.
+ * For now setting it to enable all the 17 irqs to L2 controller
+ * Bit 0-15  -> 16 Broadcast Channels
+ * Bit 16    -> 1 uC interrupt input.
+*/
+#define XAIE_ERROR_L2_ENABLE					0x1FFFFU
+#endif
+ 
 /************************** Function Prototypes  *****************************/
+u32 _XAie_LIntrCtrlL2Status(XAie_LocType Loc, XAie_AppIndex Id);
+void _XAie_LIntrCtrlL2Ack(XAie_LocType Loc, XAie_AppIndex Id,
+					u32 ChannelBitMap);
 XAIE_AIG_EXPORT AieRC XAie_IntrCtrlL1Enable(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_BroadcastSw Switch, u8 IntrId);
 XAIE_AIG_EXPORT AieRC XAie_IntrCtrlL1Disable(XAie_DevInst *DevInst, XAie_LocType Loc,

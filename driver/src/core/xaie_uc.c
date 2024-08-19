@@ -496,5 +496,54 @@ AieRC _XAie_UcCoreGetStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	return XAIE_OK;
 }
 
+/*****************************************************************************/
+/*
+*
+* This API configures UC Module Event Select register which selects the
+* uC-Module that triggers events in Group_uC_Core_Program_Flow,
+* Group_uC_Core_PC_Event, and Group_uC_Core_Status.
+*
+* @param	DevInst: Device Instance
+* @param	Loc: Location of the Shim tile.
+* @param	SelectID: Select uc module A or uc Module B.
+*
+* @return	XAIE_OK on success, Error code on failure.
+*
+* @note		None.
+*
+******************************************************************************/
+AieRC XAie_UcModuleEventSelect(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u8 SelectId)
+{
+	u8 TileType;
+	u64 RegAddr;
+	const XAie_UcMod *UcMod;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid device instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if(TileType != XAIEGBL_TILE_TYPE_SHIMNOC) {
+		XAIE_ERROR("Invalid tile type\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	if(SelectId >= 2) {
+		XAIE_ERROR("Invalid selection ID\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	UcMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_SHIMNOC].UcMod;
+
+	RegAddr = UcMod->UcModuleEventSelect +
+		_XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
+
+	return XAie_Write32(DevInst, RegAddr, SelectId);
+}
+
+
 #endif /* XAIE_FEATURE_UC_ENABLE */
 /** @} */

@@ -298,6 +298,7 @@ typedef struct XAie_UcMod {
 	u32 DataMemAddr;
 	u32 DataMemSize;
 	u32 DataMemUcOffset;
+	u32 UcModuleEventSelect;
 	const XAie_RegUcCoreCtrl *CoreCtrl;
 	const XAie_RegUcCoreSts *CoreSts;
 	AieRC (*Wakeup)(XAie_DevInst *DevInst, XAie_LocType Loc,

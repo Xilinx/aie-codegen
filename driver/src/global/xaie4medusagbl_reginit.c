@@ -200,6 +200,7 @@ static const XAie_UcMod Aie4UcMod =
 	.DataMemAddr = XAIE4GBL_UC_MODULE_MODULE_DATA_MEMORY,
 	.DataMemSize = 32 * 1024,
 	.DataMemUcOffset = 0x20000,
+	.UcModuleEventSelect = XAIE4GBL_PL_MODULE_UC_MODULE_EVENT_SELECT,
 	.CoreCtrl = &Aie4UcCoreCtrlReg,
 	.CoreSts = &Aie4UcCoreStsReg,
 	.Wakeup = &_XAie_UcCoreWakeup,

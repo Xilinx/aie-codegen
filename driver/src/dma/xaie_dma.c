@@ -38,6 +38,7 @@
 #include "xaie_helper.h"
 #include "xaie_helper_internal.h"
 #include "xaiegbl_regdef.h"
+#include "xaie_dma_aie4.h"
 
 #ifdef XAIE_FEATURE_DMA_ENABLE
 
@@ -49,7 +50,17 @@
 #define XAIE_DMA_WAITFORDONE_DEF_WAIT_TIME_US		1000000U
 
 #define XAIE_DMA_PAD_WORDS_MAX				0x3FU /* 6 bits */
+
+extern XAie4_MemTileDmaBdChMap XAie4_MemTileDmaBdChLut[320];
 /************************** Function Definitions *****************************/
+static inline u8 _XAie_GetMaxNumBds(u8 DevGen, u8 TileType, u8 AppMode, u8 NumBds)
+{
+	if (TileType == XAIEGBL_TILE_TYPE_MEMTILE)
+		return NumBds;
+	else
+		return _XAie_GetMaxElementValue(DevGen, TileType, AppMode, NumBds);
+}
+
 
 u8 _XAie_DmaGetMaxNumChannels(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
 				    u8 TileType, u8 Dir)
@@ -71,6 +82,149 @@ u8 _XAie_DmaGetMaxNumChannels(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
 
 	return _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, NumElements);
 }
+
+static inline u64 _XAie4_GetChannelCtrlAddr(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
+				      XAie_LocType Loc, u8 Dir, u8 ChNum)
+{
+	u8 TileType;
+	u8 NumChannels;
+	u32 ChCtrlBase;
+	u64 Addr;
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+
+	ChCtrlBase = DmaMod->ChCtrlBase;
+	if (DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) {
+		if ((TileType == XAIEGBL_TILE_TYPE_SHIMNOC) && (Dir == DMA_MM2S_CTRL))
+			NumChannels = DmaMod->NumMm2sCtrlChannels;
+		else
+			NumChannels = (Dir == DMA_S2MM) ? DmaMod->NumChannels :
+				DmaMod->NumMm2sChannels;
+
+		if (ChNum >= NumChannels) {
+			ChCtrlBase = _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen, DmaMod->ChCtrlBase);
+			ChNum -= NumChannels;
+		}
+	}
+
+	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+		ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
+		Dir * DmaMod->ChCtrlOffset;
+
+	return Addr;
+}
+
+/*
+ * This API is to validate DMA Channel number.
+ *
+ * In AIE4, From V1.2 spec, for memtile (MM2S5 & MM2S11) and shimtile(S2MM1 & S2MM3) are
+ * removed. But the port numbers not adjusted sequentially.
+ * So this API checks for the same and validates.
+ */
+static AieRC _XAie_ValidateChannelNumber(XAie_DevInst* DevInst, u8 TileType,
+	XAie_DmaDirection Dir, u8 ChNum, u8 MaxChannels)
+{
+	if (MaxChannels == 0)
+		return XAIE_INVALID_CHANNEL_NUM;
+
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+		(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE)) {
+		if (((TileType == XAIEGBL_TILE_TYPE_MEMTILE) && (Dir == DMA_MM2S)) ||
+			((TileType == XAIEGBL_TILE_TYPE_SHIMNOC) && (Dir == DMA_S2MM))) {
+			if (ChNum == (MaxChannels / 2) - 1)
+				return XAIE_INVALID_CHANNEL_NUM;
+			if (ChNum > (MaxChannels - 1))
+				return XAIE_INVALID_CHANNEL_NUM;
+		}
+	}
+
+	if (ChNum >= MaxChannels)
+		return XAIE_INVALID_CHANNEL_NUM;
+
+	return XAIE_OK;
+}
+
+static AieRC _XAie4_ValidateBd(XAie_DevInst* DevInst, u8 TileType,
+	const XAie_DmaMod* DmaMod, u16 BdNum)
+{
+	u8 BdNumTemp;
+	u8 Dir;
+	u8 ChNum;
+	u8 MaxNumChannels;
+	u8 MaxNumBds;
+	u16 TotalBdsOfAllChannaels;
+
+	if (TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+		/* Check if given BdNum is out of the range */
+		TotalBdsOfAllChannaels = DmaMod->NumBds * (DmaMod->NumChannels +
+			DmaMod->NumMm2sChannels);
+		if (DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE)
+			TotalBdsOfAllChannaels *= 2;
+		if (BdNum >= TotalBdsOfAllChannaels)
+			return XAIE_INVALID_BD_NUM;
+
+		/* Get Private pool BD num, and channel info */
+		BdNumTemp = XAie4_MemTileDmaBdChLut[BdNum].BdNum;
+		Dir = XAie4_MemTileDmaBdChLut[BdNum].Dir;
+		ChNum = XAie4_MemTileDmaBdChLut[BdNum].ChNum;
+
+		if (Dir >= DMA_MAX) {
+			XAIE_ERROR("Invalid DMA direction\n");
+			return XAIE_INVALID_DMA_DIRECTION;
+		}
+
+		MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod,
+			TileType, Dir);
+		if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
+			XAIE_ERROR("Invalid Channel number\n");
+			return XAIE_INVALID_CHANNEL_NUM;
+		}
+	}
+	else if (TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
+		/* First get the maximum BDs that the shim tile can support in
+		 * single app mode*/
+		MaxNumBds = DmaMod->NumBds * 2;
+
+		/* If given BdNum is > MaxNumBds, that means it could be for
+		 * Control_MM2S channels, so lets validate that first */
+		if (BdNum >= MaxNumBds) {
+			MaxNumChannels = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType,
+				DevInst->AppMode, DmaMod->NumMm2sCtrlChannels);
+			BdNumTemp = BdNum - MaxNumBds;
+
+			/* It could be possible that the given BdNum is not in range of
+			 * control_mm2s channel's Bds, so validate that also */
+			MaxNumBds += (DmaMod->NumMm2sCtrlBds * MaxNumChannels);
+			if (BdNum >= MaxNumBds) {
+				XAIE_ERROR("Invalid Bd Number\n");
+				return XAIE_INVALID_BD_NUM;
+			}
+
+			/* Validate channel number as well */
+			ChNum = (BdNumTemp / DmaMod->NumMm2sCtrlBds);
+			if (ChNum >= MaxNumChannels) {
+				XAIE_ERROR("Invalid Channel number\n");
+				return XAIE_INVALID_CHANNEL_NUM;
+			}
+
+			return XAIE_OK;
+		}
+		BdNumTemp = BdNum;
+	}
+	else {
+		BdNumTemp = BdNum;
+	}
+
+	MaxNumBds = _XAie_GetMaxNumBds(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, DmaMod->NumBds);
+	if (BdNumTemp >= MaxNumBds) {
+		XAIE_ERROR("Invalid BD number\n");
+		return XAIE_INVALID_BD_NUM;
+	}
+
+	return XAIE_OK;
+}
+
+
 /*****************************************************************************/
 /**
 *
@@ -113,6 +267,8 @@ AieRC XAie_DmaDescInit(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
 	DmaDesc->IsReady = XAIE_COMPONENT_IS_READY;
 	DmaDesc->DmaMod = DmaMod;
 	DmaDesc->LockMod = DevInst->DevProp.DevMod[TileType].LockMod;
+	DmaDesc->DevGen = DevInst->DevProp.DevGen;
+	DmaDesc->AppMode = DevInst->AppMode;
 
 	return XAIE_OK;
 }
@@ -140,6 +296,7 @@ static AieRC _XAie_DmaLockConfig(XAie_DmaDesc *DmaDesc, XAie_Lock Acq,
 {
 	const XAie_DmaMod *DmaMod;
 	const XAie_LockMod *LockMod;
+	u16 NumLocks;
 
 	if((DmaDesc == XAIE_NULL) ||
 			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -149,9 +306,12 @@ static AieRC _XAie_DmaLockConfig(XAie_DmaDesc *DmaDesc, XAie_Lock Acq,
 
 	DmaMod = DmaDesc->DmaMod;
 	LockMod = DmaDesc->LockMod;
-	if((Acq.LockId > DmaMod->NumLocks) ||
-			(Acq.LockVal > LockMod->LockValUpperBound) ||
-			(Rel.LockVal > LockMod->LockValUpperBound)) {
+	
+	NumLocks = _XAie_GetMaxElementValue(DmaDesc->DevGen, DmaDesc->TileType, DmaDesc->AppMode, DmaMod->NumLocks);
+
+	if((Acq.LockId >= NumLocks) ||
+	   (Acq.LockVal > LockMod->LockValUpperBound) ||
+	   (Rel.LockVal > LockMod->LockValUpperBound)) {
 		XAIE_ERROR("Invalid Lock\n");
 		return XAIE_INVALID_LOCK_ID;
 	}
@@ -522,7 +682,7 @@ AieRC XAie_DmaSetMultiDimAddr(XAie_DmaDesc *DmaDesc, XAie_DmaTensor *Tensor,
 *		hardware.
 *
 ******************************************************************************/
-AieRC XAie_DmaSetBdIteration(XAie_DmaDesc *DmaDesc, u32 StepSize, u8 Wrap,
+AieRC XAie_DmaSetBdIteration(XAie_DmaDesc *DmaDesc, u32 StepSize, u16 Wrap,
 		u8 IterCurr)
 {
 	const XAie_DmaMod *DmaMod;
@@ -645,7 +805,11 @@ AieRC XAie_DmaGetNumBds(XAie_DevInst *DevInst, XAie_LocType Loc, u8 *NumBds)
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	*NumBds = DmaMod->NumBds;
+	*NumBds = _XAie_GetMaxNumBds(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, DmaMod->NumBds);
+
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+			(TileType == XAIEGBL_TILE_TYPE_SHIMNOC))
+		XAIE_WARN("This API currently returns NumBds for S2MM & MM2S\n");
 
 	return XAIE_OK;
 }
@@ -667,9 +831,10 @@ AieRC XAie_DmaGetNumBds(XAie_DevInst *DevInst, XAie_LocType Loc, u8 *NumBds)
 *		configure the buffer descriptor field in the hardware.
 *
 ******************************************************************************/
-AieRC XAie_DmaSetNextBd(XAie_DmaDesc *DmaDesc, u8 NextBd, u8 EnableNextBd)
+AieRC XAie_DmaSetNextBd(XAie_DmaDesc *DmaDesc, u16 NextBd, u8 EnableNextBd)
 {
 	const XAie_DmaMod *DmaMod;
+	u8 BdNumTemp, NumBds, MaxNumBds;
 
 	if((DmaDesc == XAIE_NULL) ||
 			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -678,7 +843,31 @@ AieRC XAie_DmaSetNextBd(XAie_DmaDesc *DmaDesc, u8 NextBd, u8 EnableNextBd)
 	}
 
 	DmaMod = DmaDesc->DmaMod;
-	if(NextBd > DmaMod->NumBds) {
+	NumBds = DmaMod->NumBds;
+
+	if (_XAie_IsDeviceGenAIE4(DmaDesc->DevGen)) {
+		if (DmaDesc->TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+			/* Get Private pool BD num, and channel info */
+			BdNumTemp = XAie4_MemTileDmaBdChLut[NextBd].BdNum;
+			NextBd = BdNumTemp;
+		}
+		if (DmaDesc->TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
+			/* First get the maximum BDs that the shim tile can support in single app mode*/
+			MaxNumBds = DmaMod->NumBds * 2;
+
+			/* If given BdNum is > MaxNumBds, that means it could be for Control_MM2S channels, so lets validate that first */
+			if (NextBd >= MaxNumBds) {					
+				BdNumTemp = NextBd - MaxNumBds;
+				BdNumTemp = BdNumTemp % DmaMod->NumMm2sCtrlBds;
+				NumBds = DmaMod->NumMm2sCtrlBds;
+				NextBd = BdNumTemp;
+			}
+		}
+	}
+
+	MaxNumBds = _XAie_GetMaxNumBds(DmaDesc->DevGen, DmaDesc->TileType,
+			       DmaDesc->AppMode, NumBds);
+	if(NextBd >= MaxNumBds) {
 		XAIE_ERROR("Invalid Next Bd\n");
 		return XAIE_INVALID_BD_NUM;
 	}
@@ -712,6 +901,9 @@ AieRC XAie_DmaEnableBd(XAie_DmaDesc *DmaDesc)
 
 	DmaDesc->BdEnDesc.ValidBd = XAIE_ENABLE;
 
+	if (_XAie_IsDeviceGenAIE4(DmaDesc->DevGen))
+		XAIE_WARN("In AIE4, Valid_BD is assumed always Enabled\n");
+
 	return XAIE_OK;
 }
 
@@ -737,6 +929,9 @@ AieRC XAie_DmaDisableBd(XAie_DmaDesc *DmaDesc)
 	}
 
 	DmaDesc->BdEnDesc.ValidBd = XAIE_DISABLE;
+
+	if (_XAie_IsDeviceGenAIE4(DmaDesc->DevGen))
+		XAIE_WARN("In AIE4, Valid_BD is assumed always Enabled\n");
 
 	return XAIE_OK;
 }
@@ -843,24 +1038,25 @@ AieRC XAie_DmaSetInterleaveEnable(XAie_DmaDesc *DmaDesc, u8 DoubleBuff,
 
 /*****************************************************************************/
 /**
-*
-* This API writes a Dma Descriptor which is initialized and setup by other APIs
-* into the corresponding registers and register fields in the hardware.
-*
-* @param	DevInst: Device Instance
-* @param	DmaDesc: Initialized Dma Descriptor.
-* @param	Loc: Location of AIE Tile
-* @param	BdNum: Hardware BD number to be written to.
-*
-* @return	XAIE_OK on success, Error code on failure.
-*
-* @note		None.
-*
-******************************************************************************/
+ *
+ * This API writes a Dma Descriptor which is initialized and setup by other APIs
+ * into the corresponding registers and register fields in the hardware.
+ *
+ * @param	DevInst: Device Instance
+ * @param	DmaDesc: Initialized Dma Descriptor.
+ * @param	Loc: Location of AIE Tile
+ * @param	BdNum: Hardware BD number to be written to.
+ *
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note		None.
+ *
+ ******************************************************************************/
 AieRC XAie_DmaWriteBd(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 BdNum)
+		XAie_LocType Loc, u16 BdNum)
 {
 	const XAie_DmaMod *DmaMod;
+	AieRC RC;
 
 	if((DmaDesc == XAIE_NULL) ||
 			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -874,35 +1070,45 @@ AieRC XAie_DmaWriteBd(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
 	}
 
 	DmaMod = DmaDesc->DmaMod;
-	if(BdNum > DmaMod->NumBds) {
-		XAIE_ERROR("Invalid BD number\n");
-		return XAIE_INVALID_BD_NUM;
-	}
 
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		RC = _XAie4_ValidateBd(DevInst, DmaDesc->TileType, DmaMod, BdNum);
+		if (RC != XAIE_OK) {
+			XAIE_ERROR("Invalid BD number\n");
+			return RC;
+		}
+	} else {
+		if(BdNum >= DmaMod->NumBds) {
+			XAIE_ERROR("Invalid BD number\n");
+			return XAIE_INVALID_BD_NUM;
+		}
+	}
+	
 	return DmaMod->WriteBd(DevInst, DmaDesc, Loc, BdNum);
 }
 
 /*****************************************************************************/
 /**
-*
-* This API reads the data from the buffer descriptor registers to fill the
-* dma descriptor structure.
-*
-* @param	DevInst: Device Instance
-* @param	DmaDesc: Dma Descriptor to be filled.
-* @param	Loc: Location of AIE Tile
-* @param	BdNum: Hardware BD number to be written to.
-*
-* @return	XAIE_OK on success, Error code on failure.
-*
-* @note		None.
-*
-******************************************************************************/
+ *
+ * This API reads the data from the buffer descriptor registers to fill the
+ * dma descriptor structure.
+ *
+ * @param	DevInst: Device Instance
+ * @param	DmaDesc: Dma Descriptor to be filled.
+ * @param	Loc: Location of AIE Tile
+ * @param	BdNum: Hardware BD number to be written to.
+ *
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note	None.
+ *
+ ******************************************************************************/
 AieRC XAie_DmaReadBd(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 BdNum)
+		XAie_LocType Loc, u16 BdNum)
 {
 	const XAie_DmaMod *DmaMod;
 	u8 TileType;
+	AieRC RC;
 
 	if((DevInst == XAIE_NULL) || (DmaDesc == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -917,9 +1123,18 @@ AieRC XAie_DmaReadBd(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(BdNum > DmaMod->NumBds) {
-		XAIE_ERROR("Invalid BD number\n");
-		return XAIE_INVALID_BD_NUM;
+
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		RC = _XAie4_ValidateBd(DevInst, DmaDesc->TileType, DmaMod, BdNum);
+		if (RC != XAIE_OK) {
+			XAIE_ERROR("Invalid BD number\n");
+			return RC;
+		}
+	} else {
+		if(BdNum >= DmaMod->NumBds) {
+			XAIE_ERROR("Invalid BD number\n");
+			return XAIE_INVALID_BD_NUM;
+		}
 	}
 
 	memset((void *)DmaDesc, 0, sizeof(XAie_DmaDesc));
@@ -948,6 +1163,7 @@ AieRC XAie_DmaChannelReset(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		XAie_DmaDirection Dir, XAie_DmaChReset Reset)
 {
 	u8 TileType;
+	u8 MaxNumChannels;
 	u64 Addr;
 	u32 Val;
 	const XAie_DmaMod *DmaMod;
@@ -976,14 +1192,18 @@ AieRC XAie_DmaChannelReset(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
 
-	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
-		(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	if (!_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))
+		Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+				DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
+				(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	else
+		Addr = _XAie4_GetChannelCtrlAddr(DevInst, DmaMod, Loc, Dir, ChNum);
 
 	Val = XAie_SetField(Reset, DmaMod->ChProp->Reset.Lsb,
 			DmaMod->ChProp->Reset.Mask);
@@ -1009,6 +1229,7 @@ AieRC XAie_DmaChannelResetAll(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_DmaChReset Reset)
 {
 	u8 TileType;
+	u8 MaxNumChannels;
 	AieRC RC;
 	const XAie_DmaMod *DmaMod;
 
@@ -1032,7 +1253,14 @@ AieRC XAie_DmaChannelResetAll(XAie_DevInst *DevInst, XAie_LocType Loc,
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
 
 	/* Reset MM2S */
-	for(u8 i = 0U; i < DmaMod->NumChannels; i++) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, DMA_MM2S);
+	for(u8 i = 0U; i < MaxNumChannels; i++) {
+		/* Exclude non existing channles for AIE4 Memtile MM2S */
+		if ((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
+		    (TileType == XAIEGBL_TILE_TYPE_MEMTILE))
+			if ((i == ((MaxNumChannels / 2) - 1)) ||
+			    (i == (MaxNumChannels - 1)))
+				continue;
 		RC = XAie_DmaChannelReset(DevInst, Loc, i, DMA_MM2S, Reset);
 		if (RC != XAIE_OK) {
 			return RC;
@@ -1040,7 +1268,14 @@ AieRC XAie_DmaChannelResetAll(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	}
 	/* Reset S2MM */
-	for(u8 i = 0U; i < DmaMod->NumChannels; i++) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, DMA_S2MM);
+	for(u8 i = 0U; i < MaxNumChannels; i++) {
+		/* Exclude non existing channles for AIE4 SHIM Tile S2MM */
+		if ((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
+		    (TileType == XAIEGBL_TILE_TYPE_SHIMNOC))
+			if ((i == ((MaxNumChannels / 2) - 1)) ||
+			    (i == (MaxNumChannels - 1)))
+				continue;
 		RC = XAie_DmaChannelReset(DevInst, Loc, i, DMA_S2MM, Reset);
 		if (RC != XAIE_OK) {
 			return RC;
@@ -1070,6 +1305,7 @@ AieRC XAie_DmaChannelPauseStream(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 ChNum, XAie_DmaDirection Dir, u8 Pause)
 {
 	u8 TileType;
+	u8 MaxNumChannels;
 	u32 Value;
 	u64 Addr;
 	const XAie_DmaMod *DmaMod;
@@ -1097,7 +1333,8 @@ AieRC XAie_DmaChannelPauseStream(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
@@ -1105,9 +1342,12 @@ AieRC XAie_DmaChannelPauseStream(XAie_DevInst *DevInst, XAie_LocType Loc,
 	Value = XAie_SetField(Pause, DmaMod->ChProp->PauseStream.Lsb,
 			DmaMod->ChProp->PauseStream.Mask);
 
-	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
-		(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)))
+		Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+			DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
+			(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	else
+		Addr = _XAie4_GetChannelCtrlAddr(DevInst, DmaMod, Loc, Dir, ChNum);
 
 	return XAie_MaskWrite32(DevInst, Addr, DmaMod->ChProp->PauseStream.Mask,
 			Value);
@@ -1133,6 +1373,7 @@ AieRC XAie_DmaChannelPauseMem(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		XAie_DmaDirection Dir, u8 Pause)
 {
 	u8 TileType;
+	u8 MaxNumChannels;
 	u32 Value;
 	u64 Addr;
 	const XAie_DmaMod *DmaMod;
@@ -1160,16 +1401,21 @@ AieRC XAie_DmaChannelPauseMem(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
 
 	Value = XAie_SetField(Pause, DmaMod->ChProp->PauseMem.Lsb,
 			DmaMod->ChProp->PauseMem.Mask);
-	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
-		(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)))
+		Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+			DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
+			(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	else
+		Addr = _XAie4_GetChannelCtrlAddr(DevInst, DmaMod, Loc, Dir, ChNum);
 
 	return XAie_MaskWrite32(DevInst, Addr, DmaMod->ChProp->PauseMem.Mask,
 			Value);
@@ -1194,10 +1440,11 @@ AieRC XAie_DmaChannelPauseMem(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 *
 ******************************************************************************/
 AieRC XAie_DmaChannelPushBdToQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
-		u8 ChNum, XAie_DmaDirection Dir, u8 BdNum)
+		u8 ChNum, XAie_DmaDirection Dir, u16 BdNum)
 {
 	AieRC RC;
 	u8 TileType;
+	u8 BdNumTemp, MaxNumBds, MaxNumChannels;
 	u64 Addr;
 	const XAie_DmaMod *DmaMod;
 
@@ -1213,20 +1460,47 @@ AieRC XAie_DmaChannelPushBdToQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
-		XAIE_ERROR("Invalid Tile Type\n");
+	if((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
+			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
+		XAIE_ERROR("Invalid Tile Type or Direction\n");
 		return XAIE_INVALID_TILE;
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
 
-	if(BdNum > DmaMod->NumBds) {
-		XAIE_ERROR("Invalid BD number\n");
-		return XAIE_INVALID_BD_NUM;
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		RC = _XAie4_ValidateBd(DevInst, TileType, DmaMod, BdNum);
+		if (RC != XAIE_OK) {
+			XAIE_ERROR("Invalid BD number\n");
+			return RC;
+		}
+		if (TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+			/* Get Private pool BD num, and channel info */
+			BdNumTemp = XAie4_MemTileDmaBdChLut[BdNum].BdNum;
+			BdNum = BdNumTemp;
+		}
+		if ((TileType == XAIEGBL_TILE_TYPE_SHIMNOC) && (Dir == DMA_MM2S_CTRL)) {
+			/* First get the maximum BDs that the shim tile can support in single app mode*/
+			MaxNumBds = DmaMod->NumBds * 2;
+
+			/* If given BdNum is > MaxNumBds, that means it could be for Control_MM2S channels, so lets validate that first */
+			if (BdNum >= MaxNumBds) {					
+				BdNumTemp = BdNum - MaxNumBds;
+				BdNumTemp = BdNumTemp % DmaMod->NumMm2sCtrlBds;
+				BdNum = BdNumTemp;
+			}
+		}
+	} else {
+		MaxNumBds = _XAie_GetMaxNumBds(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, DmaMod->NumBds);
+		if(BdNum >= MaxNumBds) {
+			XAIE_ERROR("Invalid BD number\n");
+			return XAIE_INVALID_BD_NUM;
+		}
 	}
 
 	RC = DmaMod->BdChValidity(BdNum, ChNum);
@@ -1234,9 +1508,12 @@ AieRC XAie_DmaChannelPushBdToQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return RC;
 	}
 
-	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
-		(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)))
+		Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+			DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
+			(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	else
+		Addr = _XAie4_GetChannelCtrlAddr(DevInst, DmaMod, Loc, Dir, ChNum);
 
 	return XAie_Write32(DevInst, Addr + (u64)(DmaMod->ChProp->StartBd.Idx * 4U),
 			BdNum);
@@ -1262,6 +1539,7 @@ static AieRC _XAie_DmaChannelControl(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 ChNum, XAie_DmaDirection Dir, u8 Enable)
 {
 	u8 TileType;
+	u8 MaxNumChannels;
 	u64 Addr;
 	const XAie_DmaMod *DmaMod;
 
@@ -1283,7 +1561,8 @@ static AieRC _XAie_DmaChannelControl(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
@@ -1309,13 +1588,16 @@ static AieRC _XAie_DmaChannelControl(XAie_DevInst *DevInst, XAie_LocType Loc,
 *
 * @return	XAIE_OK on success, Error code on failure.
 *
-* @note		None.
+* @note		From AIE4 there is no channel enable configuration in RegDB
 *
 ******************************************************************************/
 AieRC XAie_DmaChannelEnable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		XAie_DmaDirection Dir)
 {
-	return _XAie_DmaChannelControl(DevInst, Loc, ChNum, Dir, XAIE_ENABLE);
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))
+		return XAIE_NOT_SUPPORTED;
+	else
+		return _XAie_DmaChannelControl(DevInst, Loc, ChNum, Dir, XAIE_ENABLE);
 }
 
 /*****************************************************************************/
@@ -1330,13 +1612,16 @@ AieRC XAie_DmaChannelEnable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 *
 * @return	XAIE_OK on success, Error code on failure.
 *
-* @note		None.
+* @note		From AIE4 there is no channel enable configuration in RegDB
 *
 ******************************************************************************/
 AieRC XAie_DmaChannelDisable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		XAie_DmaDirection Dir)
 {
-	return _XAie_DmaChannelControl(DevInst, Loc, ChNum, Dir, XAIE_DISABLE);
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))
+		return XAIE_NOT_SUPPORTED;
+	else
+		return _XAie_DmaChannelControl(DevInst, Loc, ChNum, Dir, XAIE_DISABLE);
 }
 
 /*****************************************************************************/
@@ -1361,6 +1646,7 @@ AieRC XAie_DmaGetPendingBdCount(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 ChNum, XAie_DmaDirection Dir, u8 *PendingBd)
 {
 	u8 TileType;
+	u8 MaxNumChannels;
 	const XAie_DmaMod *DmaMod;
 
 	if((DevInst == XAIE_NULL) ||
@@ -1375,13 +1661,15 @@ AieRC XAie_DmaGetPendingBdCount(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
-		XAIE_ERROR("Invalid Tile Type\n");
+	if ((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
+			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
+		XAIE_ERROR("Invalid Tile Type or Direction\n");
 		return XAIE_INVALID_TILE;
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
@@ -1409,6 +1697,7 @@ AieRC XAie_DmaGetChannelStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 ChNum, XAie_DmaDirection Dir, u32 *Status)
 {
 	u8 TileType;
+	u8 MaxNumChannels;
 	const XAie_DmaMod *DmaMod;
 
 	if((DevInst == XAIE_NULL) ||
@@ -1423,13 +1712,15 @@ AieRC XAie_DmaGetChannelStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
-		XAIE_ERROR("Invalid Tile Type\n");
+	if ((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
+			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
+		XAIE_ERROR("Invalid Tile Type or Direction\n");
 		return XAIE_INVALID_TILE;
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
@@ -1457,6 +1748,7 @@ AieRC XAie_DmaWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		XAie_DmaDirection Dir, u32 TimeOutUs)
 {
 	u8 TileType;
+	u8 MaxNumChannels;
 	const XAie_DmaMod *DmaMod;
 
 	if((DevInst == XAIE_NULL) ||
@@ -1471,13 +1763,15 @@ AieRC XAie_DmaWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
-		XAIE_ERROR("Invalid Tile Type\n");
+	if ((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
+			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
+		XAIE_ERROR("Invalid Tile Type or Direction\n");
 		return XAIE_INVALID_TILE;
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
@@ -1577,7 +1871,11 @@ AieRC XAie_DmaGetMaxQueueSize(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return XAIE_INVALID_TILE;
 	}
 
-	*QueueSize = XAIE_DMA_MAX_QUEUE_SIZE;
+	/* TODO: If the request is for MM2S_Control channel,
+	 * how to get the MaxQueue Size
+	 */
+
+	*QueueSize = DevInst->DevProp.DevMod[TileType].DmaMod->ChProp->StartQSizeMax;
 	return XAIE_OK;
 }
 
@@ -1604,7 +1902,7 @@ AieRC XAie_DmaGetMaxQueueSize(XAie_DevInst *DevInst, XAie_LocType Loc,
 *
 ******************************************************************************/
 AieRC XAie_DmaChannelSetStartQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
-		u8 ChNum, XAie_DmaDirection Dir, u8 BdNum, u32 RepeatCount,
+		u8 ChNum, XAie_DmaDirection Dir, u16 BdNum, u32 RepeatCount,
 		u8 EnTokenIssue)
 {
 	XAie_DmaDeclareQueueConfig(DmaQueueDesc, BdNum, RepeatCount,
@@ -1637,7 +1935,9 @@ AieRC XAie_DmaChannelSetStartQueueGeneric(XAie_DevInst *DevInst,
 {
 	AieRC RC;
 	u8 TileType;
-	u8 StartBd;
+	u8 StartBd, BdNumTemp;
+	u8 MaxNumChannels;
+	u8 MaxNumBds;
 	u32 Val = 0;
 	u64 Addr;
 	const XAie_DmaMod *DmaMod;
@@ -1665,6 +1965,11 @@ AieRC XAie_DmaChannelSetStartQueueGeneric(XAie_DevInst *DevInst,
 		return XAIE_INVALID_TILE;
 	}
 
+	if ((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC)) {
+		XAIE_ERROR("Invalid Tile Type for given Direction\n");
+		return XAIE_INVALID_DMA_DIRECTION;
+	}
+
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
 	if(DmaMod->RepeatCount == XAIE_FEATURE_UNAVAILABLE) {
 		XAIE_ERROR("Repeat count feature in start queue is not supported for this device generation\n");
@@ -1676,7 +1981,8 @@ AieRC XAie_DmaChannelSetStartQueueGeneric(XAie_DevInst *DevInst,
 		return XAIE_FEATURE_NOT_SUPPORTED;
 	}
 
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod, TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
@@ -1690,9 +1996,35 @@ AieRC XAie_DmaChannelSetStartQueueGeneric(XAie_DevInst *DevInst,
 
 	if(DmaQueueDesc->OutOfOrder != XAIE_ENABLE) {
 		StartBd = DmaQueueDesc->StartBd;
-		if(StartBd > DmaMod->NumBds) {
-			XAIE_ERROR("Invalid BD number\n");
-			return XAIE_INVALID_BD_NUM;
+		if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+			RC = _XAie4_ValidateBd(DevInst, TileType, DmaMod, StartBd);
+			if (RC != XAIE_OK) {
+				XAIE_ERROR("Invalid BD number\n");
+				return RC;
+			}
+			if (TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+				/* Get Private pool BD num, and channel info */
+				BdNumTemp = XAie4_MemTileDmaBdChLut[StartBd].BdNum;
+				StartBd = BdNumTemp;
+			}
+			
+			if ((TileType == XAIEGBL_TILE_TYPE_SHIMNOC) && (Dir == DMA_MM2S_CTRL)) {
+				/* First get the maximum BDs that the shim tile can support in single app mode*/
+				MaxNumBds = DmaMod->NumBds * 2;
+
+				/* If given BdNum is > MaxNumBds, that means it could be for Control_MM2S channels, so lets validate that first */
+				if (StartBd >= MaxNumBds) {					
+					BdNumTemp = StartBd - MaxNumBds;
+					BdNumTemp = BdNumTemp % DmaMod->NumMm2sCtrlBds;
+					StartBd = BdNumTemp;
+				}
+			}
+		} else {
+			MaxNumBds = _XAie_GetMaxNumBds(DevInst->DevProp.DevGen, TileType, DevInst->AppMode, DmaMod->NumBds);
+			if(StartBd >= MaxNumBds) {
+				XAIE_ERROR("Invalid BD number\n");
+				return XAIE_INVALID_BD_NUM;
+			}
 		}
 		RC = DmaMod->BdChValidity(StartBd, ChNum);
 		if(RC != XAIE_OK) {
@@ -1702,9 +2034,15 @@ AieRC XAie_DmaChannelSetStartQueueGeneric(XAie_DevInst *DevInst,
 		StartBd = 0;
 	}
 
-	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->StartQueueBase + ChNum * DmaMod->ChIdxOffset +
-		(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))) {
+		Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+			DmaMod->StartQueueBase + ChNum * DmaMod->ChIdxOffset +
+			(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	} else {
+		Addr = _XAie4_GetChannelCtrlAddr(DevInst, DmaMod, Loc, Dir, ChNum);
+		/* Status Register = Ctrl register addr + 0x04 */
+		Addr += 0x04;
+	}
 
 	Val = XAie_SetField(StartBd, DmaMod->ChProp->StartBd.Lsb,
 			DmaMod->ChProp->StartBd.Mask) |
@@ -1949,6 +2287,7 @@ AieRC XAie_DmaWriteChannel(XAie_DevInst *DevInst,
 {
 	u64 Addr;
 	u32 Val;
+	u8 MaxNumChannels;
 	const XAie_DmaMod *DmaMod;
 
 	if((DevInst == XAIE_NULL) || (DmaChannelDesc == XAIE_NULL) ||
@@ -1978,23 +2317,40 @@ AieRC XAie_DmaWriteChannel(XAie_DevInst *DevInst,
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[DmaChannelDesc->TileType].DmaMod;
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod,
+			DmaChannelDesc->TileType, Dir);
+	if (_XAie_ValidateChannelNumber(DevInst, DmaChannelDesc->TileType,
+		Dir, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
 
-	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
-		(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)))
+		Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+			DmaMod->ChCtrlBase + ChNum * DmaMod->ChIdxOffset +
+			(u8)Dir * DmaMod->ChIdxOffset * DmaMod->NumChannels;
+	else
+		Addr = _XAie4_GetChannelCtrlAddr(DevInst, DmaMod, Loc, Dir, ChNum);
 
-	Val = XAie_SetField(DmaChannelDesc->EnOutofOrderId, (DmaMod->ChProp->EnOutofOrder.Lsb),
-			(DmaMod->ChProp->EnOutofOrder.Mask)) |
-		XAie_SetField(DmaChannelDesc->EnCompression, (DmaMod->ChProp->EnCompression.Lsb),
-			(DmaMod->ChProp->EnCompression.Mask)) |
-		XAie_SetField(DmaChannelDesc->ControllerId, (DmaMod->ChProp->ControllerId.Lsb),
-			(DmaMod->ChProp->ControllerId.Mask)) |
-		XAie_SetField(DmaChannelDesc->FoTMode, (DmaMod->ChProp->FoTMode.Lsb),
-			(DmaMod->ChProp->FoTMode.Mask));
+	if (Dir == DMA_MM2S_CTRL) {
+		if (DmaChannelDesc->EnOutofOrderId || DmaChannelDesc->EnCompression) {
+			XAIE_ERROR("Dma MM2S Control channel doesn't support OutofOrder and Compression\n");
+			return XAIE_INVALID_DMA_DIRECTION;
+		}
+		Val = XAie_SetField(DmaChannelDesc->ControllerId, (DmaMod->ChProp->ControllerId.Lsb),
+					(DmaMod->ChProp->ControllerId.Mask)) |
+				XAie_SetField(DmaChannelDesc->FoTMode, (DmaMod->ChProp->FoTMode.Lsb),
+						(DmaMod->ChProp->FoTMode.Mask));
+	} else {
+		Val = XAie_SetField(DmaChannelDesc->EnOutofOrderId, (DmaMod->ChProp->EnOutofOrder.Lsb),
+				(DmaMod->ChProp->EnOutofOrder.Mask)) |
+			XAie_SetField(DmaChannelDesc->EnCompression, (DmaMod->ChProp->EnCompression.Lsb),
+				(DmaMod->ChProp->EnCompression.Mask)) |
+			XAie_SetField(DmaChannelDesc->ControllerId, (DmaMod->ChProp->ControllerId.Lsb),
+				(DmaMod->ChProp->ControllerId.Mask)) |
+			XAie_SetField(DmaChannelDesc->FoTMode, (DmaMod->ChProp->FoTMode.Lsb),
+				(DmaMod->ChProp->FoTMode.Mask));
+	}
 
 	return XAie_Write32(DevInst, Addr, Val);
 }
@@ -2079,6 +2435,11 @@ AieRC XAie_DmaSetZeroPadding(XAie_DmaDesc *DmaDesc, u8 Dim,
 			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Arguments\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	if (_XAie_IsDeviceGenAIE4(DmaDesc->DevGen)) {
+		XAIE_ERROR("DevGen = %d, doesn't support Zeropadding, use SetPadValue\n",DmaDesc->DevGen);
+		return XAIE_FEATURE_NOT_SUPPORTED;
 	}
 
 	DmaMod = DmaDesc->DmaMod;
@@ -2210,7 +2571,7 @@ AieRC XAie_DmaTlastDisable(XAie_DmaDesc *DmaDesc)
 *
 ******************************************************************************/
 AieRC XAie_DmaGetBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 *Len,
-		u8 BdNum)
+		u16 BdNum)
 {
 	u8 TileType;
 	u64 RegAddr;
@@ -2231,37 +2592,53 @@ AieRC XAie_DmaGetBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 *Len,
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(BdNum > DmaMod->NumBds) {
-		XAIE_ERROR("Invalid BD number\n");
-		return XAIE_INVALID_BD_NUM;
-	}
 
-	RegAddr = (u64)(DmaMod->BaseAddr + BdNum * DmaMod->IdxOffset) +
-		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->BdProp->BdEn->ValidBd.Idx * 4U;
-	RC = XAie_Read32(DevInst, RegAddr, &RegVal);
-	if(RC != XAIE_OK) {
-		return RC;
-	}
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		RC = _XAie4_ValidateBd(DevInst, TileType, DmaMod, BdNum);
+		if (RC != XAIE_OK) {
+			XAIE_ERROR("Invalid BD number\n");
+			return RC;
+		}
 
-	Valid = XAie_GetField(RegVal, DmaMod->BdProp->BdEn->ValidBd.Lsb,
-			DmaMod->BdProp->BdEn->ValidBd.Mask);
-	if(Valid == 1U) {
-		RegAddr = (u64)(DmaMod->BaseAddr + BdNum * DmaMod->IdxOffset)
-			+ XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-			DmaMod->BdProp->BufferLen.Idx * 4U;
+		RC = DmaMod->GetBdLen(DevInst, DmaMod, Loc, Len, BdNum);
+		if (RC != XAIE_OK) {
+			*Len = 0;
+			return RC;
+		}
+
+		return XAIE_OK;
+	} else {
+		if (BdNum >= DmaMod->NumBds) {
+			XAIE_ERROR("Invalid BD number\n");
+			return XAIE_INVALID_BD_NUM;
+		}
+
+		RegAddr = (u64)(DmaMod->BaseAddr + BdNum * DmaMod->IdxOffset) +
+			XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+			DmaMod->BdProp->BdEn->ValidBd.Idx * 4U;
 		RC = XAie_Read32(DevInst, RegAddr, &RegVal);
 		if(RC != XAIE_OK) {
 			return RC;
 		}
 
-		*Len = (XAie_GetField(RegVal, DmaMod->BdProp->BufferLen.Lsb,
-			DmaMod->BdProp->BufferLen.Mask) +
-			DmaMod->BdProp->LenActualOffset)
-			<< XAIE_DMA_32BIT_TXFER_LEN;
-	}
-	else {
-		*Len = 0;
+		Valid = XAie_GetField(RegVal, DmaMod->BdProp->BdEn->ValidBd.Lsb,
+				DmaMod->BdProp->BdEn->ValidBd.Mask);
+		if(Valid == 1U) {
+			RegAddr = (u64)(DmaMod->BaseAddr + BdNum * DmaMod->IdxOffset)
+				+ XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+				DmaMod->BdProp->BufferLen.Idx * 4U;
+			RC = XAie_Read32(DevInst, RegAddr, &RegVal);
+			if(RC != XAIE_OK) {
+				return RC;
+			}
+
+			*Len = (XAie_GetField(RegVal, DmaMod->BdProp->BufferLen.Lsb,
+				DmaMod->BdProp->BufferLen.Mask) +
+				DmaMod->BdProp->LenActualOffset)
+				<< XAIE_DMA_32BIT_TXFER_LEN;
+		} else {
+			*Len = 0;
+		}
 	}
 	return XAIE_OK;
 }
@@ -2282,8 +2659,9 @@ AieRC XAie_DmaGetBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 *Len,
 *		on software descriptor.
 ******************************************************************************/
 AieRC XAie_DmaUpdateBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Len,
-		u8 BdNum)
+		u16 BdNum)
 {
+	AieRC RC;
 	const XAie_DmaMod *DmaMod;
 	u32 AdjustedLen;
 	u8 TileType;
@@ -2301,14 +2679,22 @@ AieRC XAie_DmaUpdateBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Len,
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(BdNum > DmaMod->NumBds) {
-		XAIE_ERROR("Invalid BD number\n");
-		return XAIE_INVALID_BD_NUM;
+
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		RC = _XAie4_ValidateBd(DevInst, TileType, DmaMod, BdNum);
+		if (RC != XAIE_OK) {
+			XAIE_ERROR("Invalid BD number\n");
+			return RC;
+		}
+	} else {
+		if(BdNum >= DmaMod->NumBds) {
+			XAIE_ERROR("Invalid BD number\n");
+			return XAIE_INVALID_BD_NUM;
+		}
 	}
 
 	AdjustedLen = (Len >> XAIE_DMA_32BIT_TXFER_LEN) -
 		DmaMod->BdProp->LenActualOffset;
-
 
 	return DmaMod->UpdateBdLen(DevInst, DmaMod, Loc, AdjustedLen, BdNum);
 }
@@ -2329,10 +2715,11 @@ AieRC XAie_DmaUpdateBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Len,
 *		on software descriptor.
 ******************************************************************************/
 AieRC XAie_DmaUpdateBdAddr(XAie_DevInst *DevInst, XAie_LocType Loc, u64 Addr,
-		u8 BdNum)
+		u16 BdNum)
 {
 	const XAie_DmaMod *DmaMod;
 	u8 TileType;
+	AieRC RC;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -2347,9 +2734,18 @@ AieRC XAie_DmaUpdateBdAddr(XAie_DevInst *DevInst, XAie_LocType Loc, u64 Addr,
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
-	if(BdNum > DmaMod->NumBds) {
-		XAIE_ERROR("Invalid BD number\n");
-		return XAIE_INVALID_BD_NUM;
+
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		RC = _XAie4_ValidateBd(DevInst, TileType, DmaMod, BdNum);
+		if (RC != XAIE_OK) {
+			XAIE_ERROR("Invalid BD number\n");
+			return RC;
+		}
+	} else {
+		if(BdNum >= DmaMod->NumBds) {
+			XAIE_ERROR("Invalid BD number\n");
+			return XAIE_INVALID_BD_NUM;
+		}
 	}
 
 	if(((Addr & DmaMod->BdProp->AddrAlignMask) != 0U) ||
@@ -2383,7 +2779,8 @@ AieRC XAie_DmaSetPadValue(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 {
 	const XAie_DmaMod *DmaMod;
 	u8 TileType;
-	u64 Addr;
+	u8 MaxNumChannels;
+	u64 Addr = 0;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -2404,13 +2801,23 @@ AieRC XAie_DmaSetPadValue(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		return XAIE_FEATURE_NOT_SUPPORTED;
 	}
 
-	if(ChNum > DmaMod->NumChannels) {
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod,
+			TileType, DMA_MM2S);
+	if (_XAie_ValidateChannelNumber(DevInst, TileType, DMA_MM2S, ChNum, MaxNumChannels)) {
 		XAIE_ERROR("Invalid Channel number\n");
 		return XAIE_INVALID_CHANNEL_NUM;
 	}
+		
+	if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+			(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) ) {
+		if (ChNum >= DmaMod->NumMm2sChannels) {
+			Addr = _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen, Addr);	
+			ChNum -= DmaMod->NumMm2sChannels;			
+		}
+	}
 
-	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->PadValueBase + ChNum * 0x4U;
+	Addr |= XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+					 DmaMod->PadValueBase + ChNum * 0x4U;
 
 	return XAie_Write32(DevInst, Addr, PadValue);
 }

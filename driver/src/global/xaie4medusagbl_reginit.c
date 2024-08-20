@@ -28,6 +28,7 @@
 #include "xaie_device_aie.h"
 #include "xaie_device_aie4.h"
 #include "xaie_dma_aieml.h"
+#include "xaie_dma_aie2p.h"
 #include "xaie_dma_aie4.h"
 #include "xaie_events.h"
 #include "xaie_events_aie4.h"
@@ -425,27 +426,28 @@ static const  XAie_DmaMod Aie4MemTileDmaMod =
 	.ChCtrlBase = XAIE4GBL_MEM_TILE_MODULE_DMA_S2MM_0_CTRL,
 	.ChCtrlOffset = 0x60,
 	.NumChannels = 4,	/* number of s2mm channels */
-	.NumMm2sChannels = 5,	/* number of mm2s channels */
+	.NumMm2sChannels = 6,	/* number of mm2s channels */
 	.ChIdxOffset = 0x8,	/* This is the offset between each channel */
 	.ChStatusBase = XAIE4GBL_MEM_TILE_MODULE_DMA_S2MM_STATUS_0,
 	.ChStatusOffset = 0x30,
 	.PadValueBase = XAIE4GBL_MEM_TILE_MODULE_DMA_MM2S_0_CONSTANT_PAD_VALUE,
 	.BdProp = &Aie4MemTileDmaProp,
 	.ChProp = &Aie4MemTileDmaChProp,
-	.DmaBdInit = NULL,
+	.DmaBdInit = &_XAie4_MemTileDmaInit,
 	.SetLock = &_XAieMl_DmaSetLock,
 	.SetIntrleave = NULL,
-	.SetMultiDim = NULL,
+	.SetMultiDim = &_XAie4_DmaSetMultiDim,
 	.SetBdIter = &_XAieMl_DmaSetBdIteration,
-	.WriteBd = NULL,
-	.ReadBd = NULL,
-	.PendingBd = NULL,
-	.WaitforDone = NULL,
+	.WriteBd = &_XAie4_MemTileDmaWriteBd,
+	.ReadBd = &_XAie4_MemTileDmaReadBd,
+	.PendingBd = &_XAie4_DmaGetPendingBdCount,
+	.WaitforDone = &_XAie4_DmaWaitForDone,
 	.BdChValidity = &_XAieMl_DmaCheckBdChValidity,
-	.UpdateBdLen = NULL,
-	.GetBdLen = NULL,
-	.UpdateBdAddr = NULL,
-	.GetChannelStatus = NULL,
+	.UpdateBdLen = &_XAie4_MemTileDmaUpdateBdLen,
+	.GetBdLen = &_XAie4_MemTileDmaGetBdLen,
+	.UpdateBdAddr = &_XAie4_MemTileDmaUpdateBdAddr,
+	.GetChannelStatus = &_XAie4_DmaGetChannelStatus,
+	.AxiBurstLenCheck = NULL,
 };
 
 static const  XAie_DmaBdEnProp Aie4TileDmaBdEnProp =
@@ -645,20 +647,21 @@ static const  XAie_DmaMod Aie4TileDmaMod =
 	.PadValueBase = XAIE_FEATURE_UNAVAILABLE,
 	.BdProp = &Aie4TileDmaProp,
 	.ChProp = &Aie4DmaChProp,
-	.DmaBdInit = NULL,
+	.DmaBdInit = &_XAie4_TileDmaInit,
 	.SetLock = &_XAieMl_DmaSetLock,
 	.SetIntrleave = NULL,
-	.SetMultiDim = NULL,
+	.SetMultiDim = &_XAie4_DmaSetMultiDim,
 	.SetBdIter = &_XAieMl_DmaSetBdIteration,
-	.WriteBd = NULL,
-	.ReadBd = NULL,
-	.PendingBd = NULL,
-	.WaitforDone = NULL,
+	.WriteBd = &_XAie4_TileDmaWriteBd,
+	.ReadBd = &_XAie4_TileDmaReadBd,
+	.PendingBd = &_XAie4_DmaGetPendingBdCount,
+	.WaitforDone = &_XAie4_DmaWaitForDone,
 	.BdChValidity = &_XAieMl_DmaCheckBdChValidity,
-	.UpdateBdLen = NULL,
-	.GetBdLen = NULL,
-	.UpdateBdAddr = NULL,
-	.GetChannelStatus = NULL,
+	.UpdateBdLen = &_XAie4_TileDmaUpdateBdLen,
+	.GetBdLen = &_XAie4_TileDmaGetBdLen,
+	.UpdateBdAddr = &_XAie4_TileDmaUpdateBdAddr,
+	.GetChannelStatus = &_XAie4_DmaGetChannelStatus,
+	.AxiBurstLenCheck = NULL,
 };
 
 static const  XAie_DmaBdEnProp Aie4ShimDmaBdEnProp =
@@ -888,7 +891,7 @@ static const  XAie_DmaMod Aie4ShimDmaMod =
 	.StartQueueBase = XAIE4GBL_NOC_MODULE_DMA_S2MM_0_TASK_QUEUE,
 	.ChCtrlBase = XAIE4GBL_NOC_MODULE_DMA_S2MM_0_CTRL,
 	.ChCtrlOffset = 0x10,
-	.NumChannels = 1U,	/* Number of mm2s channels */
+	.NumChannels = 2U,	/* Number of s2mm channels */
 	.NumMm2sChannels = 2U, /* Number of mm2s channels */
 	.NumMm2sCtrlChannels = 1, /* Number of control MM2S channels */
 	.ChIdxOffset = 0x8,  /* This is the offset between each channel */
@@ -897,20 +900,21 @@ static const  XAie_DmaMod Aie4ShimDmaMod =
 	.PadValueBase = XAIE_FEATURE_UNAVAILABLE,
 	.BdProp = &Aie4ShimDmaProp,
 	.ChProp = &Aie4ShimDmaChProp,
-	.DmaBdInit = NULL,
+	.DmaBdInit = &_XAie4_ShimDmaInit,
 	.SetLock = &_XAieMl_DmaSetLock,
 	.SetIntrleave = NULL,
-	.SetMultiDim = NULL,
+	.SetMultiDim = &_XAie4_DmaSetMultiDim,
 	.SetBdIter = &_XAieMl_DmaSetBdIteration,
-	.WriteBd = NULL,
-	.ReadBd = NULL,
-	.PendingBd = NULL,
-	.WaitforDone = NULL,
-	.BdChValidity = NULL,
-	.UpdateBdLen = NULL,
-	.GetBdLen = NULL,
-	.UpdateBdAddr = NULL,
-	.GetChannelStatus = NULL,
+	.WriteBd = &_XAie4_ShimDmaWriteBd,
+	.ReadBd = &_XAie4_ShimDmaReadBd,
+	.PendingBd = &_XAie4_DmaGetPendingBdCount,
+	.WaitforDone = &_XAie4_DmaWaitForDone,
+	.BdChValidity = &_XAie4_ShimTileDmaCheckBdChValidity,
+	.UpdateBdLen = &_XAie4_ShimTileDmaUpdateBdLen,
+	.GetBdLen = &_XAie4_ShimTileDmaGetBdLen,
+	.UpdateBdAddr = &_XAie4_ShimTileDmaUpdateBdAddr,
+	.GetChannelStatus = &_XAie4_DmaGetChannelStatus,
+	.AxiBurstLenCheck = &_XAie2P_AxiBurstLenCheck,
 };
 #endif /* XAIE_FEATURE_DMA_ENABLE */
 

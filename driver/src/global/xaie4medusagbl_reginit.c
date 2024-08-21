@@ -3427,7 +3427,7 @@ static const  XAie_StrmMod Aie4TileStrmSw =
 	.MasterPortMap = Aie4TileStrmSwMasterPortMap,
 	.SlavePortMap = Aie4TileStrmSwSlavePortMap,
 	.DetMerge = &Aie4AieTileStrmSwDetMerge,
-	.PortVerify = NULL,
+	.PortVerify = _XAie4_AieTile_StrmSwCheckPortValidity,
 };
 
 static const XAie_StrmMod Aie4TileStrmSw32b =
@@ -3458,7 +3458,7 @@ static const XAie_StrmMod Aie4TileStrmSw32b =
 	.MasterPortMap = Aie4TileStrmSw32bMasterPortMap,
 	.SlavePortMap = Aie4TileStrmSw32bSlavePortMap,
 	.DetMerge = NULL,
-	.PortVerify = NULL,
+	.PortVerify = _XAie4_StrmSw32bCheckPortValidity,
 };
 
 /*
@@ -3492,7 +3492,7 @@ static const  XAie_StrmMod Aie4ShimStrmSw =
 	.MasterPortMap = Aie4ShimStrmSwMasterPortMap,
 	.SlavePortMap = Aie4ShimStrmSwSlavePortMap,
 	.DetMerge = &Aie4ShimTileStrmSwDetMerge,
-	.PortVerify = NULL,
+	.PortVerify = _XAie4_ShimTile_StrmSwCheckPortValidity,
 };
 
 /*
@@ -3526,7 +3526,7 @@ static const  XAie_StrmMod Aie4ShimStrmSw32b =
 	.MasterPortMap = Aie4ShimStrmSwMasterPortMap32b,
 	.SlavePortMap = Aie4ShimStrmSwSlavePortMap32b,
 	.DetMerge = NULL,
-	.PortVerify = NULL,
+	.PortVerify = _XAie4_StrmSw32bCheckPortValidity,
 };
 
 /*
@@ -3560,7 +3560,7 @@ static const  XAie_StrmMod Aie4MemTileStrmSw =
         .MasterPortMap = Aie4MemTileStrmSwMasterPortMap,
         .SlavePortMap = Aie4MemTileStrmSwSlavePortMap,
         .DetMerge = &Aie4MemTileStrmSwDetMerge,
-        .PortVerify = NULL,
+        .PortVerify = _XAie4_MemTile_StrmSwCheckPortValidity,
 };
 
 /*
@@ -3595,7 +3595,7 @@ static const  XAie_StrmMod Aie4MemTileStrmSw32b =
 	.MasterPortMap = Aie4MemTileStrmSw32bMasterPortMap,
 	.SlavePortMap = Aie4MemTileStrmSw32bSlavePortMap,
 	.DetMerge = NULL,
-	.PortVerify = NULL,
+	.PortVerify = _XAie4_StrmSw32bCheckPortValidity,
 };
 #endif /* XAIE_FEATURE_SS_ENABLE */
 

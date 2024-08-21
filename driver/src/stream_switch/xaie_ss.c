@@ -25,8 +25,6 @@
 * 1.6   Tejus   04/13/2020  Remove range apis and change to single tile apis
 * 1.7   Nishad  06/19/2020  Move XAIE_PACKETID_MAX to xaiegbl.h
 * 1.8   Tejus   06/10/2020  Switch to new io backend apis.
-* 1.9   Nishad  07/01/2020  Move _XAie_GetSlaveIdx() helper API common
-*			    directory.
 * 2.0   Nishad  09/15/2020  Add check to validate XAie_StrmSwPktHeader value in
 *			    _XAie_StrmPktSwMstrPortConfig()
 * </pre>
@@ -103,6 +101,17 @@ static AieRC _GetMaxNumSsPorts(XAie_DevInst *DevInst, u8 TileType,
 
 	return XAIE_OK;
 }
+
+static inline const XAie_StrmMod * _GetStreamMod(XAie_DevInst *DevInst, u8 TileType, u8 PortType)
+{
+	if (PortType <= _512B_PORT_END)
+		return DevInst->DevProp.DevMod[TileType].StrmSw;
+	else if ((PortType >= _32B_PORT_START) && (PortType <= _32B_PORT_END))
+		return DevInst->DevProp.DevMod[TileType].StrmSw32b;
+
+	return NULL;
+}
+
 /*
  * This is an internal API
  */
@@ -290,22 +299,51 @@ AieRC _XAie_GetPortIdx(XAie_DevInst *DevInst, u8 TileType,
 *		PortNum 1 maps to MEM_TRACE_PORT.
 *
 *******************************************************************************/
-static AieRC _XAie_StrmConfigSlv(const XAie_StrmMod *StrmMod,
-		StrmSwPortType PortType, u8 PortNum, u8 Enable, u8 PktEnable,
+static AieRC _XAie_StrmConfigSlv(XAie_DevInst *DevInst, const XAie_StrmMod *StrmMod,
+		u8 TileType, StrmSwPortType PortType, u8 PortNum, u8 Enable, u8 PktEnable,
 		u32 *RegVal, u32 *RegOff)
 {
+	AieRC RC;
+	u8 MaxNumPorts = 0;
+	u8 AddPlaceHolderPort = 0;
 	*RegVal = 0U;
+	*RegOff = 0U;
 	const XAie_StrmPort  *PortPtr;
 
 	/* Get the slave port pointer from stream module */
 	PortPtr = &StrmMod->SlvConfig[PortType];
 
-	if((PortPtr->NumPorts == 0U) || (PortNum >= PortPtr->NumPorts)) {
-		XAIE_ERROR("Invalid Slave Port\n");
-		return XAIE_ERR_STREAM_PORT;
+	RC = _GetMaxNumSsPorts(DevInst, TileType, PortPtr, PortType, &MaxNumPorts);
+	if (RC != XAIE_OK) {
+		XAIE_ERROR("Invalid stream port\n");
+		return RC;
 	}
 
-	*RegOff = PortPtr->PortBaseAddr + StrmMod->PortOffset * PortNum;
+	RC = _XAie_ValidatePortNumber(DevInst, TileType, PortType, XAIE_STRMSW_SLAVE,
+		PortNum, MaxNumPorts);
+	if (RC != XAIE_OK) {
+		XAIE_ERROR("Invalid stream port\n");
+		return RC;
+	}
+
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		if (TileType == XAIEGBL_TILE_TYPE_AIETILE) {
+			if ((DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) &&
+				(PortType == NORTH) &&
+				(PortNum >= (PortPtr->NumPorts / 2))) {
+				AddPlaceHolderPort = 1;
+			}
+		} else {
+			if (PortNum >= PortPtr->NumPorts) {
+				*RegOff = XAIE4_MASK_VALUE_APP_B;
+				PortNum -= PortPtr->NumPorts;
+				if ((TileType == XAIEGBL_TILE_TYPE_MEMTILE) && (PortType == DMA))
+					PortNum--;
+			}
+		}
+	}
+
+	*RegOff |= PortPtr->PortBaseAddr + StrmMod->PortOffset * (PortNum + AddPlaceHolderPort);
 
 	if (Enable != XAIE_ENABLE) {
 		return XAIE_OK;
@@ -339,23 +377,53 @@ static AieRC _XAie_StrmConfigSlv(const XAie_StrmMod *StrmMod,
 * @note		Internal API.
 *
 *******************************************************************************/
-static AieRC _StrmConfigMstr(const XAie_StrmMod *StrmMod,
-		StrmSwPortType PortType, u8 PortNum, u8 Enable, u8 PktEnable,
+static AieRC _StrmConfigMstr(XAie_DevInst *DevInst, const XAie_StrmMod *StrmMod,
+		u8 TileType, StrmSwPortType PortType, u8 PortNum, u8 Enable, u8 PktEnable,
 		u8 Config, u32 *RegVal, u32 *RegOff)
 {
-
+	AieRC RC;
 	u8 DropHdr;
+	u8 MaxNumPorts = 0;
+	u8 AddPlaceHolderPort = 0;
 	*RegVal = 0U;
+	*RegOff = 0U;
 	const XAie_StrmPort *PortPtr;
 
+	/* Get Port pointer from stream switch module */
 	PortPtr = &StrmMod->MstrConfig[PortType];
 
-	if((PortPtr->NumPorts == 0U) || (PortNum >= PortPtr->NumPorts)) {
-		XAIE_ERROR("Invalid Stream Port\n");
-		return XAIE_ERR_STREAM_PORT;
+	RC = _GetMaxNumSsPorts(DevInst, TileType, PortPtr, PortType, &MaxNumPorts);
+	if (RC != XAIE_OK) {
+		XAIE_ERROR("Invalid stream port\n");
+		return RC;
 	}
 
-	*RegOff = PortPtr->PortBaseAddr + StrmMod->PortOffset * PortNum;
+	RC = _XAie_ValidatePortNumber(DevInst, TileType, PortType, XAIE_STRMSW_MASTER,
+		PortNum, MaxNumPorts);
+	if (RC != XAIE_OK) {
+		XAIE_ERROR("Invalid stream port\n");
+		return RC;
+	}
+
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		if (TileType == XAIEGBL_TILE_TYPE_AIETILE) {
+			if ((DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) &&
+				(PortType == SOUTH) &&
+				(PortNum >= (PortPtr->NumPorts / 2))) {
+				AddPlaceHolderPort = 1;
+			}
+		} else {
+			if (PortNum >= PortPtr->NumPorts) {
+				*RegOff = XAIE4_MASK_VALUE_APP_B;
+				PortNum -= PortPtr->NumPorts;
+				if ((TileType == XAIEGBL_TILE_TYPE_SHIMNOC) && (PortType == DMA))
+					PortNum--;
+			}
+		}
+	}
+
+	*RegOff |= PortPtr->PortBaseAddr + StrmMod->PortOffset * (PortNum + AddPlaceHolderPort);
+
 	if (Enable != XAIE_ENABLE) {
 		return XAIE_OK;
 	}
@@ -419,11 +487,6 @@ static AieRC _XAie_StreamSwitchConfigureCct(XAie_DevInst *DevInst,
 		return XAIE_INVALID_ARGS;
 	}
 
-	if((Slave >= SS_PORT_TYPE_MAX) || (Master >= SS_PORT_TYPE_MAX)) {
-		XAIE_ERROR("Invalid Stream Switch Ports\n");
-		return XAIE_ERR_STREAM_PORT;
-	}
-
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 	if(TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
@@ -431,31 +494,36 @@ static AieRC _XAie_StreamSwitchConfigureCct(XAie_DevInst *DevInst,
 	}
 
 	/* Get stream switch module pointer from device instance */
-	StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw;
+	StrmMod = _GetStreamMod(DevInst, TileType, Master);
+	if (StrmMod == NULL) {
+		XAIE_ERROR("Invalid Stream Switch Ports\n");
+		return XAIE_ERR_STREAM_PORT;
+	}
 
-	RC = StrmMod->PortVerify(DevInst, Slave, SlvPortNum, Master, MstrPortNum);
-	if(RC != XAIE_OK) {
-		XAIE_ERROR("Slave port(Type: %d, Number: %d) can't connect to Master port(Type: %d, Number: %d) on the AIE tile.\n",
-				Slave, SlvPortNum, Master, MstrPortNum);
-                return RC;
-        }
-
-	RC = _XAie_GetSlaveIdx(StrmMod, Slave, SlvPortNum, &SlaveIdx);
+	RC = _XAie_GetPortIdx(DevInst, TileType, StrmMod, Slave,
+			SlvPortNum, &SlaveIdx, XAIE_STRMSW_SLAVE);
 	if(RC != XAIE_OK) {
 		XAIE_ERROR("Unable to compute Slave Index\n");
 		return RC;
 	}
 
+	RC = StrmMod->PortVerify(DevInst, Slave, SlvPortNum, Master, MstrPortNum);
+	if(RC != XAIE_OK) {
+		XAIE_ERROR("Slave port(Type: %d, Number: %d) can't connect to Master port(Type: %d, Number: %d) on the AIE tile.\n",
+		Slave, SlvPortNum, Master, MstrPortNum);
+		return RC;
+	}
+
 	/* Compute the register value and register address for the master port*/
-	RC = _StrmConfigMstr(StrmMod, Master, MstrPortNum, Enable, XAIE_DISABLE,
-			SlaveIdx, &MstrVal, &MstrOff);
+	RC = _StrmConfigMstr(DevInst, StrmMod, TileType, Master, MstrPortNum,
+			Enable, XAIE_DISABLE, SlaveIdx, &MstrVal, &MstrOff);
 	if(RC != XAIE_OK) {
 		XAIE_ERROR("Master config error\n");
 		return RC;
 	}
 
 	/* Compute the register value and register address for slave port */
-	RC = _XAie_StrmConfigSlv(StrmMod, Slave, SlvPortNum, Enable,
+	RC = _XAie_StrmConfigSlv(DevInst, StrmMod, TileType, Slave, SlvPortNum, Enable,
 			XAIE_DISABLE, &SlvVal, &SlvOff);
 	if(RC != XAIE_OK) {
 		XAIE_ERROR("Slave config error\n");
@@ -547,8 +615,8 @@ AieRC XAie_StrmConnCctDisable(XAie_DevInst *DevInst, XAie_LocType Loc,
 *
 * @return	XAIE_OK on success, Error code on failure.
 *
-* @note		Internal only. When PortType is TRACE and there are more than
-*		one TRACE ports in the Tile, PortNum 0 maps to CORE_TRACE_PORT
+* @note		Internal only. When PortType is TRACE or _32B_TRACE and there are
+* 		more than one TRACE ports in the Tile, PortNum 0 maps to CORE_TRACE_PORT
 *		and PortNum 1 maps to MEM_TRACE_PORT.
 *
 *******************************************************************************/
@@ -556,23 +624,18 @@ static AieRC _XAie_StrmSlavePortConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
 		StrmSwPortType Slave, u8 SlvPortNum, u8 EnPkt, u8 Enable)
 {
 	AieRC RC;
+	const XAie_StrmMod *StrmMod;
 	u64 Addr;
 	u32 RegOff;
 	u32 RegVal = 0U;
 	u8 TileType;
-	const XAie_StrmMod *StrmMod;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
 	}
-
-	if((Slave >= SS_PORT_TYPE_MAX)) {
-		XAIE_ERROR("Invalid Stream Switch Ports\n");
-		return XAIE_ERR_STREAM_PORT;
-	}
-
+	
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 	if(TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
@@ -580,11 +643,15 @@ static AieRC _XAie_StrmSlavePortConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	/* Get stream switch module pointer from device instance */
-	StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw;
+	StrmMod = _GetStreamMod(DevInst, TileType, Slave);
+	if (StrmMod == NULL) {
+		XAIE_ERROR("Invalid Stream Switch Ports\n");
+		return XAIE_ERR_STREAM_PORT;
+	}
 
 	/* Compute the register value and register address for slave port */
-	RC = _XAie_StrmConfigSlv(StrmMod, Slave, SlvPortNum, EnPkt,
-			Enable, &RegVal, &RegOff);
+	RC = _XAie_StrmConfigSlv(DevInst, StrmMod, TileType, Slave, SlvPortNum,
+			EnPkt, Enable, &RegVal, &RegOff);
 	if(RC != XAIE_OK) {
 		XAIE_ERROR("Slave config error\n");
 		return RC;
@@ -698,11 +765,6 @@ static AieRC _XAie_StrmPktSwMstrPortConfig(XAie_DevInst *DevInst,
 		return XAIE_INVALID_ARGS;
 	}
 
-	if((Master >= SS_PORT_TYPE_MAX)) {
-		XAIE_ERROR("Invalid Stream Switch Ports\n");
-		return XAIE_ERR_STREAM_PORT;
-	}
-
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 	if(TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
@@ -710,7 +772,11 @@ static AieRC _XAie_StrmPktSwMstrPortConfig(XAie_DevInst *DevInst,
 	}
 
 	/* Get stream switch module pointer from device instance */
-	StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw;
+	StrmMod = _GetStreamMod(DevInst, TileType, Master);
+	if (StrmMod == NULL) {
+		XAIE_ERROR("Invalid Stream Switch Ports\n");
+		return XAIE_ERR_STREAM_PORT;
+	}
 
 	/* Construct Config and Drop header register fields */
 	if(Enable == XAIE_ENABLE) {
@@ -723,8 +789,8 @@ static AieRC _XAie_StrmPktSwMstrPortConfig(XAie_DevInst *DevInst,
 	}
 
 	/* Compute the register value and register address for the master port*/
-	RC = _StrmConfigMstr(StrmMod, Master, MstrPortNum, Enable, PktEn,
-			(u8)Config, &RegVal, &RegOff);
+	RC = _StrmConfigMstr(DevInst, StrmMod, TileType, Master, MstrPortNum,
+			Enable, PktEn, (u8)Config, &RegVal, &RegOff);
 	if(RC != XAIE_OK) {
 		XAIE_ERROR("Master config error\n");
 		return RC;
@@ -818,10 +884,14 @@ static AieRC _XAie_StrmSlaveSlotConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
 		StrmSwPortType Slave, u8 SlvPortNum, u8 SlotNum,
 		XAie_Packet Pkt, u8 Mask, u8 MSel, u8 Arbitor, u8 Enable)
 {
+	AieRC RC;
+	u8 MaxNumPorts;
 	u8 TileType;
-	u64 RegAddr;
+	u8 AddPlaceHolderPort = 0;
+	u64 RegAddr = 0U;
 	u32 RegVal = 0U;
 	const XAie_StrmMod *StrmMod;
+	const XAie_StrmPort *PortPtr;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -843,17 +913,54 @@ static AieRC _XAie_StrmSlaveSlotConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	/* Get stream switch module pointer from device instance */
-	StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw;
-	if((Slave >= SS_PORT_TYPE_MAX) || (SlotNum >= StrmMod->NumSlaveSlots) ||
-			(SlvPortNum >= StrmMod->SlvConfig[Slave].NumPorts)) {
-		XAIE_ERROR("Invalid Slave port and slot arguments\n");
+	StrmMod = _GetStreamMod(DevInst, TileType, Slave);
+	if (!StrmMod) {
+		XAIE_ERROR("Invalid Stream Switch Ports\n");
 		return XAIE_ERR_STREAM_PORT;
 	}
 
-	RegAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		StrmMod->SlvSlotConfig[Slave].PortBaseAddr +
-		SlvPortNum * StrmMod->SlotOffsetPerPort +
-		SlotNum * StrmMod->SlotOffset;
+	/* Get Port pointer from stream switch module */
+	PortPtr = &StrmMod->SlvConfig[Slave];
+
+	RC = _GetMaxNumSsPorts(DevInst, TileType, PortPtr, Slave, &MaxNumPorts);
+	if (RC != XAIE_OK) {
+		XAIE_ERROR("Invalid stream port\n");
+		return RC;
+	}
+
+	RC = _XAie_ValidatePortNumber(DevInst, TileType, Slave, XAIE_STRMSW_SLAVE,
+		SlvPortNum, MaxNumPorts);
+	if (RC != XAIE_OK) {
+		XAIE_ERROR("Invalid stream port\n");
+		return RC;
+	}
+
+	if (SlotNum >= StrmMod->NumSlaveSlots) {
+		XAIE_ERROR("Invalid slot\n");
+		return XAIE_ERR_STREAM_PORT;
+	}
+
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		if (TileType == XAIEGBL_TILE_TYPE_AIETILE) {
+			if ((DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) &&
+				(Slave == NORTH) &&
+				(SlvPortNum >= (PortPtr->NumPorts / 2))) {
+				AddPlaceHolderPort = 1;
+			}
+		} else {
+			if (SlvPortNum >= PortPtr->NumPorts) {
+				RegAddr = XAIE4_MASK_VALUE_APP_B;
+				SlvPortNum -= PortPtr->NumPorts;
+				if ((TileType == XAIEGBL_TILE_TYPE_MEMTILE) && (Slave == DMA))
+					SlvPortNum--;
+			}
+		}
+	}
+
+	RegAddr |= _XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+				StrmMod->SlvSlotConfig[Slave].PortBaseAddr +
+				(SlvPortNum + AddPlaceHolderPort) * StrmMod->SlotOffsetPerPort +
+				SlotNum * StrmMod->SlotOffset;
 
 	if(Enable == XAIE_ENABLE) {
 		RegVal = XAie_SetField(Pkt.PktId, StrmMod->SlotPktId.Lsb,
@@ -963,8 +1070,8 @@ AieRC XAie_StrmSwLogicalToPhysicalPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return XAIE_INVALID_ARGS;
 	}
 
-	if((PortType >= SS_PORT_TYPE_MAX) || (Port > XAIE_STRMSW_MASTER)) {
-		XAIE_ERROR("Invalid Stream Switch Ports\n");
+	if(Port > XAIE_STRMSW_MASTER) {
+		XAIE_ERROR("Invalid Stream Switch Port Interface\n");
 		return XAIE_ERR_STREAM_PORT;
 	}
 
@@ -974,13 +1081,44 @@ AieRC XAie_StrmSwLogicalToPhysicalPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	/* Get stream switch module pointer from device instance */
-	StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw;
+	StrmMod = _GetStreamMod(DevInst, TileType, PortType);
+	if (!StrmMod) {
+		XAIE_ERROR("Invalid Stream Switch Port Type\n");
+		return XAIE_ERR_STREAM_PORT;
+	}
+
+	return _XAie_GetPortIdx(DevInst, TileType, StrmMod, PortType,
+			PortNum, PhyPortId, Port);
+}
+
+static AieRC _XAie_StrmSwGetPhysicalToLogicalPort(const XAie_StrmMod *StrmMod,
+	XAie_StrmPortIntf Port, u8 PhyPortId, StrmSwPortType *PortType, u8 *PortNum)
+{
+	u8 MaxPhyPorts;
+	const XAie_StrmSwPortMap *PortMap;
+
+	if(Port > XAIE_STRMSW_MASTER) {
+		XAIE_ERROR("Invalid Stream Switch port interface\n");
+		return XAIE_ERR_STREAM_PORT;
+	}
 
 	if(Port == XAIE_STRMSW_SLAVE) {
-		return _XAie_GetSlaveIdx(StrmMod, PortType, PortNum, PhyPortId);
+		PortMap = StrmMod->SlavePortMap;
+		MaxPhyPorts = StrmMod->MaxSlavePhyPortId;
 	} else {
-		return _XAie_GetMstrIdx(StrmMod, PortType, PortNum, PhyPortId);
+		PortMap = StrmMod->MasterPortMap;
+		MaxPhyPorts = StrmMod->MaxMasterPhyPortId;
 	}
+
+	if(PhyPortId > MaxPhyPorts) {
+		XAIE_ERROR("Invalid physical port id\n");
+		return XAIE_ERR_STREAM_PORT;
+	}
+
+	*PortType = PortMap[PhyPortId].PortType;
+	*PortNum = PortMap[PhyPortId].PortNum;
+
+	return XAIE_OK;
 }
 
 /*****************************************************************************/
@@ -1008,9 +1146,8 @@ AieRC XAie_StrmSwPhysicalToLogicalPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_StrmPortIntf Port, u8 PhyPortId, StrmSwPortType *PortType,
 		u8 *PortNum)
 {
-	u8 TileType, MaxPhyPorts;
-	const XAie_StrmSwPortMap *PortMap;
 	const XAie_StrmMod *StrmMod;
+	u8 TileType;
 
 	if((DevInst == XAIE_NULL) || (PortType == XAIE_NULL) ||
 			(PortNum == XAIE_NULL) ||
@@ -1019,36 +1156,69 @@ AieRC XAie_StrmSwPhysicalToLogicalPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return XAIE_INVALID_ARGS;
 	}
 
-	if(Port > XAIE_STRMSW_MASTER) {
-		XAIE_ERROR("Invalid Stream Switch port interface\n");
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if(TileType == XAIEGBL_TILE_TYPE_MAX)
+		return XAIE_INVALID_TILE;
+
+	/* Get stream switch module pointer from device instance */
+	StrmMod = _GetStreamMod(DevInst, TileType, _512B_PORT_START);
+	if (!StrmMod) {
+		XAIE_ERROR("Invalid Stream Switch Port Type\n");
 		return XAIE_ERR_STREAM_PORT;
+	}
+
+	return _XAie_StrmSwGetPhysicalToLogicalPort(StrmMod, Port, PhyPortId,
+		PortType, PortNum);
+}
+
+/*****************************************************************************/
+/**
+*
+* This API is used to get logical port id and port number for a given tile
+* location and physical port id for 32bit switch.
+*
+* @param	DevInst: Device Instance
+* @param	Loc: Loc of AIE Tiles
+* @param	Port: XAIE_STRMSW_SLAVE/MASTER for Slave or Master ports
+* @param	PhyPortId: Physical port id
+* @param	PortType: Pointer to store the logical port type of the stream
+*		switch
+* @param	PortNum: Pointer to store the logical port number
+*
+* @return	XAIE_OK on success, Error code on failure.
+*
+* @note		None. When PortType is _32B_TRACE and there are more than one TRACE
+*		ports in the Tile, PortNum 0 maps to CORE_TRACE_PORT and
+*		PortNum 1 maps to MEM_TRACE_PORT.
+*
+*******************************************************************************/
+AieRC XAie_StrmSw32bPhysicalToLogicalPort(XAie_DevInst *DevInst, XAie_LocType Loc,
+		XAie_StrmPortIntf Port, u8 PhyPortId, StrmSwPortType *PortType,
+		u8 *PortNum)
+{
+	const XAie_StrmMod *StrmMod;
+	u8 TileType;
+
+	if((DevInst == XAIE_NULL) || (PortType == XAIE_NULL) ||
+			(PortNum == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_MAX) {
+	if(TileType == XAIEGBL_TILE_TYPE_MAX)
 		return XAIE_INVALID_TILE;
-	}
 
 	/* Get stream switch module pointer from device instance */
-	StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw;
-
-	if(Port == XAIE_STRMSW_SLAVE) {
-		PortMap = StrmMod->SlavePortMap;
-		MaxPhyPorts = StrmMod->MaxSlavePhyPortId;
-	} else {
-		PortMap = StrmMod->MasterPortMap;
-		MaxPhyPorts = StrmMod->MaxMasterPhyPortId;
-	}
-
-	if(PhyPortId > MaxPhyPorts) {
-		XAIE_ERROR("Invalid physical port id\n");
+	StrmMod = _GetStreamMod(DevInst, TileType, _32B_PORT_START);
+	if (!StrmMod) {
+		XAIE_ERROR("Invalid Stream Switch Port Type\n");
 		return XAIE_ERR_STREAM_PORT;
 	}
 
-	*PortType = PortMap[PhyPortId].PortType;
-	*PortNum = PortMap[PhyPortId].PortNum;
-
-	return XAIE_OK;
+	return _XAie_StrmSwGetPhysicalToLogicalPort(StrmMod, Port, PhyPortId,
+			PortType, PortNum);
 }
 
 /*****************************************************************************/
@@ -1076,14 +1246,22 @@ AieRC XAie_StrmSwDeterministicMergeConfig(XAie_DevInst *DevInst,
 {
 	AieRC RC;
 	u8 TileType, SlvIdx;
+	u8 MaxNumPorts, MaxArbitors;
 	u32 RegVal, Mask;
-	u64 RegAddr;
+	u64 RegAddr = 0;
 	const XAie_StrmMod *StrmMod;
+	const XAie_StrmPort *PortPtr;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* There is no deterministic feature support for 32bit switch ports */
+	if (Slave < _512B_PORT_START || Slave > _512B_PORT_END) {
+		XAIE_ERROR("Invalid Port Type\n");
+		return XAIE_ERR_STREAM_PORT;
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
@@ -1099,25 +1277,48 @@ AieRC XAie_StrmSwDeterministicMergeConfig(XAie_DevInst *DevInst,
 		return XAIE_FEATURE_NOT_SUPPORTED;
 	}
 
-	if((Slave >= SS_PORT_TYPE_MAX) ||
-			(PortNum >= StrmMod->SlvConfig[Slave].NumPorts)) {
-		XAIE_ERROR("Invalid stream port type and port number\n");
+	/* Get Port pointer from stream switch module */
+	PortPtr = &StrmMod->SlvConfig[Slave];
+
+	RC = _GetMaxNumSsPorts(DevInst, TileType, PortPtr, Slave, &MaxNumPorts);
+	if (RC != XAIE_OK) {
+		XAIE_ERROR("Invalid stream port\n");
+		return RC;
+	}
+
+	RC = _XAie_ValidatePortNumber(DevInst, TileType, Slave, XAIE_STRMSW_SLAVE,
+		PortNum, MaxNumPorts);
+	if (RC != XAIE_OK) {
+		XAIE_ERROR("Invalid stream port\n");
+		return RC;
+	}
+
+	if (Slave >= SS_PORT_TYPE_MAX) {
+		XAIE_ERROR("Invalid stream port type or port number\n");
 		return XAIE_ERR_STREAM_PORT;
 	}
 
-	if((Arbitor >= StrmMod->DetMerge->NumArbitors) ||
+	MaxArbitors = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode,
+			StrmMod->DetMerge->NumArbitors);
+	if((Arbitor > MaxArbitors) ||
 			(Position >= StrmMod->DetMerge->NumPositions) ||
 			(PktCount > XAIE_SS_DETERMINISTIC_MERGE_MAX_PKT_CNT)) {
 		XAIE_ERROR("Invalid Arbitor/Position or PktCount\n");
 		return XAIE_INVALID_ARGS;
 	}
 
-	RC = _XAie_GetSlaveIdx(StrmMod, Slave, PortNum, &SlvIdx);
+	RC = _XAie_GetPortIdx(DevInst, TileType, StrmMod, Slave,
+			PortNum, &SlvIdx, XAIE_STRMSW_SLAVE);
 	if(RC != XAIE_OK) {
 		return RC;
 	}
 
-	RegAddr = (u64)(StrmMod->DetMerge->ConfigBase +
+	if (Arbitor > StrmMod->DetMerge->NumArbitors) {
+		RegAddr = XAIE4_MASK_VALUE_APP_B;
+		Arbitor -= StrmMod->DetMerge->NumArbitors;
+	}
+
+	RegAddr |= (u64)(StrmMod->DetMerge->ConfigBase +
 		StrmMod->DetMerge->ArbConfigOffset * Arbitor) +
 		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 	if(Position > 1U) {
@@ -1163,8 +1364,9 @@ static AieRC _XAie_StrmSwDeterministicMergeCtrl(XAie_DevInst *DevInst,
 		XAie_LocType Loc, u8 Arbitor, u8 Enable)
 {
 	u8 TileType;
+	u8 MaxArbitors;
 	u32 RegVal;
-	u64 RegAddr;
+	u64 RegAddr = 0;
 	const XAie_StrmMod *StrmMod;
 
 	if((DevInst == XAIE_NULL) ||
@@ -1186,12 +1388,20 @@ static AieRC _XAie_StrmSwDeterministicMergeCtrl(XAie_DevInst *DevInst,
 		return XAIE_FEATURE_NOT_SUPPORTED;
 	}
 
-	if(Arbitor >= StrmMod->DetMerge->NumArbitors) {
+	MaxArbitors = _XAie_GetMaxElementValue(DevInst->DevProp.DevGen, TileType, DevInst->AppMode,
+			StrmMod->DetMerge->NumArbitors);
+
+	if(Arbitor > MaxArbitors) {
 		XAIE_ERROR("Invalid Arbitor number\n");
 		return XAIE_INVALID_ARGS;
 	}
 
-	RegAddr = (u64)(StrmMod->DetMerge->EnableBase +
+	if(Arbitor > StrmMod->DetMerge->NumArbitors) {
+		RegAddr = XAIE4_MASK_VALUE_APP_B;
+		Arbitor -= StrmMod->DetMerge->NumArbitors;
+	}
+
+	RegAddr |= (u64)(StrmMod->DetMerge->EnableBase +
 		StrmMod->DetMerge->ArbConfigOffset * Arbitor) +
 		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 	RegVal = XAie_SetField(Enable, StrmMod->DetMerge->Enable.Lsb,

@@ -31,8 +31,8 @@
 
 /************************** Function Prototypes ******************************/
 
-AieRC _XAie_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortType Slave, u8 SlvPortNum,
-		StrmSwPortType Master, u8 MstrPortNum);
+AieRC _XAie_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortType Slave,
+		u8 SlvPortNum, StrmSwPortType Master, u8 MstrPortNum);
 
 #endif /* XAIE_SS_AIE_H */
 /** @} */

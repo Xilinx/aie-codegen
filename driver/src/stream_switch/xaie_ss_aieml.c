@@ -47,8 +47,9 @@
 *		Module data structure.
 *
 *****************************************************************************/
-AieRC _XAieMl_AieTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortType Slave,
-		u8 SlvPortNum, StrmSwPortType Master, u8 MstrPortNum)
+AieRC _XAieMl_AieTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst,
+		StrmSwPortType Slave, u8 SlvPortNum, StrmSwPortType Master,
+		u8 MstrPortNum)
 {
 	AieRC RC = XAIE_OK;
 	(void)DevInst;
@@ -115,8 +116,9 @@ AieRC _XAieMl_AieTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortT
 * 		Module data structure.
 *
 *****************************************************************************/
-AieRC _XAieMl_MemTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortType Slave,
-		u8 SlvPortNum, StrmSwPortType Master, u8 MstrPortNum)
+AieRC _XAieMl_MemTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst,
+		StrmSwPortType Slave, u8 SlvPortNum, StrmSwPortType Master,
+		u8 MstrPortNum)
 {
 	AieRC RC = XAIE_OK;
 	(void)DevInst;
@@ -175,8 +177,9 @@ AieRC _XAieMl_MemTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortT
 *
 *****************************************************************************/
 
-AieRC _XAieMl_ShimTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst, StrmSwPortType Slave,
-		u8 SlvPortNum, StrmSwPortType Master, u8 MstrPortNum)
+AieRC _XAieMl_ShimTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst,
+		StrmSwPortType Slave, u8 SlvPortNum, StrmSwPortType Master,
+		u8 MstrPortNum)
 {
 	AieRC RC = XAIE_OK;
 	(void)DevInst;

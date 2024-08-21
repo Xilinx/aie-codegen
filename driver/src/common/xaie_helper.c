@@ -22,8 +22,6 @@
 * 1.3   Tejus   04/13/2020  Add api to get tile type from Loc
 * 1.4   Tejus   04/13/2020  Remove helper functions for range apis
 * 1.5   Dishita 04/29/2020  Add api to check module & tile type combination
-* 1.6   Nishad  07/06/2020  Add _XAie_GetMstrIdx() helper API and move
-*			    _XAie_GetSlaveIdx() API.
 * 1.7   Nishad  07/24/2020  Add _XAie_GetFatalGroupErrors() helper function.
 * 1.8   Dishita 08/10/2020  Add api to get bit position from tile location
 * 1.9   Nishad  08/26/2020  Fix tiletype check in XAie_CheckModule()
@@ -304,86 +302,6 @@ u32 XAie_GetStartRow(XAie_DevInst *DevInst, u8 TileType)
 u32 _XAie_GetStartRow(XAie_DevInst *DevInst, u8 TileType)
 {
 	return XAie_GetStartRow(DevInst, TileType);
-}
-
-/*****************************************************************************/
-/**
-*
-* To configure stream switch master registers, slave index has to be calculated
-* from the internal data structure. The routine calculates the slave index for
-* any tile type.
-*
-* @param	StrmMod: Stream Module pointer
-* @param	Slave: Stream switch port type
-* @param	PortNum: Slave port number
-* @param	SlaveIdx: Place holder for the routine to store the slave idx
-*
-* @return	XAIE_OK on success and XAIE_INVALID_RANGE on failure
-*
-* @note		Internal API only.
-*
-******************************************************************************/
-AieRC _XAie_GetSlaveIdx(const XAie_StrmMod *StrmMod, StrmSwPortType Slave,
-		u8 PortNum, u8 *SlaveIdx)
-{
-	u32 BaseAddr;
-	u32 RegAddr;
-	const XAie_StrmPort *PortPtr;
-
-	/* Get Base Addr of the slave tile from Stream Switch Module */
-	BaseAddr = StrmMod->SlvConfigBaseAddr;
-
-	PortPtr = &StrmMod->SlvConfig[Slave];
-
-	/* Return error if the Slave Port Type is not valid */
-	if((PortPtr->NumPorts == 0U) || (PortNum >= PortPtr->NumPorts)) {
-		XAIE_ERROR("Invalid Slave Port\n");
-		return XAIE_ERR_STREAM_PORT;
-	}
-
-	RegAddr = PortPtr->PortBaseAddr + StrmMod->PortOffset * PortNum;
-	*SlaveIdx = (u8)((RegAddr - BaseAddr) / 4U);
-
-	return XAIE_OK;
-}
-
-/*****************************************************************************/
-/**
-*
-* The routine calculates the master index for any tile type.
-*
-* @param	StrmMod: Stream Module pointer
-* @param	Master: Stream switch port type
-* @param	PortNum: Master port number
-* @param	MasterIdx: Place holder for the routine to store the master idx
-*
-* @return	XAIE_OK on success and XAIE_INVALID_RANGE on failure
-*
-* @note		Internal API only.
-*
-******************************************************************************/
-AieRC _XAie_GetMstrIdx(const XAie_StrmMod *StrmMod, StrmSwPortType Master,
-		u8 PortNum, u8 *MasterIdx)
-{
-	u32 BaseAddr;
-	u32 RegAddr;
-	const XAie_StrmPort *PortPtr;
-
-	/* Get Base Addr of the master tile from Stream Switch Module */
-	BaseAddr = StrmMod->MstrConfigBaseAddr;
-
-	PortPtr = &StrmMod->MstrConfig[Master];
-
-	/* Return error if the Master Port Type is not valid */
-	if((PortPtr->NumPorts == 0U) || (PortNum >= PortPtr->NumPorts)) {
-		XAIE_ERROR("Invalid Master Port\n");
-		return XAIE_ERR_STREAM_PORT;
-	}
-
-	RegAddr = PortPtr->PortBaseAddr + StrmMod->PortOffset * PortNum;
-	*MasterIdx = (u8)((RegAddr - BaseAddr) / 4U);
-
-	return XAIE_OK;
 }
 
 /*****************************************************************************/

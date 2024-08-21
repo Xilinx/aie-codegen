@@ -72,6 +72,9 @@ XAIE_AIG_EXPORT AieRC XAie_StrmSwLogicalToPhysicalPort(XAie_DevInst *DevInst, XA
 XAIE_AIG_EXPORT AieRC XAie_StrmSwPhysicalToLogicalPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_StrmPortIntf Port, u8 PhyPortId, StrmSwPortType *PortType,
 		u8 *PortNum);
+XAIE_AIG_EXPORT AieRC XAie_StrmSw32bPhysicalToLogicalPort(XAie_DevInst *DevInst, XAie_LocType Loc,
+		XAie_StrmPortIntf Port, u8 PhyPortId, StrmSwPortType *PortType,
+		u8 *PortNum);
 XAIE_AIG_EXPORT AieRC XAie_StrmSwDeterministicMergeConfig(XAie_DevInst *DevInst,
 		XAie_LocType Loc, u8 Arbitor, StrmSwPortType Slave, u8 PortNum,
 		u8 PktCount, u8 Position);

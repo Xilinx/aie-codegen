@@ -1758,6 +1758,44 @@ AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 	return XAIE_OK;
 }
 
+/*****************************************************************************/
+/**
+*
+* This API setups the iteration parameters for a Buffer descriptor.
+*
+* @param	DmaDesc: Initialized Dma Descriptor.
+* @param	StepSize: Offset applied at each execution of the BD.
+* @param	Wrap: Iteration Wrap.
+* @param	IterCurr: Current iteration step. This field is incremented by
+*		the hardware after BD is loaded.
+*
+* @return	XAIE_OK on success, Error code on failure.
+*
+* @note		Internal. The stepsize and wrap parameters operate at 32 bit
+*		granularity. The address is the absolute address of the buffer
+*		which is 32 bit aligned. The driver will configure the BD
+*		register with necessary bits(<32 bits) as required by the
+*		hardware.
+*
+******************************************************************************/
+AieRC _XAie4_DmaSetBdIteration(XAie_DmaDesc *DmaDesc, u32 StepSize, u16 Wrap,
+		u8 IterCurr)
+{
+	const XAie_DmaBdProp *BdProp = DmaDesc->DmaMod->BdProp;
+
+	if((StepSize > (BdProp->IterStepSizeMax )) || (Wrap < 1) || (Wrap > (BdProp->IterWrapMax + 1U)) ||
+			(IterCurr > BdProp->IterCurrMax)) {
+		XAIE_ERROR("Iteration parameters out of Range.\n");
+		return XAIE_ERR;
+	}
+
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterDesc.StepSize = StepSize;
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterDesc.Wrap = Wrap;
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterCurr = IterCurr;
+
+	return XAIE_OK;
+}
+
 #endif /* XAIE_FEATURE_DMA_ENABLE */
 
 /** @} */

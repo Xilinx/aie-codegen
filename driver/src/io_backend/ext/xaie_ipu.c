@@ -472,7 +472,9 @@ const XAie_Backend IpuBackend =
 	.Ops.MemAttach = XAie_IpuMemAttach,
 	.Ops.MemDetach = XAie_IpuMemDetach,
 	.Ops.GetTid = XAie_IODummyGetTid,
+	.Ops.WaitTaskCompleteToken = NULL,
 	.Ops.SubmitTxn = NULL,
+	.Ops.AddressPatching = NULL,
 };
 
 /** @} */

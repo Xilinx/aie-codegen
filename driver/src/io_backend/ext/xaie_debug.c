@@ -544,7 +544,9 @@ const XAie_Backend DebugBackend =
 	.Ops.MemAttach = XAie_DebugMemAttach,
 	.Ops.MemDetach = XAie_DebugMemDetach,
 	.Ops.GetTid = XAie_DebugGetTid,
+	.Ops.WaitTaskCompleteToken = NULL,
 	.Ops.SubmitTxn = NULL,
+	.Ops.AddressPatching = NULL,
 };
 
 /** @} */

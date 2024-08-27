@@ -268,6 +268,7 @@ static AieRC _XAie_PrivilegeSetPartProtectedRegs(XAie_DevInst *DevInst,
 	AieRC RC;
 	XAie_NpiProtRegReq NpiProtReq = {0};
 
+	NpiProtReq.StartCol = DevInst->StartCol;
 	NpiProtReq.NumCols = DevInst->NumCols;
 	NpiProtReq.Enable = Enable;
 	RC = _XAie_NpiSetProtectedRegEnable(DevInst, &NpiProtReq);
@@ -693,21 +694,21 @@ AieRC _XAie_PrivilegeTeardownPart(XAie_DevInst *DevInst)
 			return RC;
 		}
 
-	RC = _XAie_PrivilegeSetPartColReset(DevInst, XAIE_ENABLE);
-	if(RC != XAIE_OK) {
-		_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
-		return RC;
-	}
+		RC = _XAie_PrivilegeSetPartColReset(DevInst, XAIE_ENABLE);
+		if(RC != XAIE_OK) {
+			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
+			return RC;
+		}
 
-	RC = _XAie_PmSetPartitionClock(DevInst, XAIE_ENABLE);
-	if(RC != XAIE_OK) {
-		_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
-		return RC;
-	}
+		RC = _XAie_PmSetPartitionClock(DevInst, XAIE_ENABLE);
+		if(RC != XAIE_OK) {
+			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
+			return RC;
+		}
 
-	RC = _XAie_PrivilegeSetPartColReset(DevInst, XAIE_DISABLE);
-	if(RC != XAIE_OK) {
-		_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
+		RC = _XAie_PrivilegeSetPartColReset(DevInst, XAIE_DISABLE);
+		if(RC != XAIE_OK) {
+			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
 		return RC;
 		}
 	}

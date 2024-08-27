@@ -2034,6 +2034,23 @@ AieRC XAie_RunOp(XAie_DevInst *DevInst, XAie_BackendOpCode Op, void *Arg)
 	return Backend->Ops.RunOp(DevInst->IOInst, DevInst, Op, Arg);
 }
 
+AieRC XAie_WaitTct(XAie_DevInst *DevInst, uint16_t Column, uint16_t Row, uint32_t Channel, uint8_t NumTokens)
+{
+	const XAie_Backend *Backend = DevInst->Backend;
+	if( Backend->Ops.WaitTaskCompleteToken )
+	{
+		return Backend->Ops.WaitTaskCompleteToken(DevInst, Column, Row, Channel, NumTokens);
+	}
+	printf("Wait TCT function pointer points to NULL\n");
+	return XAIE_ERR;
+}
+
+AieRC XAie_AddressPatching(XAie_DevInst *DevInst, u8 Arg_Offset, u8 Num_BDs)
+{
+	const XAie_Backend *Backend = DevInst->Backend;
+	return Backend->Ops.AddressPatching((void *)DevInst->IOInst, Arg_Offset, Num_BDs);
+}
+
 AieRC _XAie_ClearTransaction(XAie_DevInst* DevInst)
 {
 	AieRC RC;

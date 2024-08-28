@@ -1668,10 +1668,7 @@ static const  XAie_StrmPort Aie4MemTileStrmMstr32b[SS_PORT_TYPE_MAX] =
 		.PortLogicalId = 0,
 	},
 	{	/* 32bit West */
-		.NumPorts = 1,
-		.PortBaseAddr = XAIE4GBL_MEM_TILE_MODULE_STREAM_SWITCH_32B_MANAGER_CONFIG_WEST_0,
-		.PortPhysicalId = 2,
-		.PortLogicalId = 0xFF, /* will not be available in dualapp mode */
+		.NumPorts = 0,
 	},
 	{	/* 32bit North */
 		.NumPorts = 1,
@@ -1680,10 +1677,7 @@ static const  XAie_StrmPort Aie4MemTileStrmMstr32b[SS_PORT_TYPE_MAX] =
 		.PortLogicalId = 1,
 	},
 	{	/* 32bit East */
-		.NumPorts = 1,
-		.PortBaseAddr = XAIE4GBL_MEM_TILE_MODULE_STREAM_SWITCH_32B_MANAGER_CONFIG_EAST_0,
-		.PortPhysicalId = 5,
-		.PortLogicalId = 0xFF, /* will not be available in dualapp mode */
+		.NumPorts = 0,
 	},
 	{	/* 32bit switch 512b */
 		.NumPorts = 1,
@@ -1713,7 +1707,7 @@ static const  XAie_StrmPort Aie4MemTileStrmSlv32b[SS_PORT_TYPE_MAX] =
 		.PortLogicalId = 0,
 	},
 	{	/* 32bit trace */
-		.NumPorts = 0,
+		.NumPorts = 1,
 		.PortBaseAddr = XAIE4GBL_MEM_TILE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_CONFIG_TRACE_0,
 		.PortPhysicalId = 2,
 		.PortLogicalId = 1,
@@ -1725,10 +1719,7 @@ static const  XAie_StrmPort Aie4MemTileStrmSlv32b[SS_PORT_TYPE_MAX] =
 		.PortLogicalId = 2,
 	},
 	{	/* 32bit West */
-		.NumPorts = 1,
-		.PortBaseAddr = XAIE4GBL_MEM_TILE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_CONFIG_WEST_0,
-		.PortPhysicalId = 6,
-		.PortLogicalId = 0xFF, /* will not be available in dualapp mode */
+		.NumPorts = 0,
 	},
 	{	/* 32bit North */
 		.NumPorts = 1,
@@ -1737,10 +1728,7 @@ static const  XAie_StrmPort Aie4MemTileStrmSlv32b[SS_PORT_TYPE_MAX] =
 		.PortLogicalId = 3,
 	},
 	{	/* 32bit East */
-		.NumPorts = 1,
-		.PortBaseAddr = XAIE4GBL_MEM_TILE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_CONFIG_EAST_0,
-		.PortPhysicalId = 9,
-		.PortLogicalId = 0xFF, /* will not be available in dualapp mode */
+		.NumPorts = 0,
 	},
 	{	/* 32bit switch 512b */
 		.NumPorts = 1,

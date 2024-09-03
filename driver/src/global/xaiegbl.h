@@ -50,6 +50,7 @@
 #define XAIE_PACKET_ID_MAX		0x1FU
 #define XAIE_PACKET_TYPE_MAX		0x7U
 #define XAIE_TILES_BITMAP_SIZE          32U
+#define XAIE_MEMINTERLEAVE_MODE_SHIFT	5U
 
 #define XAIE_TRANSACTION_ENABLE_AUTO_FLUSH	0b1U
 #define XAIE_TRANSACTION_DISABLE_AUTO_FLUSH	0b0U
@@ -833,6 +834,15 @@ typedef struct {
 	uint32_t UtilSize;
 } XAie_PerfInst;
 
+/*
+ * This typedef captures all the memory interleaving modes supported by the driver
+ */
+typedef enum {
+	XAIE_MEM_INTERLEAVING_MODE_DISABLE, /* Disable memory interleaving */
+	XAIE_MEM_INTERLEAVING_MODE_ENABLE = (1 << XAIE_MEMINTERLEAVE_MODE_SHIFT),   /* Enable memory interleaving */
+	XAIE_MEM_INTERLEAVING_MODE_SKEW = (2 << XAIE_MEMINTERLEAVE_MODE_SHIFT),   /* Enable memory interleaving skew mode */
+	XAIE_MEM_INTERLEAVING_MODE_INVALID = (3 << XAIE_MEMINTERLEAVE_MODE_SHIFT), /* Invalid Mode */
+} XAie_MemInterleavingMode;
 
 /**************************** Function prototypes ***************************/
 XAIE_AIG_EXPORT AieRC XAie_SetupPartitionConfig(XAie_DevInst *DevInst,

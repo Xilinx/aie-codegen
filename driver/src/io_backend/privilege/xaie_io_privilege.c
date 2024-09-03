@@ -51,7 +51,6 @@
 
 #define XAIE_MEMINTERLEAV_MODES_2	1U
 #define XAIE_MEMINTERLEAV_MODES_3	2U
-#define XAIE_MEMINTERLEAVE_SHIFT	5U
 /************************** Function Definitions *****************************/
 /*****************************************************************************/
 /**
@@ -613,9 +612,10 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 	}
 
 	if (((OptFlags & XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING)) !=
-			(1U << XAIE_MEMINTERLEAVE_SHIFT)) {
+			XAIE_MEM_INTERLEAVING_MODE_ENABLE) {
 		RC = _XAie_PrivilegeConfigMemInterleaving(DevInst,
-			(OptFlags & XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING) >> XAIE_MEMINTERLEAVE_SHIFT);
+			((OptFlags & XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING) >>
+			  XAIE_MEMINTERLEAVE_MODE_SHIFT));
 		if(RC != XAIE_OK) {
 			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
 			return RC;

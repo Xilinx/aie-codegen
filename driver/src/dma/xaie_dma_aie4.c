@@ -157,8 +157,8 @@ static u64 _GetChannelStatusAddr(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMo
 		NumChannels = DmaMod->NumChannels;
 
 	/*Add App_B base address if ChNum is from second half of the resources*/
-	if (ChNum > NumChannels) {
-		Addr = 0x40000;
+	if (ChNum >= NumChannels) {
+		Addr = XAIE4_MASK_VALUE_APP_B;
 		ChNum -= NumChannels;
 	}
 
@@ -180,8 +180,8 @@ static u64 _GetMemTileBdBaseAddr(const XAie_DmaMod *DmaMod, u8 BdNum, u8 ChNum, 
 		NumChannels = DmaMod->NumChannels;
 
 	/*Add App_B base address if ChNum is from second half of the resources*/
-	if (ChNum > NumChannels) {
-		RegAddr = 0x40000;
+	if (ChNum >= NumChannels) {
+		RegAddr = XAIE4_MASK_VALUE_APP_B;
 		ChNum -= NumChannels;
 	}
 
@@ -207,7 +207,7 @@ static u64 _GetShimTileCtrlMm2sChanBdBaseAddr(const XAie_DmaMod *DmaMod,
 
 	/*Add App_B base address if BD is from second half of the resources*/
 	if (ChNum >= DmaMod->NumMm2sCtrlChannels) {
-		BdBaseAddr = 0x40000;
+		BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
 		ChNum -= DmaMod->NumMm2sCtrlChannels;
 	}
 
@@ -621,8 +621,8 @@ AieRC _XAie4_ShimTileDmaUpdateBdLen(XAie_DevInst *DevInst,
 		RegAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaMod, BdNum, MaxNumBds);
 	} else {
 		/*Add App_B base address if BD is from second half of the resources*/
-		if (BdNum > DmaMod->NumBds) {
-			RegAddr = 0x40000;
+		if (BdNum >= DmaMod->NumBds) {
+			RegAddr = XAIE4_MASK_VALUE_APP_B;
 			BdNum -= DmaMod->NumBds;
 		}
 		RegAddr |= (u64)(DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset);
@@ -756,8 +756,8 @@ AieRC _XAie4_ShimTileDmaGetBdLen(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMo
 		RegAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaMod, BdNum, MaxNumBds);
 	} else {
 		/*Add App_B base address if BD is from second half of the resources*/
-		if (BdNum > DmaMod->NumBds) {
-			RegAddr = 0x40000;
+		if (BdNum >= DmaMod->NumBds) {
+			RegAddr = XAIE4_MASK_VALUE_APP_B;
 			BdNum -= DmaMod->NumBds;
 		}
 
@@ -890,8 +890,8 @@ AieRC _XAie4_ShimTileDmaUpdateBdAddr(XAie_DevInst *DevInst,
 		BaseAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaMod, BdNum, MaxNumBds);
 	} else {
 		/*Add App_B base address if BD is from second half of the resources*/
-		if (BdNum > DmaMod->NumBds) {
-			BaseAddr = 0x40000;
+		if (BdNum >= DmaMod->NumBds) {
+			BaseAddr = XAIE4_MASK_VALUE_APP_B;
 			BdNum -= DmaMod->NumBds;
 		}
 		BaseAddr |= (DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset);
@@ -1217,8 +1217,8 @@ AieRC _XAie4_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		BdBaseAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaMod, BdNum, MaxNumBds);
 	} else {
 		/*Add App_B base address if BD is from second half of the resources*/
-		if (BdNum > DmaMod->NumBds) {
-			BdBaseAddr = 0x40000;
+		if (BdNum >= DmaMod->NumBds) {
+			BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
 			BdNum -= DmaMod->NumBds;
 		}
 
@@ -1637,8 +1637,8 @@ AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		BdBaseAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaDesc->DmaMod, BdNum, MaxNumBds);
 	} else {
 		/*Add App_B base address if BD is from second half of the resources*/
-		if (BdNum > DmaDesc->DmaMod->NumBds) {
-			BdBaseAddr = 0x40000;
+		if (BdNum >= DmaDesc->DmaMod->NumBds) {
+			BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
 			BdNum -= DmaDesc->DmaMod->NumBds;
 		}
 

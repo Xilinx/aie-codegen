@@ -2866,7 +2866,7 @@ u8 _XAie_IsTileResourceInSharedAddrSpace(u8 DevGen, u8 TileType)
 * 			It is asssumed that all parameters are valid for this function
 *
 *******************************************************************************/
-s8 _XAie_GetMaxElementValue(u8 DevGen, u8 TileType, u8 AppMode, s8 elementValue)
+u8 _XAie_GetMaxElementValue(u8 DevGen, u8 TileType, u8 AppMode, u8 elementValue)
 {
 	if(_XAie_IsDeviceGenAIE4(DevGen) &&
 			(AppMode == XAIE_DEVICE_SINGLE_APP_MODE) && 

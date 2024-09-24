@@ -593,9 +593,14 @@ static int TxnCmdDump(XAie_TxnCmd* cmd) {
 ******************************************************************************/
 static AieRC _XAie_ReallocCmdBuf(XAie_TxnInst *TxnInst)
 {
+	u64 NewMaxCmds = (u64)(TxnInst->MaxCmds + XAIE_DEFAULT_NUM_CMDS);
+	if(NewMaxCmds > UINT32_MAX) {
+		XAIE_ERROR("Failed reallocate memory for transaction buffer\n");
+		return XAIE_ERR;
+	}
+
 	TxnInst->CmdBuf = (XAie_TxnCmd *)realloc((void *)TxnInst->CmdBuf,
-			sizeof(XAie_TxnCmd) *
-			(u64)(TxnInst->MaxCmds + XAIE_DEFAULT_NUM_CMDS));
+			sizeof(XAie_TxnCmd) * (u32)NewMaxCmds);
 	if(TxnInst->CmdBuf == NULL) {
 		XAIE_ERROR("Failed reallocate memory for transaction buffer "
 				"with id: %llu\n", TxnInst->Tid);
@@ -684,7 +689,12 @@ static AieRC _XAie_ExecuteCmd(XAie_DevInst *DevInst, XAie_TxnCmd *Cmd,
 		XAIE_WARN("Custom OP Transaction %d handler hook point\n",Cmd->Opcode);
 		return XAIE_OK;
 	}
-
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (Cmd->DataPtr > UINTPTR_MAX) {
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+    	return XAIE_ERR;
+    }
+#endif
 	switch(Cmd->Opcode)
 	{
 		case XAIE_IO_WRITE:
@@ -707,7 +717,7 @@ static AieRC _XAie_ExecuteCmd(XAie_DevInst *DevInst, XAie_TxnCmd *Cmd,
 		case XAIE_IO_BLOCKWRITE:
 			RC = Backend->Ops.BlockWrite32((void *)DevInst->IOInst,
 					Cmd->RegOff,
-					(u32 *)(uintptr_t)Cmd->DataPtr,
+					(const u32 *)(uintptr_t)Cmd->DataPtr,
 					Cmd->Size);
 			if(RC != XAIE_OK) {
 				XAIE_ERROR("Block Wr failed. Addr: 0x%llx\n",
@@ -716,7 +726,7 @@ static AieRC _XAie_ExecuteCmd(XAie_DevInst *DevInst, XAie_TxnCmd *Cmd,
 			}
 
 			if((Flags & XAIE_TXN_INST_EXPORTED_MASK) == 0U) {
-				free((void *)Cmd->DataPtr);
+				free((void *)(uintptr_t)Cmd->DataPtr);
 			}
 			break;
 		case XAIE_IO_BLOCKSET:
@@ -892,6 +902,13 @@ XAie_TxnInst* _XAie_TxnExport(XAie_DevInst *DevInst)
 	for(u32 i = 0U; i < TmpInst->NumCmds; i++) {
 		XAie_TxnCmd *TmpCmd = &TmpInst->CmdBuf[i];
 		XAie_TxnCmd *Cmd = &Inst->CmdBuf[i];
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (TmpCmd->DataPtr > UINTPTR_MAX){
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+		free(Inst);
+    	return NULL;
+    }
+#endif
 		if(TmpCmd->Opcode == XAIE_IO_BLOCKWRITE) {
 			Cmd->DataPtr = (u64)(uintptr_t)malloc(
 					sizeof(u32) * TmpCmd->Size);
@@ -904,8 +921,8 @@ XAie_TxnInst* _XAie_TxnExport(XAie_DevInst *DevInst)
 			}
 
 			Cmd->DataPtr = (u64)(uintptr_t)memcpy(
-					(void *)Cmd->DataPtr,
-					(void *)TmpCmd->DataPtr,
+					(void *)(uintptr_t)Cmd->DataPtr,
+					(const void *)(uintptr_t)TmpCmd->DataPtr,
 					sizeof(u32) * TmpCmd->Size);
 		}
 	}
@@ -951,7 +968,7 @@ static inline u8 _XAie_GetColfromRegOff(XAie_DevInst *DevInst, u64 RegOff)
 static inline void _XAie_AppendWrite32(XAie_DevInst *DevInst,
 		XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
-	XAie_Write32Hdr *Hdr = (XAie_Write32Hdr*)TxnPtr;
+	XAie_Write32Hdr *Hdr = (XAie_Write32Hdr*)(uintptr_t)TxnPtr;
 	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Value = Cmd->Value;
 	Hdr->Size = (u32)sizeof(*Hdr);
@@ -963,7 +980,7 @@ static inline void _XAie_AppendWrite32(XAie_DevInst *DevInst,
 static inline void _XAie_AppendMaskWrite32(XAie_DevInst *DevInst,
 		XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
-	XAie_MaskWrite32Hdr *Hdr = (XAie_MaskWrite32Hdr*)TxnPtr;
+	XAie_MaskWrite32Hdr *Hdr = (XAie_MaskWrite32Hdr*)(uintptr_t)TxnPtr;
 
 	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Mask = Cmd->Mask;
@@ -977,7 +994,7 @@ static inline void _XAie_AppendMaskWrite32(XAie_DevInst *DevInst,
 static inline void _XAie_AppendMaskPoll32(XAie_DevInst *DevInst,
 		XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 {
-	XAie_MaskPoll32Hdr *Hdr = (XAie_MaskPoll32Hdr*)TxnPtr;
+	XAie_MaskPoll32Hdr *Hdr = (XAie_MaskPoll32Hdr*)(uintptr_t)TxnPtr;
 
 	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Mask = Cmd->Mask;
@@ -992,15 +1009,20 @@ static inline void _XAie_AppendBlockWrite32(XAie_DevInst *DevInst,
 		XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u8 *Payload = TxnPtr + sizeof(XAie_BlockWrite32Hdr);
-	XAie_BlockWrite32Hdr *Hdr = (XAie_BlockWrite32Hdr*)TxnPtr;
+	XAie_BlockWrite32Hdr *Hdr = (XAie_BlockWrite32Hdr*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = (u32)Cmd->RegOff;
+	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
 	Hdr->OpHdr.Col = _XAie_GetColfromRegOff(DevInst,Cmd->RegOff);
 	Hdr->OpHdr.Row = _XAie_GetRowfromRegOff(DevInst,Cmd->RegOff);
 	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
-
-	memcpy((void *)Payload, (void *)Cmd->DataPtr,
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (Cmd->DataPtr > UINTPTR_MAX) {
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+    	return;
+    }
+#endif
+	memcpy((void *)Payload, (void const *)(uintptr_t)Cmd->DataPtr,
 			Cmd->Size * sizeof(u32));
 }
 
@@ -1008,16 +1030,16 @@ static inline void _XAie_AppendBlockSet32(XAie_DevInst *DevInst,
 		XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u8 *Payload = TxnPtr + sizeof(XAie_BlockWrite32Hdr);
-	XAie_BlockWrite32Hdr *Hdr = (XAie_BlockWrite32Hdr*)TxnPtr;
+	XAie_BlockWrite32Hdr *Hdr = (XAie_BlockWrite32Hdr*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = (u32)Cmd->RegOff;
+	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
 	Hdr->OpHdr.Col = _XAie_GetColfromRegOff(DevInst,Cmd->RegOff);
 	Hdr->OpHdr.Row = _XAie_GetRowfromRegOff(DevInst,Cmd->RegOff);
 	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
 
 	for (u32 i = 0U; i < Cmd->Size; i++) {
-		*((u32 *)Payload) = Cmd->Value;
+		*((u32 *)(uintptr_t)Payload) = Cmd->Value;
 		Payload += 4;
 	}
 }
@@ -1025,26 +1047,31 @@ static inline void _XAie_AppendBlockSet32(XAie_DevInst *DevInst,
 static inline void _XAie_AppendCustomOp(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u8 *Payload = TxnPtr + sizeof(XAie_CustomOpHdr);
-	XAie_CustomOpHdr *Hdr = (XAie_CustomOpHdr*)TxnPtr;
+	XAie_CustomOpHdr *Hdr = (XAie_CustomOpHdr*)(uintptr_t)TxnPtr;
 
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size;
 	Hdr->OpHdr.Op = (u8)Cmd->Opcode;
-
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (Cmd->DataPtr > UINTPTR_MAX) {
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+    	return ;
+    }
+#endif
 	for (u32 i = 0U; i < Cmd->Size; ++i, ++Payload) {
-		*(Payload) = *((u8*)Cmd->DataPtr + i);
+		*(Payload) = *((u8*)(uintptr_t)(Cmd->DataPtr + i));
 	}
 }
 
 static inline void _XAie_AppendNoOp(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
-	XAie_NoOpHdr *Hdr = ( XAie_NoOpHdr*)TxnPtr;
+	XAie_NoOpHdr *Hdr = ( XAie_NoOpHdr*)(uintptr_t)TxnPtr;
 
 	Hdr->Op = (u8)Cmd->Opcode;
 }
 
 static inline void _XAie_AppendPreempt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
-	XAie_PreemptHdr *Hdr = ( XAie_PreemptHdr*)TxnPtr;
+	XAie_PreemptHdr *Hdr = ( XAie_PreemptHdr*)(uintptr_t)TxnPtr;
 
 	Hdr->Op = (u8)Cmd->Opcode;
 	Hdr->Preempt_level = (u8)Cmd->Preempt_level;
@@ -1077,7 +1104,7 @@ static inline void _XAie_CreateTxnHeader_opt(XAie_DevInst *DevInst,
 
 static inline void _XAie_AppendWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
-	XAie_Write32Hdr_opt *Hdr = (XAie_Write32Hdr_opt*)TxnPtr;
+	XAie_Write32Hdr_opt *Hdr = (XAie_Write32Hdr_opt*)(uintptr_t)TxnPtr;
 	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Value = Cmd->Value;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_WRITE;
@@ -1085,7 +1112,7 @@ static inline void _XAie_AppendWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 
 static inline void _XAie_AppendMaskWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
-	XAie_MaskWrite32Hdr_opt *Hdr = (XAie_MaskWrite32Hdr_opt*)TxnPtr;
+	XAie_MaskWrite32Hdr_opt *Hdr = (XAie_MaskWrite32Hdr_opt*)(uintptr_t)TxnPtr;
 
 	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Mask = Cmd->Mask;
@@ -1095,7 +1122,7 @@ static inline void _XAie_AppendMaskWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 
 static inline void _XAie_AppendMaskPoll32_opt(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 {
-	XAie_MaskPoll32Hdr_opt *Hdr = (XAie_MaskPoll32Hdr_opt*)TxnPtr;
+	XAie_MaskPoll32Hdr_opt *Hdr = (XAie_MaskPoll32Hdr_opt*)(uintptr_t)TxnPtr;
 
 	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Mask = Cmd->Mask;
@@ -1106,27 +1133,33 @@ static inline void _XAie_AppendMaskPoll32_opt(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 static inline void _XAie_AppendBlockWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u32 *Payload = (void*)(TxnPtr + sizeof(XAie_BlockWrite32Hdr_opt));
-	XAie_BlockWrite32Hdr_opt *Hdr = (XAie_BlockWrite32Hdr_opt*)TxnPtr;
+	XAie_BlockWrite32Hdr_opt *Hdr = (XAie_BlockWrite32Hdr_opt*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = (u32)Cmd->RegOff;
+	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
 	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
 
-	memcpy((void *)Payload, (void *)Cmd->DataPtr,
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (Cmd->DataPtr > UINTPTR_MAX) {
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+    	return;
+    }
+#endif
+	memcpy((void *)Payload, (void const *)(uintptr_t)Cmd->DataPtr,
 			Cmd->Size * sizeof(u32));
 }
 
 static inline void _XAie_AppendBlockSet32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u8 *Payload = TxnPtr + sizeof(XAie_BlockWrite32Hdr_opt);
-	XAie_BlockWrite32Hdr_opt *Hdr = (XAie_BlockWrite32Hdr_opt*)TxnPtr;
+	XAie_BlockWrite32Hdr_opt *Hdr = (XAie_BlockWrite32Hdr_opt*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = (u32)Cmd->RegOff;
+	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
 	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
 
 	for (u32 i = 0U; i < Cmd->Size; i++) {
-		*((u32 *)Payload) = Cmd->Value;
+		*((u32 *)(uintptr_t)Payload) = Cmd->Value;
 		Payload += 4;
 	}
 }
@@ -1134,13 +1167,18 @@ static inline void _XAie_AppendBlockSet32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 static inline void _XAie_AppendCustomOp_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u8 *Payload = TxnPtr + sizeof(XAie_CustomOpHdr_opt);
-	XAie_CustomOpHdr_opt *Hdr = (XAie_CustomOpHdr_opt*)TxnPtr;
+	XAie_CustomOpHdr_opt *Hdr = (XAie_CustomOpHdr_opt*)(uintptr_t)TxnPtr;
 
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size;
 	Hdr->OpHdr.Op = (u8)Cmd->Opcode;
-
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (Cmd->DataPtr > UINTPTR_MAX) {
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+    	return ;
+    }
+#endif
 	for (u32 i = 0U; i < Cmd->Size; ++i, ++Payload) {
-		*(Payload) = *((u8*)Cmd->DataPtr + i);
+		*(Payload) = *((u8*)(uintptr_t)(Cmd->DataPtr + i));
 	}
 }
 
@@ -1210,7 +1248,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 		return NULL;
 	}
 
-	_XAie_CreateTxnHeader(DevInst, (XAie_TxnHeader *)TxnPtr);
+	_XAie_CreateTxnHeader(DevInst, (XAie_TxnHeader *)(uintptr_t)TxnPtr);
 	BuffSize += (u32)sizeof(XAie_TxnHeader);
 	TxnPtr += sizeof(XAie_TxnHeader);
 	XAIE_DBG("number of cmd %d\n", TmpInst->NumCmds);
@@ -1414,8 +1452,8 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 		XAIE_ERROR("TxnPtr realloc failed\n");
 		return NULL;
 	}
-	((XAie_TxnHeader *)TxnPtr)->NumOps =  NumOps;
-	((XAie_TxnHeader *)TxnPtr)->TxnSize =  four_byte_aligned_BuffSize;
+	((XAie_TxnHeader *)(uintptr_t)TxnPtr)->NumOps =  NumOps;
+	((XAie_TxnHeader *)(uintptr_t)TxnPtr)->TxnSize =  four_byte_aligned_BuffSize;
 
 	return (u8 *)TxnPtr;
 }
@@ -1446,7 +1484,7 @@ u8* _XAie_TxnExportSerialized_opt(XAie_DevInst *DevInst, u8 NumConsumers,
 		return NULL;
 	}
 
-	_XAie_CreateTxnHeader_opt(DevInst, (XAie_TxnHeader*)TxnPtr);
+	_XAie_CreateTxnHeader_opt(DevInst, (XAie_TxnHeader*)(uintptr_t)TxnPtr);
 	BuffSize += (u32)sizeof(XAie_TxnHeader);
 	TxnPtr += sizeof(XAie_TxnHeader);
 	XAIE_DBG("number of cmd %d\n", TmpInst->NumCmds);
@@ -1645,8 +1683,8 @@ u8* _XAie_TxnExportSerialized_opt(XAie_DevInst *DevInst, u8 NumConsumers,
                 return NULL;
         }
 	
-	((XAie_TxnHeader *)TxnPtr)->NumOps =  NumOps;
-	((XAie_TxnHeader *)TxnPtr)->TxnSize =  four_byte_aligned_BuffSize;
+	((XAie_TxnHeader *)(uintptr_t)TxnPtr)->NumOps =  NumOps;
+	((XAie_TxnHeader *)(uintptr_t)TxnPtr)->TxnSize =  four_byte_aligned_BuffSize;
 	return (u8 *)TxnPtr;
 }
 
@@ -1677,6 +1715,12 @@ AieRC _XAie_TxnFree(XAie_TxnInst *Inst)
 
 	for(u32 i = 0; i < Inst->NumCmds; i++) {
 		XAie_TxnCmd *Cmd = &Inst->CmdBuf[i];
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (Cmd->DataPtr > UINTPTR_MAX) {
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+    	return XAIE_ERR;
+    }
+#endif
 		if((Cmd->Opcode == XAIE_IO_BLOCKWRITE || Cmd->Opcode >= XAIE_IO_CUSTOM_OP_BEGIN) &&
 				((void *)(uintptr_t)Cmd->DataPtr != NULL)) {
 			free((void *)(uintptr_t)Cmd->DataPtr);
@@ -1715,6 +1759,12 @@ void _XAie_TxnResourceCleanup(XAie_DevInst *DevInst)
 
 		for(u32 i = 0; i < TxnInst->NumCmds; i++) {
 			XAie_TxnCmd *Cmd = &TxnInst->CmdBuf[i];
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (Cmd->DataPtr > UINTPTR_MAX) {
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+    	return;
+    }
+#endif
 			//TBD handle custom OP as well
 			if((Cmd->Opcode == XAIE_IO_BLOCKWRITE || Cmd->Opcode >= XAIE_IO_CUSTOM_OP_BEGIN) &&
 					((void *)(uintptr_t)Cmd->DataPtr != NULL)) {
@@ -1944,7 +1994,7 @@ AieRC XAie_BlockWrite32(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data, u32 
 			return XAIE_ERR;
 		}
 
-		Buf = memcpy((void *)Buf, (void *)Data, sizeof(u32) * Size);
+		Buf = memcpy((void *)Buf, (const void *)Data, sizeof(u32) * Size);
 		TxnInst->CmdBuf[TxnInst->NumCmds].Opcode = XAIE_IO_BLOCKWRITE;
 		TxnInst->CmdBuf[TxnInst->NumCmds].RegOff = RegOff;
 		TxnInst->CmdBuf[TxnInst->NumCmds].DataPtr = (u64)(uintptr_t)Buf;
@@ -2111,9 +2161,15 @@ AieRC _XAie_ClearTransaction(XAie_DevInst* DevInst)
 
 	for(u32 i = 0U; i < Inst->NumCmds; i++) {
 		XAie_TxnCmd *Cmd = &Inst->CmdBuf[i];
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (Cmd->DataPtr > UINTPTR_MAX) {
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+    	return XAIE_ERR;
+    }
+#endif
 		if(Cmd->Opcode == XAIE_IO_BLOCKWRITE || Cmd->Opcode >= XAIE_IO_CUSTOM_OP_BEGIN) {
 			XAIE_DBG("free DataPtr %p\n", Cmd->DataPtr);
-			free((void *)Cmd->DataPtr);
+			free((void *)(uintptr_t)Cmd->DataPtr);
 		}
 	}
 
@@ -2305,7 +2361,7 @@ AieRC XAie_Txn_Preempt(XAie_DevInst *DevInst, XAie_PreemptHdr* Preempt)
 	u8 p_level = Preempt->Preempt_level;
 	if(p_level >= INVALID)
 	{
-		printf("Error: Preempt_level = %d",p_level);
+		printf("Error: Preempt_level = %u",p_level);
 		return XAIE_ERR;
 	}
 
@@ -2547,7 +2603,12 @@ static AieRC _XAie_CoreStatusDump(XAie_DevInst *DevInst,
 	if (RC != XAIE_OK) {
 		return RC;
 	}
-	Index = Loc.Row - TileStart;
+	if(Loc.Row < TileStart){
+		XAIE_ERROR("Loc.Row should not be less than TileStart\n");
+		return XAIE_ERR;
+	}else {
+		Index = Loc.Row - TileStart;
+	}
 	Status[Loc.Col].CoreTile[Index].CoreStatus = RegVal;
 
 	/* program counter */
@@ -2627,6 +2688,11 @@ static AieRC _XAie_DmaStatusDump(XAie_DevInst *DevInst,
 			return RC;
 		}
 
+		if(Loc.Row < AieTileStart ||  Loc.Row < MemTileStart){
+			XAIE_ERROR("Loc.Row should not be less than TileStart\n");
+			return XAIE_ERR;
+		}
+
 		if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
 			Index = Loc.Row - AieTileStart;
 			CoreTile[Index].Dma[Chan].S2MMStatus = RegVal;
@@ -2694,6 +2760,12 @@ static AieRC _XAie_LockValueStatusDump(XAie_DevInst *DevInst,
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
+
+	if(Loc.Row < AieTileStart ||  Loc.Row < MemTileStart){
+		XAIE_ERROR("Loc.Row should not be less than TileStart\n");
+		return XAIE_ERR;
+	}
+
 	LockMod = DevInst->DevProp.DevMod[TileType].LockMod;
 	CoreTile = Status[Loc.Col].CoreTile;
 	MemTile = Status[Loc.Col].MemTile;
@@ -2707,6 +2779,11 @@ static AieRC _XAie_LockValueStatusDump(XAie_DevInst *DevInst,
 		RC = XAie_LockGetValue(DevInst, Loc, Lock, &RegVal);
 		if (RC != XAIE_OK) {
 			return RC;
+		}
+
+		if(RegVal > UINT8_MAX){
+			XAIE_ERROR("Invalid Lock value\n");
+			return XAIE_ERR;
 		}
 
 		if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
@@ -2764,6 +2841,11 @@ static AieRC _XAie_EventStatusDump(XAie_DevInst *DevInst,
 	MemTile = Status[Loc.Col].MemTile;
 	ShimTile = Status[Loc.Col].ShimTile;
 	DevMod = DevInst->DevProp.DevMod;
+
+	if(Loc.Row < AieTileStart || Loc.Row < MemTileStart ){
+		XAIE_ERROR("Loc.Row should not be less than TileStart\n");
+		return XAIE_ERR;
+	}
 
 	if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
 		EvntCoreMod = &DevMod[TileType].EvntMod[XAIE_CORE_MOD];
@@ -2962,6 +3044,11 @@ u8 _XAie_IsTileResourceInSharedAddrSpace(u8 DevGen, u8 TileType)
 *******************************************************************************/
 u8 _XAie_GetMaxElementValue(u8 DevGen, u8 TileType, u8 AppMode, u8 elementValue)
 {
+	if(elementValue > UCHAR_MAX/2 )
+	{
+		XAIE_ERROR("Invalid elementValue \n");
+		return XAIE_ERR;
+	}
 	if(_XAie_IsDeviceGenAIE4(DevGen) &&
 			(AppMode == XAIE_DEVICE_SINGLE_APP_MODE) && 
 			_XAie_IsTileResourceInSharedAddrSpace(DevGen, TileType)) {
@@ -3066,6 +3153,10 @@ AieRC _XAie_IsTileTypeAndModuleSupportForEvents(XAie_DevInst* DevInst,
 u64 XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C)
 {
 	XAie_LocType Loc = { R, C };
+	if ((DevInst->DevProp.RowShift > 55) || (DevInst->DevProp.ColShift > 55)){
+		XAIE_ERROR("Invalid shift value pair\n");
+		return XAIE_ERR;
+	}
 	u8 TileType = XAie_GetTileTypefromLoc(DevInst,Loc);
 	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
 		switch(TileType) {
@@ -3086,8 +3177,8 @@ u64 XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C)
 			return 0;
 		}
 	}
-	return (((u64)R & 0xFFU) << DevInst->DevProp.RowShift) |
-			(((u64)C & 0xFFU) << DevInst->DevProp.ColShift);
+	return (((u64)(R & 0xFFU)) << DevInst->DevProp.RowShift) |
+			(((u64)(C & 0xFFU)) << DevInst->DevProp.ColShift);
 }
 
 /*****************************************************************************/
@@ -3129,5 +3220,6 @@ u8 _XAie_IsUcModulePresent(XAie_DevInst* DevInst, u8 TileType) {
 	}
 	return 0;
 }
+
 
 /** @} */

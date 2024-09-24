@@ -85,6 +85,9 @@ static AieRC _XAie_NpiSetLock(XAie_DevInst *DevInst, u8 Lock)
 	u32 LockVal;
 
 	NpiMod = _XAie_NpiGetMod(DevInst);
+	if (NpiMod == NULL) {
+		return XAIE_ERR;
+	}
 
 	if (Lock == XAIE_DISABLE) {
 		LockVal = NpiMod->PcsrUnlockCode;

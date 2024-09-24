@@ -661,7 +661,7 @@ typedef struct {
 	XAie_OpHdr OpHdr;
 	uint8_t Col;
 	uint8_t Row;
-	uint32_t RegOff;
+	uint64_t RegOff;
 	uint32_t Size;
 } XAie_BlockWrite32Hdr;
 
@@ -750,27 +750,27 @@ typedef struct{
 
 typedef struct {
 	XAie_OpHdr_opt OpHdr;
-	uint32_t RegOff;
+	uint64_t RegOff;
 	uint32_t Value;
 } XAie_Write32Hdr_opt;
 
 typedef struct {
 	XAie_OpHdr_opt OpHdr;
-	uint32_t RegOff;
+	uint64_t RegOff;
 	uint32_t Value;
 	uint32_t Mask;
 } XAie_MaskWrite32Hdr_opt;
 
 typedef struct {
 	XAie_OpHdr_opt OpHdr;
-	uint32_t RegOff;
+	uint64_t RegOff;
 	uint32_t Value;
 	uint32_t Mask;
 } XAie_MaskPoll32Hdr_opt;
 
 typedef struct {
 	XAie_OpHdr_opt OpHdr;
-	uint32_t RegOff;
+	uint64_t RegOff;
 	uint32_t Size;
 } XAie_BlockWrite32Hdr_opt;
 

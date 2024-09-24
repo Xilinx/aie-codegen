@@ -177,7 +177,7 @@ AieRC XAie_DataMemRdWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 *
 *******************************************************************************/
 static AieRC _XAie_DataMemoryBlockWrite(XAie_DevInst* DevInst, XAie_LocType Loc,
-		u32 Offset, u32 DMBaseAddr, unsigned char *Src, u32 Size) {
+		u32 Offset, u32 DMBaseAddr, const unsigned char *Src, u32 Size) {
 	AieRC RC = XAIE_OK;
 	u32 BytePtr = 0, RemBytes = Size, TempWord = 0, Mask = 0;
 	u64 DmAddrRoundDown, DmAddrRoundUp;
@@ -201,7 +201,7 @@ static AieRC _XAie_DataMemoryBlockWrite(XAie_DevInst* DevInst, XAie_LocType Loc,
 		for(u32 UnalignedByte = FirstWriteOffset;
 				(u8)((UnalignedByte < XAIE_MEM_WORD_ALIGN_SIZE) != 0U) && (RemBytes != 0U);
 				UnalignedByte++, RemBytes--) {
-			TempWord |= (u32)(Src[BytePtr++] << (UnalignedByte * 8U));
+			TempWord |= (u32)((u32)Src[BytePtr++] << (UnalignedByte * 8U));
 			Mask |= (u32)(0xFFU << (UnalignedByte * 8U));
 		}
 		RC = XAie_MaskWrite32(DevInst, DmAddrRoundDown, Mask, TempWord);
@@ -213,7 +213,7 @@ static AieRC _XAie_DataMemoryBlockWrite(XAie_DevInst* DevInst, XAie_LocType Loc,
 	/* Aligned bytes */
 	if (RemBytes >= XAIE_MEM_WORD_ALIGN_SIZE) {
 		RC = XAie_BlockWrite32(DevInst, DmAddrRoundUp,
-				(const u32 *)(Src + BytePtr),
+				(const u32 *)(uintptr_t)(Src + BytePtr),
 				(RemBytes / XAIE_MEM_WORD_ALIGN_SIZE));
 		if(RC != XAIE_OK) {
 			return RC;
@@ -230,7 +230,7 @@ static AieRC _XAie_DataMemoryBlockWrite(XAie_DevInst* DevInst, XAie_LocType Loc,
 		for (u32 UnalignedByte = 0;
 			 UnalignedByte < RemBytes % XAIE_MEM_WORD_ALIGN_SIZE;
 			 UnalignedByte++) {
-			TempWord |= (u32)(Src[BytePtr++] << (UnalignedByte * 8U));
+			TempWord |= (u32)((u32)Src[BytePtr++] << (UnalignedByte * 8U));
 			Mask |= (u32)(0xFFU << (UnalignedByte * 8U));
 		}
 		RC = XAie_MaskWrite32(DevInst, DmAddrRoundDown, Mask, TempWord);
@@ -266,7 +266,7 @@ AieRC XAie_DataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 	AieRC RC;
 	u32 MemSize, MemAddr;
 	u8 TileType;
-	unsigned char *CharSrc = (unsigned char *)Src;
+	const unsigned char *CharSrc = (const unsigned char *)Src;
 	const XAie_MemMod *MemMod;
 	const XAie_UcMod *UcMod;
 
@@ -332,7 +332,7 @@ AieRC XAie_SharedDataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc,
 	AieRC RC;
 	u32 MemSize, MemAddr;
 	u8 TileType;
-	unsigned char *CharSrc = (unsigned char *)Src;
+	const unsigned char *CharSrc = (const unsigned char *)Src;
 	const XAie_UcMod *UcMod;
 
 	if((DevInst == XAIE_NULL) ||
@@ -391,7 +391,8 @@ AieRC XAie_DataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 	u32 BytePtr = 0;
 	u32 RemBytes = Size;
 	u32 TempWord;
-	u8 FirstReadOffset = (u8)Addr & XAIE_MEM_WORD_ALIGN_MASK;
+
+	u8 FirstReadOffset = (u8)(Addr & XAIE_MEM_WORD_LAST_BYTE_MASK) & XAIE_MEM_WORD_ALIGN_MASK;
 	u8 TileType;
 	unsigned char *CharDst = (unsigned char *)Dst;
 	const XAie_MemMod *MemMod;
@@ -455,7 +456,7 @@ AieRC XAie_DataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 	for(u32 AlignedWord = 0; AlignedWord < RemBytes / 4U;
 		AlignedWord++, BytePtr += 4U, DmAddrRoundUp += 4U) {
 		RC = XAie_Read32(DevInst, DmAddrRoundUp,
-				(u32 *)(CharDst + BytePtr));
+				(u32 *)(uintptr_t)(CharDst + BytePtr));
 		if(RC != XAIE_OK) {
 			return RC;
 		}

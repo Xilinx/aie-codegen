@@ -105,6 +105,10 @@ static inline XAie_Range _XAie_MapIrqIdToCols(u8 IrqId)
 ******************************************************************************/
 static inline u8 _XAie_MapColToIrqId(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
+	if((UINT8_MAX-Loc.Col) > DevInst->StartCol){
+		XAIE_ERROR("Colum is out of range\n");
+		return XAIE_INVALID_RANGE;
+	}
 	u8 AbsCol = DevInst->StartCol + Loc.Col;
 
 	return AbsCol / (XAIE_NUM_COLS / XAIE_MAX_NUM_NOC_INTR);

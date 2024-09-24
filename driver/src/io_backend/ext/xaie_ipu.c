@@ -112,8 +112,13 @@ static AieRC XAie_IpuIO_Init(XAie_DevInst *DevInst)
 static AieRC XAie_IpuIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 {
 	XAie_IpuIO *IpuIOInst = (XAie_IpuIO *)IOInst;
-
-	reg_write32(IpuIOInst->BaseAddr + RegOff, Value);
+	u64 RegAddr = IpuIOInst->BaseAddr + RegOff;
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if ((RegAddr) > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
+	reg_write32((void *)(uintptr_t)RegAddr, Value);
 
 	return XAIE_OK;
 }
@@ -135,8 +140,14 @@ static AieRC XAie_IpuIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 static AieRC XAie_IpuIO_Read32(void *IOInst, u64 RegOff, u32 *Data)
 {
 	XAie_IpuIO *IpuIOInst = (XAie_IpuIO *)IOInst;
+	u64 RegAdd = IpuIOInst->BaseAddr + RegOff;
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if ((RegAddr) > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
 
-	*Data = reg_read32(IpuIOInst->BaseAddr + RegOff);
+	*Data = reg_read32((void *)(uintptr_t)RegAddr);
 
 	return XAIE_OK;
 }
@@ -161,8 +172,13 @@ static AieRC XAie_IpuIO_MaskWrite32(void *IOInst, u64 RegOff, u32 Mask,
 		u32 Value)
 {
 	XAie_IpuIO *IpuIOInst = (XAie_IpuIO *)IOInst;
-
-	reg_maskwrite32(IpuIOInst->BaseAddr + RegOff, Mask, Value);
+	u64 RegAddr = IpuIOInst->BaseAddr + RegOff;
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if ((RegAddr) > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
+	reg_maskwrite32((void *)(uintptr_t)RegAddr, Mask, Value);
 
 	return XAIE_OK;
 }

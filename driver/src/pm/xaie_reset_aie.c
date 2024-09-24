@@ -84,6 +84,10 @@ static void _XAie_RstSetShimReset(XAie_DevInst *DevInst, XAie_LocType Loc,
 ******************************************************************************/
 AieRC _XAie_RstShims(XAie_DevInst *DevInst, u32 StartCol, u32 NumCols)
 {
+	if(StartCol + NumCols > UINT8_MAX){
+		XAIE_ERROR(" Columns Exceed Max Range\n");
+		return XAIE_ERR;
+	}
 	for (u8 C = StartCol; C < (StartCol + NumCols); C++) {
 		XAie_LocType Loc = XAie_TileLoc(C, 0);
 

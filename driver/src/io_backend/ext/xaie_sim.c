@@ -622,6 +622,10 @@ static u64 XAie_SimIOGetAttr(void *IOInst, XAie_BackendAttrType Attr) {
 
 AieRC XAie_SimIOSetAttr(void *IOInst, XAie_BackendAttrType Attr, u64 AttrVal) {
 	XAie_SimIO *SimIOInst = (XAie_SimIO *)IOInst;
+	if(AttrVal > UINT_MAX){
+		XAIE_ERROR("AttrVal should be less than UINT_MAX\n");
+		return XAIE_ERR;
+	}
 	switch (Attr) {
 		case XAIE_BACKEND_ATTR_CORE_PROG_MEM_SIZE:
 			SimIOInst->CoreModOverride.ProgMemSize = (u32) AttrVal;

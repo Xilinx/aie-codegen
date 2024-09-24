@@ -87,22 +87,37 @@ extern int usleep(unsigned int usec);
 __FORCE_INLINE__
 static inline void _XAie_LRawWrite32(u64 RegAddr, u32 Value)
 {
-	*(volatile u32*) RegAddr = Value;
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (RegAddr > UINTPTR_MAX) {
+    	return;
+    }
+#endif
+	*(volatile u32*)(uintptr_t)RegAddr = Value;
 }
 
 __FORCE_INLINE__
 static inline void _XAie_LRawMaskWrite32(u64 RegAddr, u32 Mask, u32 Value)
 {
-	u32 RegVal = *(volatile u32*) RegAddr;
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (RegAddr > UINTPTR_MAX) {
+    	return;
+    }
+#endif
+	u32 RegVal = *(volatile u32*)(uintptr_t) RegAddr;
 
 	RegVal = (RegVal & (~Mask)) | Value;
-	*(volatile u32*) RegAddr = RegVal;
+	*(volatile u32*) (uintptr_t)RegAddr = RegVal;
 }
 
 __FORCE_INLINE__
 static inline u32 _XAie_LRawRead32(u64 RegAddr)
 {
-	return *(volatile u32*) RegAddr;
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (RegAddr > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
+	return *(volatile u32*)(uintptr_t)RegAddr;
 }
 
 __FORCE_INLINE__

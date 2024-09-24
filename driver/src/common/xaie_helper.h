@@ -34,6 +34,7 @@
 
 /***************************** Include Files *********************************/
 #include <limits.h>
+#include <stdio.h>
 #include "xaie_io.h"
 #include "xaiegbl_regdef.h"
 #include "xaie_core.h"
@@ -46,13 +47,13 @@
 
 #define XAIE_ERROR(...)							      \
 	do {								      \
-		XAie_Log(stderr, "[AIE ERROR]", __func__, __LINE__,	      \
+		XAie_Log((FILE*)(uintptr_t)stderr, "[AIE ERROR]", __func__, __LINE__,	      \
 				__VA_ARGS__);				      \
 	} while(0)
 
 #define XAIE_WARN(...)							      \
 	do {								      \
-		XAie_Log(stderr, "[AIE WARNING]", __func__, __LINE__,	      \
+		XAie_Log((FILE*)(uintptr_t)stderr, "[AIE WARNING]", __func__, __LINE__,	      \
 				__VA_ARGS__);				      \
 	} while(0)
 
@@ -76,7 +77,7 @@
 
 /* Compute a pointer to a structure given a pointer to one of its fields */
 #define XAIE_CONTAINER_OF(ptr, structure, member) \
-	(void*)((uintptr_t)(ptr) - XAIE_OFFSET_OF(structure, member))
+	 (void*)((uintptr_t)(ptr) - XAIE_OFFSET_OF(structure, member))
 
 /* Loop through the set bits in Value */
 #define for_each_set_bit(Index, Value, Len)				      \
@@ -86,6 +87,12 @@
 
 /* Generate value with a set bit at given Index */
 #define BIT(Index)		(1 << (Index))
+
+/*as AIE address space is 32bit , the max valid bit index will be 31*/
+#define MAX_VALID_AIE_REG_BIT_INDEX 31
+#define MAX_VALID_U8_BIT_INDEX 7
+#define MAX_VALID_U16_BIT_INDEX 15
+
 
 /*
  * __attribute is not supported for windows. remove it conditionally.

@@ -90,7 +90,7 @@ static void _XAie_PrivilegeSetColClkBuf(XAie_DevInst *DevInst,
 static void _XAie_PrivilegeSetPartColClkBuf(XAie_DevInst *DevInst,
 		u8 Enable)
 {
-	for(u32 C = 0; C < DevInst->NumCols; C++) {
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		XAie_LocType Loc = XAie_TileLoc(C, 0);
 
 		_XAie_PrivilegeSetColClkBuf(DevInst, Loc, Enable);
@@ -116,7 +116,7 @@ AieRC XAie_SetColumnClk(XAie_DevInst *DevInst, u8 Enable)
 	if (!(_XAie_LIsDeviceGenAIE4())) {
 		_XAie_LNpiSetPartProtectedReg(DevInst, XAIE_ENABLE);
 	}
-	for(u32 C = 0; C < DevInst->NumCols; C++) {
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		XAie_LocType Loc = XAie_TileLoc(C, 0);
 
 		//This modifies column clk which affects all the aie and mem tile in the column.
@@ -173,7 +173,7 @@ static void _XAie_PrivilegeSetColReset(XAie_DevInst *DevInst,
 ******************************************************************************/
 static void _XAie_PrivilegeSetPartColRst(XAie_DevInst *DevInst, u8 RstEnable)
 {
-	for(u32 C = 0; C < DevInst->NumCols; C++) {
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		XAie_LocType Loc = XAie_TileLoc(C, 0);
 
 		_XAie_PrivilegeSetColReset(DevInst, Loc, RstEnable);
@@ -195,7 +195,7 @@ static void _XAie_PrivilegeSetPartColRst(XAie_DevInst *DevInst, u8 RstEnable)
 ******************************************************************************/
 static void _XAie_PrivilegeRstPartShims(XAie_DevInst *DevInst)
 {
-	for(u32 C = 0; C < DevInst->NumCols; C++) {
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		XAie_LocType Loc = XAie_TileLoc(C, 0);
 		_XAie_LSetPartColShimReset(DevInst, Loc, XAIE_ENABLE);
 	}
@@ -206,7 +206,7 @@ static void _XAie_PrivilegeRstPartShims(XAie_DevInst *DevInst)
 	}
 
 	//TODO : Note: Jignesh : Do we need to make outof reset using _XAie_LSetPartColShimReset(XAIE_DISABLE); ??
-	for(u32 C = 0; C < DevInst->NumCols; C++) {
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		XAie_LocType Loc = XAie_TileLoc(C, 0);
 		_XAie_LSetPartColShimReset(DevInst, Loc, XAIE_DISABLE);
 	}

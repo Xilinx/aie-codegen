@@ -106,8 +106,12 @@ static AieRC XAie_DebugIO_Init(XAie_DevInst *DevInst)
 static AieRC XAie_DebugIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 {
 	XAie_DebugIO *DebugIOInst = (XAie_DebugIO *)IOInst;
-
-	printf("W: %p, 0x%x\n", (char *)DebugIOInst->BaseAddr + RegOff, Value);
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if ((DebugIOInst->BaseAddr + RegOff) > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
+	printf("W: %p, 0x%x\n", (void *)(uintptr_t)(DebugIOInst->BaseAddr + RegOff), Value);
 
 	return XAIE_OK;
 }
@@ -129,9 +133,13 @@ static AieRC XAie_DebugIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 static AieRC XAie_DebugIO_Read32(void *IOInst, u64 RegOff, u32 *Data)
 {
 	XAie_DebugIO *DebugIOInst = (XAie_DebugIO *)IOInst;
-
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if ((DebugIOInst->BaseAddr + RegOff) > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
 	*Data = 0U;
-	printf("R: %p, 0x%x\n", (char *) DebugIOInst->BaseAddr + RegOff, 0);
+	printf("R: %p, %d\n", (void *)(uintptr_t)(DebugIOInst->BaseAddr + RegOff), 0);
 
 	return XAIE_OK;
 }
@@ -156,9 +164,13 @@ static AieRC XAie_DebugIO_MaskWrite32(void *IOInst, u64 RegOff, u32 Mask,
 		u32 Value)
 {
 	XAie_DebugIO *DebugIOInst = (XAie_DebugIO *)IOInst;
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if ((DebugIOInst->BaseAddr + RegOff) > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
 
-	printf("MW: %p, 0x%x, 0x%x\n", (char *) DebugIOInst->BaseAddr + RegOff,
-			Mask, Value);
+	printf("MW: %p, 0x%x, 0x%x\n", (void *)(uintptr_t)(DebugIOInst->BaseAddr + RegOff),Mask, Value);
 
 	return XAIE_OK;
 }
@@ -183,9 +195,14 @@ static AieRC XAie_DebugIO_MaskPoll(void *IOInst, u64 RegOff, u32 Mask, u32 Value
 		u32 TimeOutUs)
 {
 	XAie_DebugIO *DebugIOInst = (XAie_DebugIO *)IOInst;
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if ((DebugIOInst->BaseAddr + RegOff) > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
 
-	printf("MP: %p, 0x%x, 0x%x, 0x%d\n", (char *) DebugIOInst->BaseAddr +
-			RegOff, Mask, Value, TimeOutUs);
+	printf("MP: %p, 0x%x, 0x%x, 0x%u\n", (void *)(uintptr_t)(DebugIOInst->BaseAddr + RegOff),
+			Mask, Value, TimeOutUs);
 
 	return XAIE_OK;
 }
@@ -275,10 +292,12 @@ static void _XAie_DebugIO_NpiWrite32(void *IOInst, u32 RegOff,
 		u32 RegVal)
 {
 	XAie_DebugIO *DebugIOInst = (XAie_DebugIO *)IOInst;
-	u64 RegAddr;
-
-	RegAddr = DebugIOInst->NpiBaseAddr + RegOff;
-	printf("NPIMW: %p, 0x%x\n", (void *) RegAddr, RegVal);
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if ((DebugIOInst->NpiBaseAddr + RegOff) > UINTPTR_MAX) {
+    	return;
+    }
+#endif
+	printf("NPIMW: %p, 0x%x\n", (void *)(uintptr_t)(DebugIOInst->NpiBaseAddr + RegOff), RegVal);
 }
 
 /*****************************************************************************/
@@ -301,9 +320,13 @@ static AieRC _XAie_DebugIO_NpiMaskPoll(void *IOInst, u64 RegOff, u32 Mask,
 		u32 Value, u32 TimeOutUs)
 {
 	XAie_DebugIO *DebugIOInst = (XAie_DebugIO *)IOInst;
-
-	printf("MP: %p, 0x%x, 0x%x, 0x%d\n", (char *) DebugIOInst->NpiBaseAddr +
-			RegOff, Mask, Value, TimeOutUs);
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if ((DebugIOInst->NpiBaseAddr + RegOff) > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
+	printf("MP: %p, 0x%x, 0x%x, 0x%u\n", (void *)(uintptr_t)(DebugIOInst->NpiBaseAddr + RegOff),
+			Mask, Value, TimeOutUs);
 
 	return XAIE_OK;
 }
@@ -415,6 +438,10 @@ static XAie_MemInst* XAie_DebugMemAllocate(XAie_DevInst *DevInst, u64 Size,
 		XAie_MemCacheProp Cache)
 {
 	XAie_MemInst *MemInst;
+	if(Size > UINT_MAX)	{
+		XAIE_ERROR("Size is more than UINT_MAX\n");
+		return NULL;
+	}
 
 	MemInst = (XAie_MemInst *)malloc(sizeof(*MemInst));
 	if(MemInst == NULL) {
@@ -422,7 +449,7 @@ static XAie_MemInst* XAie_DebugMemAllocate(XAie_DevInst *DevInst, u64 Size,
 		return NULL;
 	}
 
-	MemInst->VAddr = (void *)malloc(Size);
+	MemInst->VAddr = (void *)malloc((u32)Size);
 	if(MemInst->VAddr == NULL) {
 		XAIE_ERROR("malloc failed\n");
 		free(MemInst);

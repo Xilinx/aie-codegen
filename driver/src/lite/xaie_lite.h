@@ -116,6 +116,10 @@ __FORCE_INLINE__
 static inline XAie_LocType XAie_LPartGetNextNocTile(XAie_DevInst *DevInst,
 		XAie_LocType Loc)
 {
+	if((UINT8_MAX-Loc.Col) > DevInst->StartCol){
+		XAIE_ERROR("Colum is out of range \n");
+		return XAie_TileLoc(255,255);
+	}
 	XAie_LocType lLoc = XAie_TileLoc((Loc.Col + DevInst->StartCol),
 			Loc.Row);
 

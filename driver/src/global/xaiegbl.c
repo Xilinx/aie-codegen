@@ -669,6 +669,11 @@ AieRC XAie_MemAttach(XAie_DevInst *DevInst, XAie_MemInst *MemInst, u64 DevAddr,
 		XAIE_ERROR("Invalid cache property\n");
 		return XAIE_INVALID_ARGS;
 	}
+#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (VAddr > UINTPTR_MAX) {
+    	return XAIE_ERR;
+    }
+#endif
 
 	MemInst->DevInst = DevInst;
 	MemInst->VAddr = (void *)(uintptr_t)VAddr;

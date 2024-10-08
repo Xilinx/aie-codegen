@@ -65,10 +65,11 @@
 *
 ******************************************************************************/
 AieRC _XAie4_LockRelease(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
-		XAie_LocType Loc, XAie_Lock Lock, u32 TimeOut)
+		XAie_LocType Loc, XAie_Lock Lock, u32 TimeOut, u8 BusyPoll)
 {
 	u64 RegAddr;
 	u32 RegOff = 0;
+	AieRC Status = XAIE_OK;
 
 	if((DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) && (Lock.LockId >= LockMod->NumLocks)) {
 		RegOff = _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen, RegOff);
@@ -82,10 +83,18 @@ AieRC _XAie4_LockRelease(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 
 	RegAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) + RegOff;
 
-	if(XAie_MaskPoll(DevInst, RegAddr, XAIE4_LOCK_RESULT_MASK,
-				(XAIE4_LOCK_RESULT_SUCCESS <<
-				 XAIE4_LOCK_RESULT_LSB), TimeOut) != XAIE_OK) {
+	if (BusyPoll != XAIE_ENABLE) {
+		Status = XAie_MaskPoll(DevInst, RegAddr, XAIE4_LOCK_RESULT_MASK,
+					(XAIE4_LOCK_RESULT_SUCCESS <<
+					 XAIE4_LOCK_RESULT_LSB), TimeOut);
+	} else {
+		Status = XAie_MaskPollBusy(DevInst, RegAddr, XAIE4_LOCK_RESULT_MASK,
+					(XAIE4_LOCK_RESULT_SUCCESS <<
+					 XAIE4_LOCK_RESULT_LSB), TimeOut);
+	}
 
+	if (Status != XAIE_OK) {
+		XAIE_DBG("Wait for lock release timed out\n");
 		return XAIE_LOCK_RESULT_FAILED;
 	}
 
@@ -117,10 +126,11 @@ AieRC _XAie4_LockRelease(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 *
 ******************************************************************************/
 AieRC _XAie4_LockAcquire(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
-		XAie_LocType Loc, XAie_Lock Lock, u32 TimeOut)
+		XAie_LocType Loc, XAie_Lock Lock, u32 TimeOut, u8 BusyPoll)
 {
 	u64 RegAddr;
 	u32 RegOff = 0;
+	AieRC Status = XAIE_OK;
 
 	if((DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) && (Lock.LockId >= LockMod->NumLocks)) {
 		RegOff = _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen, RegOff);
@@ -134,10 +144,18 @@ AieRC _XAie4_LockAcquire(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 
 	RegAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) + RegOff;
 
-	if(XAie_MaskPoll(DevInst, RegAddr, XAIE4_LOCK_RESULT_MASK,
-				(XAIE4_LOCK_RESULT_SUCCESS <<
-				 XAIE4_LOCK_RESULT_LSB), TimeOut) != XAIE_OK) {
+	if (BusyPoll != XAIE_ENABLE) {
+		Status = XAie_MaskPoll(DevInst, RegAddr, XAIE4_LOCK_RESULT_MASK,
+					(XAIE4_LOCK_RESULT_SUCCESS <<
+					 XAIE4_LOCK_RESULT_LSB), TimeOut);
+	} else {
+		Status = XAie_MaskPollBusy(DevInst, RegAddr, XAIE4_LOCK_RESULT_MASK,
+					(XAIE4_LOCK_RESULT_SUCCESS <<
+					 XAIE4_LOCK_RESULT_LSB), TimeOut);
+	}
 
+	if (Status != XAIE_OK) {
+		XAIE_DBG("Wait for lock acquire timed out\n");
 		return XAIE_LOCK_RESULT_FAILED;
 	}
 

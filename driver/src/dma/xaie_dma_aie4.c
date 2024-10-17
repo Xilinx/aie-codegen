@@ -1401,7 +1401,7 @@ AieRC _XAie4_TileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 			BdProp->Pkt->PktType.Lsb,
 			BdProp->Pkt->PktType.Mask);
 
-	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[1U].StepSize = 1U +
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[1U].StepSize =
 		XAie_GetField(BdWord[2U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[1U].StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[1U].StepSize.Mask);
@@ -1414,7 +1414,7 @@ AieRC _XAie4_TileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		(u16)XAie_GetField(BdWord[3U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[0U].Wrap.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[0U].Wrap.Mask);
-	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[2U].StepSize = 1U +
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[2U].StepSize =
 		XAie_GetField(BdWord[3U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Mask);
@@ -1427,7 +1427,7 @@ AieRC _XAie4_TileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 			XAie_GetField(BdWord[4U],
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.Wrap.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.Wrap.Mask));
-	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterDesc.StepSize = 1U +
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterDesc.StepSize =
 		XAie_GetField(BdWord[4U],
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.StepSize.Mask);
@@ -1725,7 +1725,7 @@ AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 	DmaDesc->AxiDesc.AxQos = XAie_GetField(BdWord[5U],
 			BdProp->SysProp->AxQos.Lsb,
 			BdProp->SysProp->AxQos.Mask);
-	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[1U].StepSize = 1U +
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[1U].StepSize =
 		XAie_GetField(BdWord[5U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[1U].StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[1U].StepSize.Mask);
@@ -1740,7 +1740,7 @@ AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		XAie_GetField(BdWord[6U],
 				BdProp->AddrMode->AieMlMultiDimAddr.IterCurr.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.IterCurr.Mask);
-	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[2U].StepSize = 1U +
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[2U].StepSize =
 		XAie_GetField(BdWord[6U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Mask);
@@ -1752,12 +1752,12 @@ AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		XAie_GetField(BdWord[7U],
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.Wrap.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.Wrap.Mask);
-	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterDesc.StepSize = 1U +
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterDesc.StepSize =
 		XAie_GetField(BdWord[7U],
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.StepSize.Mask);
 
-	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[3U].StepSize = 1U +
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[3U].StepSize =
 		XAie_GetField(BdWord[8U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[3U].StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[3U].StepSize.Mask);

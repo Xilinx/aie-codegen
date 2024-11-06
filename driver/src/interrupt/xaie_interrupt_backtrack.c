@@ -310,16 +310,16 @@ static inline u32 _XAie_LReadArrayErrorBroadcastEvent(XAie_DevInst *DevInst,
 #endif
 	} else if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
 		RegOff = XAIE_MEM_TILE_BASE_EVENT_BROADCAST;
-	} else {
-		/**
-		 * In AIE4 which dosnot have L1 interrupt controller.
-		 * SHIM error info needs to be xtracted from event bc.
-		 *
-		 * Kotesh(TODO): Cross verify this macro name.
-		 * We want to read the internal events of SHIM tile.
-		 */
-		RegOff = XAIE_PL_MOD_EVENT_BROADCAST0;
 	}
+#if DEV_GEN_AIE4
+	else {
+		/**
+		 * In AIE4 doesnot have L1 interrupt controller.
+		 * SHIM error info needs to be extracted from event bc.
+		 */
+		RegOff = XAIE_SHIM_TILE_BASE_EVENT_BROADCAST;
+	}
+#endif
 
 	RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + RegOff +
 			BroadcastId * 4U;
@@ -857,9 +857,10 @@ static AieRC _XAie_LBacktrackIntrCtrlL2(XAie_DevInst *DevInst,
 
 		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, XAIE_PL_MOD,
 						XAIE_ERROR_BROADCAST_ID);
-		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE)
+		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE) {
 			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
 			return RC;
+		}
 	}
 
 	/* Backtrack shim's internal events */
@@ -868,9 +869,10 @@ static AieRC _XAie_LBacktrackIntrCtrlL2(XAie_DevInst *DevInst,
 
 		RC = _XAie_LBacktrackTile(DevInst, MData, Loc, XAIE_PL_MOD,
 						XAIE_ERROR_BROADCAST_ID);
-		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE)
+		if (RC == XAIE_INSUFFICIENT_BUFFER_SIZE) {
 			MData->ErrInfo->ReturnCode = XAIE_INSUFFICIENT_BUFFER_SIZE;
 			return RC;
+		}
 	}
 
 	/* Backtrack array tile's internal events. */
@@ -1040,11 +1042,15 @@ AieRC XAie_BacktrackErrorInterrupts(XAie_DevInst *DevInst,
 		XAie_ErrorMetaData *MData)
 {
 #ifdef __AIEIPU__
+#if !DEV_GEN_AIE4
 	if(!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))) {
 		return XAie_BacktrackErrorInterruptsIPU(DevInst, MData);
 	} else {
+#endif
 		return XAie_BacktrackErrorInterruptsIPU_Aie4(DevInst, MData);
+#if !DEV_GEN_AIE4
 	}
+#endif
 #endif
 #if !DEV_GEN_AIE4
 	XAIE_ERROR_RETURN((DevInst == NULL || DevInst->NumCols > XAIE_NUM_COLS),

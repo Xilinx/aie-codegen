@@ -123,13 +123,14 @@ typedef enum {
 
 typedef enum {
 	SHIMTILE_MNGR_S2MM	= 0,
-	SHIMTILE_MNGR_WEST	= 2,
-	SHIMTILE_MNGR_NORTH	= 4,
-	SHIMTILE_MNGR_EAST	= 8,
-	SHIMTILE_MNGR_NC	= 10,
-	SHIMTILE_MNGR_TC	= 12,
-	SHIMTILE_MNGR_32b	= 14,
-	SHIMTILE_MNGR_MAX	= 16
+	SHIMTILE_MNGR_TS2MM	= 1,
+	SHIMTILE_MNGR_WEST	= 3,
+	SHIMTILE_MNGR_NORTH	= 5,
+	SHIMTILE_MNGR_EAST	= 9,
+	SHIMTILE_MNGR_NC	= 11,
+	SHIMTILE_MNGR_TC	= 13,
+	SHIMTILE_MNGR_32b	= 15,
+	SHIMTILE_MNGR_MAX	= 17
 }_ShimTile_MngrPortTypeBaseIdx;
 
 typedef enum {
@@ -142,11 +143,12 @@ typedef enum {
 
 typedef enum {
 	SHIMTILE_DUALAPP_MNGR_S2MM	= 0,
-	SHIMTILE_DUALAPP_MNGR_NORTH	= 1,
-	SHIMTILE_DUALAPP_MNGR_NC	= 3,
-	SHIMTILE_DUALAPP_MNGR_TC	= 4,
-	SHIMTILE_DUALAPP_MNGR_32b	= 5,
-	SHIMTILE_DUALAPP_MNGR_MAX	= 6
+	SHIMTILE_DUALAPP_MNGR_TS2MM	= 1,
+	SHIMTILE_DUALAPP_MNGR_NORTH	= 2,
+	SHIMTILE_DUALAPP_MNGR_NC	= 4,
+	SHIMTILE_DUALAPP_MNGR_TC	= 5,
+	SHIMTILE_DUALAPP_MNGR_32b	= 6,
+	SHIMTILE_DUALAPP_MNGR_MAX	= 7
 }_ShimTile_DualAppMngrPortTypeBaseIdx;
 
 /************************** Constant Definitions *****************************/
@@ -154,6 +156,7 @@ typedef enum {
  * C --> Core
  * M2S --> mm2s
  * S2M --> s2mm
+ * TS2M --> Trace S2MM
  * S --> South
  * W --> West
  * N --> North
@@ -161,6 +164,7 @@ typedef enum {
  * SC --> South_control
  * NC --> North_control
  * TC --> Tile_control
+ * M2SC --> MM2S Control
  * 32b --> 32b_switch
  */
 static const u8 _XAie4_AieTile_PortsConectivityMatrix[AIETILE_SUBRDNT_MAX][AIETILE_MNGR_MAX] = {
@@ -251,33 +255,33 @@ static const u8 _XAie4_MemTile_DualAppPortsConectivityMatrix[MEMTILE_DUALAPP_SUB
 };
 
 static const u8 _XAie4_ShimTile_PortsConectivityMatrix[SHIMTILE_SUBRDNT_MAX][SHIMTILE_MNGR_MAX] = {
-		      /*S2M0  S2M2  W0  W1  N0  N1  N2  N3  E0  E1  NC0  NC1  TC0  TC1  32b0  32b1*/
-	/* M2S0 */ { 1,    0,   1,  1,  1,  1,  1,  1,  1,  1,  1,   0,   1,   0,    1,    1 },
-	/* M2S1 */ { 0,    0,   1,  1,  1,  1,  1,  1,  1,  1,  1,   0,   1,   0,    1,    1 },
-	/* M2S2 */ { 0,    1,   1,  1,  1,  1,  1,  1,  1,  1,  0,   1,   0,   1,    1,    1 },
-	/* M2S3 */ { 0,    0,   1,  1,  1,  1,  1,  1,  1,  1,  0,   1,   0,   1,    1,    1 },
-	/*  W0  */ { 1,    1,   1,  0,  1,  1,  1,  1,  1,  1,  1,   1,   1,   0,    1,    1 },
-	/*  W1  */ { 1,    1,   0,  1,  1,  1,  1,  1,  1,  1,  1,   1,   1,   0,    1,    1 },
-	/*  N0  */ { 1,    1,   1,  1,  1,  0,  0,  0,  1,  1,  0,   0,   0,   0,    1,    1 },
-	/*  N1  */ { 1,    1,   1,  1,  0,  1,  0,  0,  1,  1,  1,   0,   1,   0,    1,    1 },
-	/*  N2  */ { 1,    1,   1,  1,  0,  0,  1,  0,  1,  1,  0,   0,   0,   0,    1,    1 },
-	/*  N3  */ { 1,    1,   1,  1,  0,  0,  0,  1,  1,  1,  1,   1,   1,   1,    1,    1 },
-	/*  E0  */ { 1,    1,   1,  1,  1,  1,  1,  1,  1,  0,  1,   1,   1,   0,    1,    1 },
-	/*  E1  */ { 1,    1,   1,  1,  1,  1,  1,  1,  0,  1,  1,   1,   1,   0,    1,    1 },
-	/* M2SC0*/ { 0,    0,   1,  1,  1,  1,  0,  0,  1,  1,  1,   0,   1,   0,    1,    0 },
-	/* M2SC1*/ { 0,    0,   0,  1,  0,  0,  1,  1,  0,  1,  0,   1,   1,   1,    0,    1 },
-	/* 32b0 */ { 1,    1,   1,  1,  1,  1,  1,  1,  1,  1,  1,   1,   1,   0,    0,    0 },
-	/* 32b1 */ { 1,    1,   1,  1,  1,  1,  1,  1,  1,  1,  1,   1,   0,   1,    0,    0 }
+		      /*S2M0  TS2M S2M2  W0  W1  N0  N1  N2  N3  E0  E1  NC0  NC1  TC0  TC1  32b0  32b1*/
+	/* M2S0 */ { 1,    0,	0,   1,  1,  1,  1,  1,  1,  1,  1,  1,   0,   1,   0,    1,    1 },
+	/* M2S1 */ { 0,    0,	0,   1,  1,  1,  1,  1,  1,  1,  1,  1,   0,   1,   0,    1,    1 },
+	/* M2S2 */ { 0,    0,	1,   1,  1,  1,  1,  1,  1,  1,  1,  0,   1,   0,   1,    1,    1 },
+	/* M2S3 */ { 0,    0,	0,   1,  1,  1,  1,  1,  1,  1,  1,  0,   1,   0,   1,    1,    1 },
+	/*  W0  */ { 1,    1,	1,   1,  0,  1,  1,  1,  1,  1,  1,  1,   1,   1,   0,    1,    1 },
+	/*  W1  */ { 1,    1,	1,   0,  1,  1,  1,  1,  1,  1,  1,  1,   1,   1,   0,    1,    1 },
+	/*  N0  */ { 1,    1,	1,   1,  1,  1,  0,  0,  0,  1,  1,  0,   0,   0,   0,    1,    1 },
+	/*  N1  */ { 1,    1,	1,   1,  1,  0,  1,  0,  0,  1,  1,  1,   0,   1,   0,    1,    1 },
+	/*  N2  */ { 1,    1,	1,   1,  1,  0,  0,  1,  0,  1,  1,  0,   0,   0,   0,    1,    1 },
+	/*  N3  */ { 1,    1,	1,   1,  1,  0,  0,  0,  1,  1,  1,  1,   1,   1,   1,    1,    1 },
+	/*  E0  */ { 1,    1,	1,   1,  1,  1,  1,  1,  1,  1,  0,  1,   1,   1,   0,    1,    1 },
+	/*  E1  */ { 1,    1,	1,   1,  1,  1,  1,  1,  1,  0,  1,  1,   1,   1,   0,    1,    1 },
+	/* M2SC0*/ { 0,    0,	0,   1,  1,  1,  1,  0,  0,  1,  1,  1,   0,   1,   0,    1,    0 },
+	/* M2SC1*/ { 0,    0,	0,   0,  1,  0,  0,  1,  1,  0,  1,  0,   1,   1,   1,    0,    1 },
+	/* 32b0 */ { 1,    1,	1,   1,  1,  1,  1,  1,  1,  1,  1,  1,   1,   1,   0,    0,    0 },
+	/* 32b1 */ { 1,    1,	1,   1,  1,  1,  1,  1,  1,  1,  1,  1,   1,   0,   1,    0,    0 }
 };
 
 static const u8 _XAie4_ShimTile_DualAppPortsConectivityMatrix[SHIMTILE_DUALAPP_SUBRDNT_MAX][SHIMTILE_DUALAPP_MNGR_MAX] = {
-		      /*S2M0  N0    N1  NC0  TC0  32b0*/
-	/* M2S0 */ { 1,   1,    1,   1,  1,    1 },
-	/* M2S1 */ { 0,   1,    1,   1,  1,    1 },
-	/* M2SC0*/ { 0,   1,    1,   1,  1,    1 },
-	/*  N0  */ { 1,   1,    0,   0,  0,    1 },
-	/*  N1  */ { 1,   0,    1,   1,  1,    1 },
-	/* 32b0 */ { 1,   1,    1,   1,  1,    0 }
+		      /*S2M0  TS2M	N0    N1  NC0  TC0  32b0*/
+	/* M2S0 */ { 1,   0,	1,    1,   1,  1,    1 },
+	/* M2S1 */ { 0,   0,	1,    1,   1,  1,    1 },
+	/* M2SC0*/ { 0,   1,	1,    1,   1,  1,    1 },
+	/*  N0  */ { 1,   1,	1,    0,   0,  0,    1 },
+	/*  N1  */ { 1,   0,	0,    1,   1,  1,    1 },
+	/* 32b0 */ { 1,   1,	1,    1,   1,  1,    0 }
 };
 
 /************************** Function Definitions *****************************/
@@ -593,11 +597,10 @@ AieRC _XAie4_ShimTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst,
 			 * adjusted in the spec, below logic is to validate that and calculate
 			 * index based on that
 			 */
+			/* After Adding Tarce S2MM inplace of S2MM1 in v1.4 spec, S2MM1 port and index is invalid */
 			MngrPortIdx = SHIMTILE_MNGR_S2MM;
-			if (MstrPortNum == SHIMTILE_MNGR_WEST / 2)
-				return XAIE_ERR_STREAM_PORT;
-			else if (MstrPortNum > SHIMTILE_MNGR_WEST / 2)
-				HoleInTheMatrixTable = 1;
+			if (MstrPortNum == SHIMTILE_MNGR_TS2MM)
+				return XAIE_ERR_STREAM_PORT;			
 		}
 		break;
 	case WEST:
@@ -621,6 +624,12 @@ AieRC _XAie4_ShimTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst,
 		break;
 	case SWITCH_32b:
 		MngrPortIdx = DualAppMode ? SHIMTILE_DUALAPP_MNGR_32b : SHIMTILE_MNGR_32b;
+		break;
+	case DMA_Trace:
+		/* Trace S2MM only available to app A and as an opportunistic feature */
+		if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B)
+				return XAIE_ERR_STREAM_PORT;
+		MngrPortIdx = DualAppMode ? SHIMTILE_DUALAPP_MNGR_TS2MM : SHIMTILE_MNGR_TS2MM;
 		break;
 	default:
 		/* Any port that is not shown in connectivity matrix is fully connected */

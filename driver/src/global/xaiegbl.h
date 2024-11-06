@@ -284,6 +284,7 @@ typedef enum{
 	SOUTH_CTRL, /* Introduced from AIE4 */
 	SWITCH_32b, /* Introduced from AIE4 */
 	DMA_CTRL, /* Introduced from AIE4 */
+	DMA_Trace, /* Introduced from AIE4 */
 	PL, /* Introduced from AIE4 */
 	_512B_PORT_END = PL,
 

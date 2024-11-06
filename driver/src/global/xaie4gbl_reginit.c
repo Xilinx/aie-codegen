@@ -895,7 +895,7 @@ static const  XAie_DmaMod Aie4ShimDmaMod =
 	.StartQueueBase = XAIE4GBL_NOC_MODULE_DMA_S2MM_0_TASK_QUEUE,
 	.ChCtrlBase = XAIE4GBL_NOC_MODULE_DMA_S2MM_0_CTRL,
 	.ChCtrlOffset = 0x10,
-	.NumChannels = 2U,	/* Number of mm2s channels */
+	.NumChannels = 2U,	/* Number of s2mm channels */
 	.NumMm2sChannels = 2U, /* Number of mm2s channels */
 	.NumMm2sCtrlChannels = 1, /* Number of control MM2S channels */
 	.ChIdxOffset = 0x8,  /* This is the offset between each channel */
@@ -936,7 +936,7 @@ static const  XAie_StrmPort Aie4TileStrmMstr[SS_PORT_TYPE_MAX] =
 		.PortPhysicalId = 0,
 		.PortLogicalId = 0,
 	},
-	{	/* DMA_0 */
+	{	/* DMA */
 		.NumPorts = 2,
 		.PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_MANAGER_CONFIG_DMA_0,
 		.PortPhysicalId = 2,
@@ -1019,7 +1019,7 @@ static const  XAie_StrmPort Aie4TileStrmSlv[SS_PORT_TYPE_MAX] =
 		.PortPhysicalId = 0,
 		.PortLogicalId = 0,
 	},
-	{	/* DMA_0 */
+	{	/* DMA */
 		.NumPorts = 2,
 		.PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_SUBORDINATE_CONFIG_DMA_0,
 		.PortPhysicalId = 1,
@@ -1096,11 +1096,22 @@ static const  XAie_StrmPort Aie4TileStrmSlv[SS_PORT_TYPE_MAX] =
  */
 static const  XAie_StrmPort Aie4TileStrmMstr32b[SS_PORT_TYPE_MAX] =
 {
-	{/*Core*/.NumPorts = 0,}, {/*DMA_0*/.NumPorts = 0,}, {/*Ctrl*/.NumPorts = 0,},
-	{/*Fifo*/.NumPorts = 0,}, {/*South*/.NumPorts = 0,}, {/* West */.NumPorts = 0,},
-	{/*North*/.NumPorts = 0,}, {/* East */.NumPorts = 0,}, {/*Trace*/.NumPorts = 0,},
-	{/*UCtrlr*/.NumPorts = 0,}, {/*North_control*/.NumPorts = 0,}, {/*South_control*/.NumPorts = 0,},
-	{/*To 32b switch*/.NumPorts = 0,}, {/*DMA control*/.NumPorts = 0,}, {/*PL*/.NumPorts = 0,},
+	{/*Core*/.NumPorts = 0,},
+	{/*DMA_0*/.NumPorts = 0,},
+	{/*Ctrl*/.NumPorts = 0,},
+	{/*Fifo*/.NumPorts = 0,},
+	{/*South*/.NumPorts = 0,},
+	{/* West */.NumPorts = 0,},
+	{/*North*/.NumPorts = 0,},
+	{/* East */.NumPorts = 0,},
+	{/*Trace*/.NumPorts = 0,},
+	{/*UCtrlr*/.NumPorts = 0,},
+	{/*North_control*/.NumPorts = 0,},
+	{/*South_control*/.NumPorts = 0,},
+	{/*To 32b switch*/.NumPorts = 0,},
+	{/*DMA control*/.NumPorts = 0,},
+	{/*DMA Trace*/.NumPorts = 0,},
+	{/*PL*/.NumPorts = 0,},
 
 	{	/* _32B_control */
 		.NumPorts = 0,
@@ -1146,11 +1157,22 @@ static const  XAie_StrmPort Aie4TileStrmMstr32b[SS_PORT_TYPE_MAX] =
  */
 static const  XAie_StrmPort Aie4TileStrmSlv32b[SS_PORT_TYPE_MAX] =
 {
-	{/*Core*/.NumPorts = 0,}, {/*DMA_0*/.NumPorts = 0,}, {/*Ctrl*/.NumPorts = 0,},
-	{/*Fifo*/.NumPorts = 0,}, {/*South*/.NumPorts = 0,}, {/* West */.NumPorts = 0,},
-	{/*North*/.NumPorts = 0,}, {/* East */.NumPorts = 0,}, {/*Trace*/.NumPorts = 0,},
-	{/*UCtrlr*/.NumPorts = 0,}, {/*North_control*/.NumPorts = 0,}, {/*South_control*/.NumPorts = 0,},
-	{/*To 32b switch*/.NumPorts = 0,}, {/*DMA control*/.NumPorts = 0,}, {/*PL*/.NumPorts = 0,},
+	{/*Core*/.NumPorts = 0,},
+	{/*DMA_0*/.NumPorts = 0,},
+	{/*Ctrl*/.NumPorts = 0,},
+	{/*Fifo*/.NumPorts = 0,},
+	{/*South*/.NumPorts = 0,},
+	{/* West */.NumPorts = 0,},
+	{/*North*/.NumPorts = 0,},
+	{/* East */.NumPorts = 0,},
+	{/*Trace*/.NumPorts = 0,},
+	{/*UCtrlr*/.NumPorts = 0,},
+	{/*North_control*/.NumPorts = 0,},
+	{/*South_control*/.NumPorts = 0,},
+	{/*To 32b switch*/.NumPorts = 0,},
+	{/*DMA control*/.NumPorts = 0,},
+	{/*DMA Trace*/.NumPorts = 0,},
+	{/*PL*/.NumPorts = 0,},
 
 	{	/* _32B_control */
 		.NumPorts = 1,
@@ -1278,6 +1300,12 @@ static const  XAie_StrmPort Aie4ShimStrmMstr[SS_PORT_TYPE_MAX] =
 		.NumPorts = 0,
 		.PortBaseAddr = 0,
 	},
+	{       /* DMA Trace */
+		.NumPorts = 1,
+		.PortBaseAddr = XAIE4GBL_PL_MODULE_STREAM_SWITCH_MANAGER_CONFIG_DMA_TRACE,
+		.PortPhysicalId = 1,
+		.PortLogicalId = 1,
+	},
 	{       /* PL */
 		/* Spec (0.9.4) mentioned TBD for PL in ShimTile, so considering no PL ports */
 		.NumPorts = 0,
@@ -1291,11 +1319,22 @@ static const  XAie_StrmPort Aie4ShimStrmMstr[SS_PORT_TYPE_MAX] =
  */
 static const  XAie_StrmPort Aie4ShimStrmMstr32b[SS_PORT_TYPE_MAX] =
 {
-	{/*Core*/.NumPorts = 0,}, {/*DMA_0*/.NumPorts = 0,}, {/*Ctrl*/.NumPorts = 0,},
-	{/*Fifo*/.NumPorts = 0,}, {/*South*/.NumPorts = 0,}, {/* West */.NumPorts = 0,},
-	{/*North*/.NumPorts = 0,}, {/* East */.NumPorts = 0,}, {/*Trace*/.NumPorts = 0,},
-	{/*UCtrlr*/.NumPorts = 0,}, {/*North_control*/.NumPorts = 0,}, {/*South_control*/.NumPorts = 0,},
-	{/*To 32b switch*/.NumPorts = 0,}, {/*DMA control*/.NumPorts = 0,}, {/*PL*/.NumPorts = 0,},
+	{/*Core*/.NumPorts = 0,},
+	{/*DMA_0*/.NumPorts = 0,},
+	{/*Ctrl*/.NumPorts = 0,},
+	{/*Fifo*/.NumPorts = 0,},
+	{/*South*/.NumPorts = 0,},
+	{/* West */.NumPorts = 0,},
+	{/*North*/.NumPorts = 0,},
+	{/* East */.NumPorts = 0,},
+	{/*Trace*/.NumPorts = 0,},
+	{/*UCtrlr*/.NumPorts = 0,},
+	{/*North_control*/.NumPorts = 0,},
+	{/*South_control*/.NumPorts = 0,},
+	{/*To 32b switch*/.NumPorts = 0,},
+	{/*DMA control*/.NumPorts = 0,},
+	{/*DMA trace*/.NumPorts = 0,},
+	{/*PL*/.NumPorts = 0,},
 
 	{	/* _32B_control */
 		.NumPorts = 0,
@@ -1423,6 +1462,10 @@ static const  XAie_StrmPort Aie4ShimStrmSlv[SS_PORT_TYPE_MAX] =
 		.PortPhysicalId = 26,
 		.PortLogicalId = 4
 	},
+	{       /* DMA Trace */
+		.NumPorts = 0,
+		.PortBaseAddr = 0,
+	},
 	{       /* PL */
 		/* Spec (0.9.4) mentioned TBD for PL in ShimTile, so considering no PL ports */
 		.NumPorts = 0,
@@ -1436,11 +1479,22 @@ static const  XAie_StrmPort Aie4ShimStrmSlv[SS_PORT_TYPE_MAX] =
  */
 static const  XAie_StrmPort Aie4ShimStrmSlv32b[SS_PORT_TYPE_MAX] =
 {
-	{/*Core*/.NumPorts = 0,}, {/*DMA_0*/.NumPorts = 0,}, {/*Ctrl*/.NumPorts = 0,},
-	{/*Fifo*/.NumPorts = 0,}, {/*South*/.NumPorts = 0,}, {/* West */.NumPorts = 0,},
-	{/*North*/.NumPorts = 0,}, {/* East */.NumPorts = 0,}, {/*Trace*/.NumPorts = 0,},
-	{/*UCtrlr*/.NumPorts = 0,}, {/*North_control*/.NumPorts = 0,}, {/*South_control*/.NumPorts = 0,},
-	{/*To 32b switch*/.NumPorts = 0,}, {/*DMA control*/.NumPorts = 0,}, {/*PL*/.NumPorts = 0,},
+	{/*Core*/.NumPorts = 0,},
+	{/*DMA_0*/.NumPorts = 0,},
+	{/*Ctrl*/.NumPorts = 0,},
+	{/*Fifo*/.NumPorts = 0,},
+	{/*South*/.NumPorts = 0,},
+	{/* West */.NumPorts = 0,},
+	{/*North*/.NumPorts = 0,},
+	{/* East */.NumPorts = 0,},
+	{/*Trace*/.NumPorts = 0,},
+	{/*UCtrlr*/.NumPorts = 0,},
+	{/*North_control*/.NumPorts = 0,},
+	{/*South_control*/.NumPorts = 0,},
+	{/*To 32b switch*/.NumPorts = 0,},
+	{/*DMA control*/.NumPorts = 0,},
+	{/*DMA trace*/.NumPorts = 0,},
+	{/*PL*/.NumPorts = 0,},
 
 	{	/* _32B_control */
 		.NumPorts = 1,
@@ -1658,11 +1712,22 @@ static const  XAie_StrmPort Aie4MemTileStrmSlv[SS_PORT_TYPE_MAX] =
  */
 static const  XAie_StrmPort Aie4MemTileStrmMstr32b[SS_PORT_TYPE_MAX] =
 {
-	{/*Core*/.NumPorts = 0,}, {/*DMA_0*/.NumPorts = 0,}, {/*Ctrl*/.NumPorts = 0,},
-	{/*Fifo*/.NumPorts = 0,}, {/*South*/.NumPorts = 0,}, {/* West */.NumPorts = 0,},
-	{/*North*/.NumPorts = 0,}, {/* East */.NumPorts = 0,}, {/*Trace*/.NumPorts = 0,},
-	{/*UCtrlr*/.NumPorts = 0,}, {/*North_control*/.NumPorts = 0,}, {/*South_control*/.NumPorts = 0,},
-	{/*To 32b switch*/.NumPorts = 0,}, {/*DMA control*/.NumPorts = 0,}, {/*PL*/.NumPorts = 0,},
+	{/*Core*/.NumPorts = 0,},
+	{/*DMA_0*/.NumPorts = 0,},
+	{/*Ctrl*/.NumPorts = 0,},
+	{/*Fifo*/.NumPorts = 0,},
+	{/*South*/.NumPorts = 0,},
+	{/* West */.NumPorts = 0,},
+	{/*North*/.NumPorts = 0,},
+	{/* East */.NumPorts = 0,},
+	{/*Trace*/.NumPorts = 0,},
+	{/*UCtrlr*/.NumPorts = 0,},
+	{/*North_control*/.NumPorts = 0,},
+	{/*South_control*/.NumPorts = 0,},
+	{/*To 32b switch*/.NumPorts = 0,},
+	{/*DMA control*/.NumPorts = 0,},
+	{/*DMA trace*/.NumPorts = 0,},
+	{/*PL*/.NumPorts = 0,},
 
 	{	/* 32bit Ctrl */
 		.NumPorts = 0,
@@ -1709,11 +1774,22 @@ static const  XAie_StrmPort Aie4MemTileStrmMstr32b[SS_PORT_TYPE_MAX] =
  */
 static const  XAie_StrmPort Aie4MemTileStrmSlv32b[SS_PORT_TYPE_MAX] =
 {
-	{/*Core*/.NumPorts = 0,}, {/*DMA_0*/.NumPorts = 0,}, {/*Ctrl*/.NumPorts = 0,},
-	{/*Fifo*/.NumPorts = 0,}, {/*South*/.NumPorts = 0,}, {/* West */.NumPorts = 0,},
-	{/*North*/.NumPorts = 0,}, {/* East */.NumPorts = 0,}, {/*Trace*/.NumPorts = 0,},
-	{/*UCtrlr*/.NumPorts = 0,}, {/*North_control*/.NumPorts = 0,}, {/*South_control*/.NumPorts = 0,},
-	{/*To 32b switch*/.NumPorts = 0,}, {/*DMA control*/.NumPorts = 0,}, {/*PL*/.NumPorts = 0,},
+	{/*Core*/.NumPorts = 0,},
+	{/*DMA_0*/.NumPorts = 0,},
+	{/*Ctrl*/.NumPorts = 0,},
+	{/*Fifo*/.NumPorts = 0,},
+	{/*South*/.NumPorts = 0,},
+	{/* West */.NumPorts = 0,},
+	{/*North*/.NumPorts = 0,},
+	{/* East */.NumPorts = 0,},
+	{/*Trace*/.NumPorts = 0,},
+	{/*UCtrlr*/.NumPorts = 0,},
+	{/*North_control*/.NumPorts = 0,},
+	{/*South_control*/.NumPorts = 0,},
+	{/*To 32b switch*/.NumPorts = 0,},
+	{/*DMA control*/.NumPorts = 0,},
+	{/*DMA trace*/.NumPorts = 0,},
+	{/*PL*/.NumPorts = 0,},
 
 	{	/* 32bit Ctrl */
 		.NumPorts = 1,
@@ -1821,6 +1897,10 @@ static const  XAie_StrmPort Aie4ShimStrmSlaveSlot[SS_PORT_TYPE_MAX] =
                 .NumPorts = 1,
                 .PortBaseAddr = XAIE4GBL_PL_MODULE_STREAM_SWITCH_SUBORDINATE_DMA_CONTROL_0_SLOT0,
         },
+		{       /* DMA trace */
+                .NumPorts = 0,
+                .PortBaseAddr = 0,
+        },
         {       /* PL */
                 .NumPorts = 4,
                 .PortBaseAddr = XAIE4GBL_PL_MODULE_STREAM_SWITCH_SUBORDINATE_PL_0_SLOT3,
@@ -1833,11 +1913,22 @@ static const  XAie_StrmPort Aie4ShimStrmSlaveSlot[SS_PORT_TYPE_MAX] =
  */
 static const  XAie_StrmPort Aie4ShimStrmSlaveSlot32b[SS_PORT_TYPE_MAX] =
 {
-	{/*Core*/.NumPorts = 0,}, {/*DMA_0*/.NumPorts = 0,}, {/*Ctrl*/.NumPorts = 0,},
-	{/*Fifo*/.NumPorts = 0,}, {/*South*/.NumPorts = 0,}, {/* West */.NumPorts = 0,},
-	{/*North*/.NumPorts = 0,}, {/* East */.NumPorts = 0,}, {/*Trace*/.NumPorts = 0,},
-	{/*UCtrlr*/.NumPorts = 0,}, {/*North_control*/.NumPorts = 0,}, {/*South_control*/.NumPorts = 0,},
-	{/*To 32b switch*/.NumPorts = 0,}, {/*DMA control*/.NumPorts = 0,}, {/*PL*/.NumPorts = 0,},
+	{/*Core*/.NumPorts = 0,},
+	{/*DMA_0*/.NumPorts = 0,},
+	{/*Ctrl*/.NumPorts = 0,},
+	{/*Fifo*/.NumPorts = 0,},
+	{/*South*/.NumPorts = 0,},
+	{/* West */.NumPorts = 0,},
+	{/*North*/.NumPorts = 0,},
+	{/* East */.NumPorts = 0,},
+	{/*Trace*/.NumPorts = 0,},
+	{/*UCtrlr*/.NumPorts = 0,},
+	{/*North_control*/.NumPorts = 0,},
+	{/*South_control*/.NumPorts = 0,},
+	{/*To 32b switch*/.NumPorts = 0,},
+	{/*DMA control*/.NumPorts = 0,},
+	{/*DMA trace*/.NumPorts = 0,},
+	{/*PL*/.NumPorts = 0,},
 
 	{	/* _32B_control */
 		.NumPorts = 1,
@@ -1945,40 +2036,51 @@ static const  XAie_StrmPort Aie4AieTileStrmSlaveSlot[SS_PORT_TYPE_MAX] =
  */
 static const  XAie_StrmPort Aie4AieTileStrmSlaveSlot32b[SS_PORT_TYPE_MAX] =
 {
-	{/*Core*/.NumPorts = 0,}, {/*DMA_0*/.NumPorts = 0,}, {/*Ctrl*/.NumPorts = 0,},
-	{/*Fifo*/.NumPorts = 0,}, {/*South*/.NumPorts = 0,}, {/* West */.NumPorts = 0,},
-	{/*North*/.NumPorts = 0,}, {/* East */.NumPorts = 0,}, {/*Trace*/.NumPorts = 0,},
-	{/*UCtrlr*/.NumPorts = 0,}, {/*North_control*/.NumPorts = 0,}, {/*South_control*/.NumPorts = 0,},
-	{/*To 32b switch*/.NumPorts = 0,}, {/*DMA control*/.NumPorts = 0,}, {/*PL*/.NumPorts = 0,},
+	{/*Core*/.NumPorts = 0,},
+	{/*DMA_0*/.NumPorts = 0,},
+	{/*Ctrl*/.NumPorts = 0,},
+	{/*Fifo*/.NumPorts = 0,},
+	{/*South*/.NumPorts = 0,},
+	{/* West */.NumPorts = 0,},
+	{/*North*/.NumPorts = 0,},
+	{/* East */.NumPorts = 0,},
+	{/*Trace*/.NumPorts = 0,},
+	{/*UCtrlr*/.NumPorts = 0,},
+	{/*North_control*/.NumPorts = 0,},
+	{/*South_control*/.NumPorts = 0,},
+	{/*To 32b switch*/.NumPorts = 0,},
+	{/*DMA control*/.NumPorts = 0,},
+	{/*DMA trace*/.NumPorts = 0,},
+	{/*PL*/.NumPorts = 0,},
 
-	{       /* 32b Core */
+	{	/* 32b Core */
 		.NumPorts = 1,
 		.PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_TILE_CTRL_0_SLOT0,
 	},
-        {       /* 32b Trace */
-                .NumPorts = 2,
-                .PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_AIE_TRACE_0_SLOT0,
-        },
-        {       /* 32b South */
-                .NumPorts = 2,
-                .PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_SOUTH_0_SLOT0,
-        },
-        {       /* 32b West */
-                .NumPorts = 1,
-                .PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_WEST_0_SLOT0,
-        },
-        {       /* 32b North */
-                .NumPorts = 2,
-                .PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_NORTH_0_SLOT0,
-        },
-        {       /* 32b East */
-                .NumPorts = 1,
-                .PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_EAST_0_SLOT0,
-        },
-        {       /* 32b switch_512b*/
-                .NumPorts = 1,
-                .PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_512B_SWITCH_0_SLOT0
-        }
+	{	/* 32b Trace */
+		.NumPorts = 2,
+		.PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_AIE_TRACE_0_SLOT0,
+	},
+	{    /* 32b South */
+		.NumPorts = 2,
+		.PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_SOUTH_0_SLOT0,
+	},
+	{	/* 32b West */
+		.NumPorts = 1,
+		.PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_WEST_0_SLOT0,
+	},
+	{	/* 32b North */
+		.NumPorts = 2,
+		.PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_NORTH_0_SLOT0,
+	},
+	{	/* 32b East */
+		.NumPorts = 1,
+		.PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_EAST_0_SLOT0,
+	},
+	{	/* 32b switch_512b*/
+		.NumPorts = 1,
+		.PortBaseAddr = XAIE4GBL_CORE_MODULE_STREAM_SWITCH_32B_SUBORDINATE_512B_SWITCH_0_SLOT0
+	}
 };
 
 /*
@@ -2052,11 +2154,22 @@ static const  XAie_StrmPort Aie4MemTileStrmSlaveSlot[SS_PORT_TYPE_MAX] =
  */
 static const  XAie_StrmPort Aie4MemTileStrmSlaveSlot32b[SS_PORT_TYPE_MAX] =
 {
-	{/*Core*/.NumPorts = 0,}, {/*DMA_0*/.NumPorts = 0,}, {/*Ctrl*/.NumPorts = 0,},
-	{/*Fifo*/.NumPorts = 0,}, {/*South*/.NumPorts = 0,}, {/* West */.NumPorts = 0,},
-	{/*North*/.NumPorts = 0,}, {/* East */.NumPorts = 0,}, {/*Trace*/.NumPorts = 0,},
-	{/*UCtrlr*/.NumPorts = 0,}, {/*North_control*/.NumPorts = 0,}, {/*South_control*/.NumPorts = 0,},
-	{/*To 32b switch*/.NumPorts = 0,}, {/*DMA control*/.NumPorts = 0,}, {/*PL*/.NumPorts = 0,},
+	{/*Core*/.NumPorts = 0,},
+	{/*DMA_0*/.NumPorts = 0,},
+	{/*Ctrl*/.NumPorts = 0,},
+	{/*Fifo*/.NumPorts = 0,},
+	{/*South*/.NumPorts = 0,},
+	{/* West */.NumPorts = 0,},
+	{/*North*/.NumPorts = 0,},
+	{/* East */.NumPorts = 0,},
+	{/*Trace*/.NumPorts = 0,},
+	{/*UCtrlr*/.NumPorts = 0,},
+	{/*North_control*/.NumPorts = 0,},
+	{/*South_control*/.NumPorts = 0,},
+	{/*To 32b switch*/.NumPorts = 0,},
+	{/*DMA control*/.NumPorts = 0,},
+	{/*DMA trace*/.NumPorts = 0,},
+	{/*PL*/.NumPorts = 0,},
 
 	{	/* 32bit Ctrl */
 		.NumPorts = 1,
@@ -2132,7 +2245,7 @@ static const XAie_StrmSwPortMap Aie4TileStrmSwMasterPortMap[] =
 		.PortNum = 1,
 	},
 	{
-		/* PhyPort 8 */
+		/* PhyPort 8, as per spec its place holder for future devices */
 		.PortType = SOUTH,
 		.PortNum = 'X',
 	},
@@ -2147,7 +2260,7 @@ static const XAie_StrmSwPortMap Aie4TileStrmSwMasterPortMap[] =
 		.PortNum = 3,
 	},
 	{
-		/* PhyPort 11 */
+		/* PhyPort 11, as per spec its place holder for future devices */
 		.PortType = SOUTH,
 		.PortNum = 'Y',
 	},
@@ -2352,7 +2465,7 @@ static const XAie_StrmSwPortMap Aie4TileStrmSwSlavePortMap[] =
 		.PortNum = 1,
 	},
 	{
-		/* PhyPort 19 */
+		/* PhyPort 19, as per spec its place holder for future devices */
 		.PortType = NORTH,
 		.PortNum = 'X',
 	},
@@ -2367,7 +2480,7 @@ static const XAie_StrmSwPortMap Aie4TileStrmSwSlavePortMap[] =
 		.PortNum = 3,
 	},
 	{
-		/* PhyPort 22 */
+		/* PhyPort 22, as per spec its place holder for future devices */
 		.PortType = NORTH,
 		.PortNum = 'Y',
 	},

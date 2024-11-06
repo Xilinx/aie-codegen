@@ -102,6 +102,13 @@ static AieRC _GetMaxNumSsPorts(XAie_DevInst *DevInst, u8 TileType,
 					*MaxNumPorts = PortPtr->NumPorts * 2;
 				}
 			}
+			/* The trace S2MM port is supported only in APP A as oppurtunistic feature.*/
+			if ((DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) &&
+					(TileType == XAIEGBL_TILE_TYPE_SHIMNOC) &&
+					(PortType == DMA_Trace)) {
+				XAIE_ERROR(" Trace S2MM port is supported only in APP A \n");
+				return XAIE_ERR;
+			}
 		}
 	}
 

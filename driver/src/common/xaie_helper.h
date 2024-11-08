@@ -77,7 +77,7 @@
 
 /* Compute a pointer to a structure given a pointer to one of its fields */
 #define XAIE_CONTAINER_OF(ptr, structure, member) \
-	 (void*)((uintptr_t)(ptr) - XAIE_OFFSET_OF(structure, member))
+	 ((uintptr_t)(ptr) - XAIE_OFFSET_OF(structure, member))
 
 /* Loop through the set bits in Value */
 #define for_each_set_bit(Index, Value, Len)				      \
@@ -171,7 +171,7 @@ static inline u32 first_set_bit(u64 Value)
 }
 
 /* Private Functions (can be called by AIE Internal Driver Only */
-void BuffHexDump(char* buff,u32 size);
+void BuffHexDump(const char* buff,u32 size);
 
 /* Private Functions used by Public Headers. Need to be discussed as not to export Private API's  */
 XAIE_AIG_EXPORT u8 XAie_GetTileTypefromLoc(XAie_DevInst *DevInst, XAie_LocType Loc);

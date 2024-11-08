@@ -527,7 +527,7 @@ static XAie_TxnInst *_XAie_GetTxnInst(XAie_DevInst *DevInst, u64 Tid)
 	XAie_TxnInst *TxnInst;
 
 	while(NodePtr != NULL) {
-		TxnInst = XAIE_CONTAINER_OF(NodePtr, XAie_TxnInst, Node);
+		TxnInst = (XAie_TxnInst *)(uintptr_t)(XAIE_CONTAINER_OF(NodePtr, XAie_TxnInst, Node));
 		if(TxnInst->Tid == Tid) {
 			return TxnInst;
 		}
@@ -557,8 +557,7 @@ static AieRC _XAie_RemoveTxnInstFromList(XAie_DevInst *DevInst, u64 Tid)
 	XAie_TxnInst *Inst;
 
 	while(NodePtr != NULL) {
-		Inst = (XAie_TxnInst *)XAIE_CONTAINER_OF(NodePtr, XAie_TxnInst,
-				Node);
+		Inst = (XAie_TxnInst *)(uintptr_t)(XAIE_CONTAINER_OF(NodePtr, XAie_TxnInst, Node));
 		if(Inst->Tid == Tid) {
 			break;
 		}
@@ -577,7 +576,7 @@ static AieRC _XAie_RemoveTxnInstFromList(XAie_DevInst *DevInst, u64 Tid)
 	return XAIE_OK;
 }
 
-void BuffHexDump(char* buff,u32 size) {
+void BuffHexDump(const char* buff,u32 size) {
 	XAIE_DBG("Buff Info %p %d\n",buff,size);
 	for (u32 i = 0; i < size; ++i) {
 		printf("0x%x ",(u8)buff[i]&0xffU);
@@ -587,7 +586,15 @@ void BuffHexDump(char* buff,u32 size) {
 
 static int TxnCmdDump(XAie_TxnCmd* cmd) {
 	XAIE_DBG("TxnCmdDump Called for %d and size %d\n",cmd->Opcode,cmd->Size);
-	BuffHexDump((char *)(cmd->DataPtr),cmd->Size);
+
+	#if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
+    if (cmd->DataPtr > UINTPTR_MAX) {
+    	XAIE_ERROR("DataPtr cannot be represented in 32bit system\n");
+    	return XAIE_ERR;
+    }
+	#endif
+	
+	BuffHexDump((const char*)(uintptr_t)cmd->DataPtr,cmd->Size);
 	return 0;
 }
 
@@ -966,33 +973,18 @@ static inline void _XAie_CreateTxnHeader(XAie_DevInst *DevInst,
 			Header->NumRows, Header->NumMemTileRows);
 }
 
-static inline u8 _XAie_GetRowfromRegOff(XAie_DevInst *DevInst, u64 RegOff)
-{
-	return RegOff &(u64)(~((u64)ULONG_MAX << DevInst->DevProp.RowShift));
-}
-
-static inline u8 _XAie_GetColfromRegOff(XAie_DevInst *DevInst, u64 RegOff)
-{
-	u64 Mask = (u64)(((1U << DevInst->DevProp.ColShift) - 1U) &
-			~((1U << DevInst->DevProp.RowShift) - 1U));
-
-	return (u8)((RegOff & Mask) >> (u64)(DevInst->DevProp.RowShift));
-}
-
-static inline void _XAie_AppendWrite32(XAie_DevInst *DevInst,
-		XAie_TxnCmd *Cmd, u8 *TxnPtr)
+static inline void _XAie_AppendWrite32(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	XAie_Write32Hdr *Hdr = (XAie_Write32Hdr*)(uintptr_t)TxnPtr;
 	Hdr->RegOff = Cmd->RegOff;
 	Hdr->Value = Cmd->Value;
 	Hdr->Size = (u32)sizeof(*Hdr);
-	Hdr->OpHdr.Col = _XAie_GetColfromRegOff(DevInst,Cmd->RegOff);
-	Hdr->OpHdr.Row = _XAie_GetRowfromRegOff(DevInst,Cmd->RegOff);
+	Hdr->OpHdr.Col = 0;
+	Hdr->OpHdr.Row = 0;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_WRITE;
 }
 
-static inline void _XAie_AppendMaskWrite32(XAie_DevInst *DevInst,
-		XAie_TxnCmd *Cmd, u8 *TxnPtr)
+static inline void _XAie_AppendMaskWrite32(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	XAie_MaskWrite32Hdr *Hdr = (XAie_MaskWrite32Hdr*)(uintptr_t)TxnPtr;
 
@@ -1000,13 +992,12 @@ static inline void _XAie_AppendMaskWrite32(XAie_DevInst *DevInst,
 	Hdr->Mask = Cmd->Mask;
 	Hdr->Value = Cmd->Value;
 	Hdr->Size = (u32)sizeof(*Hdr);
-	Hdr->OpHdr.Col = _XAie_GetColfromRegOff(DevInst,Cmd->RegOff);
-	Hdr->OpHdr.Row = _XAie_GetRowfromRegOff(DevInst,Cmd->RegOff);
+	Hdr->OpHdr.Col = 0;
+	Hdr->OpHdr.Row = 0;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKWRITE;
 }
 
-static inline void _XAie_AppendMaskPoll32(XAie_DevInst *DevInst,
-		XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
+static inline void _XAie_AppendMaskPoll32(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 {
 	XAie_MaskPoll32Hdr *Hdr = (XAie_MaskPoll32Hdr*)(uintptr_t)TxnPtr;
 
@@ -1014,13 +1005,12 @@ static inline void _XAie_AppendMaskPoll32(XAie_DevInst *DevInst,
 	Hdr->Mask = Cmd->Mask;
 	Hdr->Value = Cmd->Value;
 	Hdr->Size = (u32)sizeof(*Hdr);
-	Hdr->OpHdr.Col = _XAie_GetColfromRegOff(DevInst,Cmd->RegOff);
-	Hdr->OpHdr.Row = _XAie_GetRowfromRegOff(DevInst,Cmd->RegOff);
+	Hdr->OpHdr.Col = 0;
+	Hdr->OpHdr.Row = 0;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL;
 }
 
-static inline void _XAie_AppendMaskPollBusy32(XAie_DevInst *DevInst,
-		XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
+static inline void _XAie_AppendMaskPollBusy32(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 {
 	XAie_MaskPoll32Hdr *Hdr = (XAie_MaskPoll32Hdr*)(uintptr_t)TxnPtr;
 
@@ -1028,21 +1018,21 @@ static inline void _XAie_AppendMaskPollBusy32(XAie_DevInst *DevInst,
 	Hdr->Mask = Cmd->Mask;
 	Hdr->Value = Cmd->Value;
 	Hdr->Size = (u32)sizeof(*Hdr);
-	Hdr->OpHdr.Col = _XAie_GetColfromRegOff(DevInst,Cmd->RegOff);
-	Hdr->OpHdr.Row = _XAie_GetRowfromRegOff(DevInst,Cmd->RegOff);
+	Hdr->OpHdr.Col = 0;
+	Hdr->OpHdr.Row = 0;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL_BUSY;
 }
 
-static inline void _XAie_AppendBlockWrite32(XAie_DevInst *DevInst,
-		XAie_TxnCmd *Cmd, u8 *TxnPtr)
+static inline void _XAie_AppendBlockWrite32(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u8 *Payload = TxnPtr + sizeof(XAie_BlockWrite32Hdr);
 	XAie_BlockWrite32Hdr *Hdr = (XAie_BlockWrite32Hdr*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = (u32)Cmd->RegOff;
+	u32 RegOff = Cmd->RegOff & 0xFFFFFFFF;
+	Hdr->RegOff = RegOff;
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
-	Hdr->OpHdr.Col = _XAie_GetColfromRegOff(DevInst,Cmd->RegOff);
-	Hdr->OpHdr.Row = _XAie_GetRowfromRegOff(DevInst,Cmd->RegOff);
+	Hdr->OpHdr.Col = 0;
+	Hdr->OpHdr.Row = 0;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
 #if UINTPTR_MAX == 0xFFFFFFFF  // 32-bit system
     if (Cmd->DataPtr > UINTPTR_MAX) {
@@ -1054,16 +1044,16 @@ static inline void _XAie_AppendBlockWrite32(XAie_DevInst *DevInst,
 			Cmd->Size * sizeof(u32));
 }
 
-static inline void _XAie_AppendBlockSet32(XAie_DevInst *DevInst,
-		XAie_TxnCmd *Cmd, u8 *TxnPtr)
+static inline void _XAie_AppendBlockSet32(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u8 *Payload = TxnPtr + sizeof(XAie_BlockWrite32Hdr);
 	XAie_BlockWrite32Hdr *Hdr = (XAie_BlockWrite32Hdr*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = (u32)Cmd->RegOff;
+	u32 RegOff = Cmd->RegOff & 0xFFFFFFFF;
+	Hdr->RegOff = RegOff;
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
-	Hdr->OpHdr.Col = _XAie_GetColfromRegOff(DevInst,Cmd->RegOff);
-	Hdr->OpHdr.Row = _XAie_GetRowfromRegOff(DevInst,Cmd->RegOff);
+	Hdr->OpHdr.Col = 0;
+	Hdr->OpHdr.Row = 0;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
 
 	for (u32 i = 0U; i < Cmd->Size; i++) {
@@ -1145,7 +1135,9 @@ static inline void _XAie_CreateTxnHeader_opt(XAie_DevInst *DevInst,
 static inline void _XAie_AppendWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	XAie_Write32Hdr_opt *Hdr = (XAie_Write32Hdr_opt*)(uintptr_t)TxnPtr;
-	Hdr->RegOff = Cmd->RegOff;
+
+	u32 RegOff = Cmd->RegOff & 0xFFFFFFFF;
+	Hdr->RegOff = RegOff;
 	Hdr->Value = Cmd->Value;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_WRITE;
 }
@@ -1154,7 +1146,8 @@ static inline void _XAie_AppendMaskWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	XAie_MaskWrite32Hdr_opt *Hdr = (XAie_MaskWrite32Hdr_opt*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = Cmd->RegOff;
+	u32 RegOff = Cmd->RegOff & 0xFFFFFFFF;
+	Hdr->RegOff = RegOff;
 	Hdr->Mask = Cmd->Mask;
 	Hdr->Value = Cmd->Value;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKWRITE;
@@ -1164,7 +1157,8 @@ static inline void _XAie_AppendMaskPoll32_opt(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 {
 	XAie_MaskPoll32Hdr_opt *Hdr = (XAie_MaskPoll32Hdr_opt*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = Cmd->RegOff;
+	u32 RegOff = Cmd->RegOff & 0xFFFFFFFF;
+	Hdr->RegOff = RegOff;
 	Hdr->Mask = Cmd->Mask;
 	Hdr->Value = Cmd->Value;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL;
@@ -1173,8 +1167,9 @@ static inline void _XAie_AppendMaskPoll32_opt(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 static inline void _XAie_AppendMaskPollBusy32_opt(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 {
 	XAie_MaskPoll32Hdr_opt *Hdr = (XAie_MaskPoll32Hdr_opt*)(uintptr_t)TxnPtr;
-
-	Hdr->RegOff = Cmd->RegOff;
+	
+	u32 RegOff = Cmd->RegOff & 0xFFFFFFFF;
+	Hdr->RegOff = RegOff;
 	Hdr->Mask = Cmd->Mask;
 	Hdr->Value = Cmd->Value;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL_BUSY;
@@ -1184,7 +1179,8 @@ static inline void _XAie_AppendBlockWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 	u32 *Payload = (void*)(TxnPtr + sizeof(XAie_BlockWrite32Hdr_opt));
 	XAie_BlockWrite32Hdr_opt *Hdr = (XAie_BlockWrite32Hdr_opt*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = (u32)Cmd->RegOff;
+	u32 RegOff = Cmd->RegOff & 0xFFFFFFFF;
+	Hdr->RegOff = RegOff;
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
 	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
 
@@ -1203,7 +1199,8 @@ static inline void _XAie_AppendBlockSet32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 	u8 *Payload = TxnPtr + sizeof(XAie_BlockWrite32Hdr_opt);
 	XAie_BlockWrite32Hdr_opt *Hdr = (XAie_BlockWrite32Hdr_opt*)(uintptr_t)TxnPtr;
 
-	Hdr->RegOff = (u32)Cmd->RegOff;
+	u32 RegOff = Cmd->RegOff & 0xFFFFFFFF;
+	Hdr->RegOff = RegOff;
 	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
 	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
 
@@ -1255,7 +1252,7 @@ static u8* _XAie_ReallocTxnBuf(u8 *TxnPtr, u32 NewSize)
 	return Tmp;
 }
 
-static inline void Append_BW_To_Blockwrite_Buff(XAie_DevInst *DevInst, XAie_TxnCmd *Cmd, u8 First_blockwrite_processed, u32* Blockwrite_buffer)
+static inline void Append_BW_To_Blockwrite_Buff(XAie_TxnCmd *Cmd, u8 First_blockwrite_processed, u32* Blockwrite_buffer)
 {
 	XAie_BlockWrite32Hdr *Hdr = (XAie_BlockWrite32Hdr*)(uintptr_t)Blockwrite_buffer;
 	u32* Payload;
@@ -1270,10 +1267,12 @@ static inline void Append_BW_To_Blockwrite_Buff(XAie_DevInst *DevInst, XAie_TxnC
 	{
 		u32 payload_offset = sizeof(XAie_BlockWrite32Hdr) / 4;
 		Payload = (void *)(Blockwrite_buffer + payload_offset);
-		Hdr->RegOff = (u32)Cmd->RegOff;
+
+		u32 RegOff = Cmd->RegOff & 0xFFFFFFFF;
+		Hdr->RegOff = RegOff;
 		Hdr->Size = (u32)sizeof(XAie_BlockWrite32Hdr) + Cmd->Size * (u32)sizeof(u32);
-		Hdr->OpHdr.Col = _XAie_GetColfromRegOff(DevInst,Cmd->RegOff);
-		Hdr->OpHdr.Row = _XAie_GetRowfromRegOff(DevInst,Cmd->RegOff);
+		Hdr->OpHdr.Col = 0;
+		Hdr->OpHdr.Row = 0;
 		Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
 
 		memcpy((void*)Payload, (void const*)(uintptr_t)Cmd->DataPtr, memcpy_size);
@@ -1425,7 +1424,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 				AllocatedBuffSize *= 2U;
 				TxnPtr += BuffSize;
 			}
-			_XAie_AppendWrite32(DevInst, Cmd, TxnPtr);
+			_XAie_AppendWrite32(Cmd, TxnPtr);
 			TxnPtr += sizeof(XAie_Write32Hdr);
 			BuffSize += (u32)sizeof(XAie_Write32Hdr);
 			continue;
@@ -1442,7 +1441,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 				AllocatedBuffSize *= 2U;
 				TxnPtr += BuffSize;
 			}
-			_XAie_AppendMaskWrite32(DevInst, Cmd, TxnPtr);
+			_XAie_AppendMaskWrite32(Cmd, TxnPtr);
 			TxnPtr += sizeof(XAie_MaskWrite32Hdr);
 			BuffSize += (u32)sizeof(XAie_MaskWrite32Hdr);
 			continue;
@@ -1459,7 +1458,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 				AllocatedBuffSize *= 2U;
 				TxnPtr += BuffSize;
 			}
-			_XAie_AppendMaskPoll32(DevInst, Cmd, TxnPtr);
+			_XAie_AppendMaskPoll32(Cmd, TxnPtr);
 			TxnPtr += sizeof(XAie_MaskPoll32Hdr);
 			BuffSize += (u32)sizeof(XAie_MaskPoll32Hdr);
 			continue;
@@ -1476,7 +1475,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 				AllocatedBuffSize *= 2U;
 				TxnPtr += BuffSize;
 			}
-			_XAie_AppendMaskPollBusy32(DevInst, Cmd, TxnPtr);
+			_XAie_AppendMaskPollBusy32(Cmd, TxnPtr);
 			TxnPtr += sizeof(XAie_MaskPoll32Hdr);
 			BuffSize += (u32)sizeof(XAie_MaskPoll32Hdr);
 			continue;
@@ -1534,7 +1533,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 				BW_Buff_AllocatedSize *= 2U;
 			}
 			RegOff_last_blockwrite = (u64) ( Cmd->RegOff + (Cmd->Size*4) );
-			Append_BW_To_Blockwrite_Buff(DevInst, Cmd,first_blockwrite_processed,blockwrite_buffer);
+			Append_BW_To_Blockwrite_Buff(Cmd,first_blockwrite_processed,blockwrite_buffer);
 			first_blockwrite_processed = 1;
 		}
 		else if (Cmd->Opcode == XAIE_IO_BLOCKSET) {
@@ -1559,7 +1558,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 				AllocatedBuffSize *= 2U;
 				TxnPtr += BuffSize;
 			}
-			_XAie_AppendBlockSet32(DevInst, Cmd, TxnPtr);
+			_XAie_AppendBlockSet32(Cmd, TxnPtr);
 			TxnPtr += sizeof(XAie_BlockWrite32Hdr) +
 				Cmd->Size * sizeof(u32);
 			BuffSize += (u32)sizeof(XAie_BlockWrite32Hdr) +
@@ -1654,6 +1653,9 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 			else
 			{
 				XAIE_ERROR("LoadSeqCountPtr is equal to NULL\n");
+				free(blockwrite_buffer);
+				free(TxnPtr);
+				return NULL;
 			}
 			LoadSeqCount = 0;
 			NumOps--;
@@ -1967,6 +1969,8 @@ u8* _XAie_TxnExportSerialized_opt(XAie_DevInst *DevInst, u8 NumConsumers,
 			else
 			{
 				XAIE_ERROR("LoadSeqCountPtr is equal to NULL\n");
+				free(TxnPtr);
+				return NULL;
 			}
 			LoadSeqCount = 0;
 			NumOps--;
@@ -2083,7 +2087,7 @@ void _XAie_TxnResourceCleanup(XAie_DevInst *DevInst)
 	XAie_TxnInst *TxnInst;
 
 	while(NodePtr != NULL) {
-		TxnInst = XAIE_CONTAINER_OF(NodePtr, XAie_TxnInst, Node);
+		TxnInst = (XAie_TxnInst*)(uintptr_t)XAIE_CONTAINER_OF(NodePtr, XAie_TxnInst, Node);
 
 		if (TxnInst == NULL) {
 			 continue;
@@ -2903,10 +2907,18 @@ AieRC XAie_Txn_MergeSync(XAie_DevInst *DevInst, u8 num_tokens, u8 num_cols)
 		}
 
 		u32* tctDataBuff = (u32 *)calloc(sizeof(tct_op_t), 1);
-		tctDataBuff[0] = ((0x000000FF & num_tokens) || (0x0000FF00 & (num_cols << 8)));
-		TxnInst->CmdBuf[TxnInst->NumCmds].Opcode = XAIE_IO_CUSTOM_OP_MERGE_SYNC;
-		TxnInst->CmdBuf[TxnInst->NumCmds].Size = (u32)sizeof(tct_op_t);
-		TxnInst->CmdBuf[TxnInst->NumCmds].DataPtr = (u64)tctDataBuff;
+		if(tctDataBuff!=NULL)
+		{
+			tctDataBuff[0] = ((0x000000FF & num_tokens) || (0x0000FF00 & (num_cols << 8)));
+			TxnInst->CmdBuf[TxnInst->NumCmds].Opcode = XAIE_IO_CUSTOM_OP_MERGE_SYNC;
+			TxnInst->CmdBuf[TxnInst->NumCmds].Size = (u32)sizeof(tct_op_t);
+			TxnInst->CmdBuf[TxnInst->NumCmds].DataPtr = (u64)tctDataBuff;
+		}
+		else
+		{
+			XAIE_ERROR("tctDataBuff equal to NULL\n");
+			return XAIE_ERR;
+		}
 
 		if (TX_DUMP_ENABLE) {
 			TxnCmdDump(&TxnInst->CmdBuf[TxnInst->NumCmds]);
@@ -2959,12 +2971,20 @@ AieRC XAie_Txn_DdrAddressPatch(XAie_DevInst *DevInst, u64 regaddr, u64 argidx,
 		}
 
 		patch_op_t* patchDataBuff = (patch_op_t *)calloc(sizeof(patch_op_t), 1);
-		patchDataBuff->regaddr = regaddr;
-		patchDataBuff->argidx = argidx;
-		patchDataBuff->argplus = argplus;
-		TxnInst->CmdBuf[TxnInst->NumCmds].Opcode = XAIE_IO_CUSTOM_OP_DDR_PATCH;
-		TxnInst->CmdBuf[TxnInst->NumCmds].Size = (u32)sizeof(patch_op_t);
-		TxnInst->CmdBuf[TxnInst->NumCmds].DataPtr = (u64)patchDataBuff;
+		if(patchDataBuff!=NULL)
+		{
+			patchDataBuff->regaddr = regaddr;
+			patchDataBuff->argidx = argidx;
+			patchDataBuff->argplus = argplus;
+			TxnInst->CmdBuf[TxnInst->NumCmds].Opcode = XAIE_IO_CUSTOM_OP_DDR_PATCH;
+			TxnInst->CmdBuf[TxnInst->NumCmds].Size = (u32)sizeof(patch_op_t);
+			TxnInst->CmdBuf[TxnInst->NumCmds].DataPtr = (u64)patchDataBuff;
+		}
+		else
+		{
+			XAIE_ERROR("patchDataBuff equal to NULL\n");
+			return XAIE_ERR;
+		}
 
 		if (TX_DUMP_ENABLE) {
 			TxnCmdDump(&TxnInst->CmdBuf[TxnInst->NumCmds]);
@@ -3086,7 +3106,7 @@ AieRC XAie_Txn_PmLoadEnd(XAie_DevInst *DevInst)
 
 		XAIE_DBG("PM Loading using Txn flow Completed\n");
 		DevInst->PmLoadingActive = 0;
-		
+
 		return XAIE_OK;
 	}
 

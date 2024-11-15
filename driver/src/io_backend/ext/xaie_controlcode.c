@@ -201,7 +201,6 @@ static void _XAie_StartNewPage(XAie_ControlCodeIO  *ControlCodeInst) {
 	}
 
 	ControlCodeInst->UcPageTextSize	= 0;
-	ControlCodeInst->UcPageSize 	 = PAGE_HEADER_SIZE + ISA_OPSIZE_EOF;
 	ControlCodeInst->CombineCommands = 0;
 	ControlCodeInst->IsPageOpen 	 = 1;
 }
@@ -276,6 +275,7 @@ static AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC +
 			UC_DMA_BD_SIZE + UC_DMA_WORD_LEN + DataAligner) > ControlCodeInst->PageSizeMax) {
+			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst);
 		}
 
@@ -366,6 +366,7 @@ static AieRC XAie_ControlCodeIO_MaskWrite32(void *IOInst, u64 RegOff, u32 Mask,
 
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_MASK_WRITE_32 +
 			DataAligner) > ControlCodeInst->PageSizeMax) {
+			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst);
 		}
 
@@ -415,6 +416,7 @@ static AieRC XAie_ControlCodeIO_MaskPoll(void *IOInst, u64 RegOff, u32 Mask, u32
 
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_MASK_POLL_32 +
 			DataAligner) > ControlCodeInst->PageSizeMax) {
+			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst);
 		}
 
@@ -468,6 +470,7 @@ static AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32
 
 			if((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC +
 				UC_DMA_BD_SIZE + UC_DMA_WORD_LEN + DataAligner) > ControlCodeInst->PageSizeMax) {
+				_XAie_StartNewPage(ControlCodeInst);
 				_XAie_StartNewJob(ControlCodeInst);
 			}
 
@@ -509,19 +512,11 @@ static AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32
 				ControlCodeInst->UcPageSize += UC_DMA_WORD_LEN;
 			}
 
-			if(IterationSize < Size)
-			{
-				fprintf(ControlCodeInst->ControlCodedatafp,
-						"\t UC_DMA_BD\t 0, 0x%lx, @DMAWRITE_data_%d, 0x%x, 0, 0\n",
-						(RegOff + AdjustedOff),  ControlCodeInst->UcDmaDataNum, IterationSize - TempItrSize );
-						TempItrSize = IterationSize;
-			}
-			else
-			{
-				fprintf(ControlCodeInst->ControlCodedatafp,
-						"\t UC_DMA_BD\t 0, 0x%lx, @DMAWRITE_data_%d, 0x%x, 0, 0\n",
-						(RegOff + AdjustedOff),  ControlCodeInst->UcDmaDataNum, (Size - TempItrSize) );
-			}
+			fprintf(ControlCodeInst->ControlCodedatafp,
+					"\t UC_DMA_BD\t 0, 0x%lx, @DMAWRITE_data_%d, 0x%x, 0, 0\n",
+					(RegOff + AdjustedOff),  ControlCodeInst->UcDmaDataNum, IterationSize - TempItrSize );
+			TempItrSize = IterationSize;
+
 			AdjustedOff += (IterationSize * UC_DMA_WORD_LEN);
 			CompletedSize += IterationSize;
 			ControlCodeInst->UcDmaDataNum++;
@@ -570,6 +565,7 @@ static AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u
 
 			if((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC +
 				UC_DMA_BD_SIZE + UC_DMA_WORD_LEN + DataAligner) > ControlCodeInst->PageSizeMax) {
+				_XAie_StartNewPage(ControlCodeInst);
 				_XAie_StartNewJob(ControlCodeInst);
 			}
 
@@ -649,6 +645,7 @@ static AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u8 Arg_Index, u8 N
 
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_APPLY_OFFSET_57 + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC
 			+ (Num_BDs * (UC_DMA_BD_SIZE + UC_DMA_WORD_LEN * 9)) + DataAligner) > ControlCodeInst->PageSizeMax) {
+			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst);
 		}
 		
@@ -658,6 +655,60 @@ static AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u8 Arg_Index, u8 N
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_APPLY_OFFSET_57;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_APPLY_OFFSET_57;
 	}
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the function to generate code for wait for task complete token.
+*
+* @param	DevInst: Device instance pointer
+* @param	Column: Column number.
+* @param	Row: Row number.Mask to be applied to Data.
+* @param	Channel: Channel number.
+* @param	NumTokens: Number of tokens to wait for completion.
+
+* @return	0 on success.
+*
+*
+*******************************************************************************/
+AieRC XAie_WaitTaskCompleteToken(XAie_DevInst *DevInst,
+	uint16_t Column, uint16_t Row, uint32_t Channel, uint8_t NumTokens)
+{
+	if (DevInst->Backend->Type != XAIE_IO_BACKEND_CONTROLCODE) {
+		XAIE_ERROR("This is supported only in Controlcode Backend %d \n", DevInst->Backend->Type);
+		return XAIE_INVALID_BACKEND;
+	}
+
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
+	uint32_t TileId;
+	u32 DataAligner = (DATA_SECTION_ALIGNMENT -
+		(ControlCodeInst->UcPageTextSize % DATA_SECTION_ALIGNMENT));
+	if (DataAligner == DATA_SECTION_ALIGNMENT) {
+		DataAligner = 0U;
+	}
+
+	if (ControlCodeInst->ControlCodefp != NULL) {
+
+		if (!ControlCodeInst->IsJobOpen) {
+			_XAie_StartNewJob(ControlCodeInst);
+		}
+
+		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_TCTS +
+			DataAligner) > ControlCodeInst->PageSizeMax) {
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_StartNewJob(ControlCodeInst);
+		}
+
+		TileId = ((Column << 5) | Row);
+		fprintf(ControlCodeInst->ControlCodefp, "WAIT_TCTS\t 0x%x, 0x%x, 0x%x\n",
+				TileId, Channel, NumTokens );
+		ControlCodeInst->CombineCommands = 0;
+		ControlCodeInst->UcPageSize += ISA_OPSIZE_WAIT_TCTS;
+		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_WAIT_TCTS;
+	}
+
 	return XAIE_OK;
 }
 
@@ -1004,59 +1055,6 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 		ControlCodeInst->ControlCodedata2fp	= NULL;
 		ControlCodeInst->ControlCodedata3fp	= NULL;
 	}
-}
-
-/*****************************************************************************/
-/**
-*
-* This is the function to generate code for wait for task complete token.
-*
-* @param	DevInst: Device instance pointer
-* @param	Column: Column number.
-* @param	Row: Row number.Mask to be applied to Data.
-* @param	Channel: Channel number.
-* @param	NumTokens: Number of tokens to wait for completion.
-
-* @return	0 on success.
-*
-*
-*******************************************************************************/
-AieRC XAie_WaitTaskCompleteToken(XAie_DevInst *DevInst,
-	uint16_t Column, uint16_t Row, uint32_t Channel, uint8_t NumTokens)
-{
-	if (DevInst->Backend->Type != XAIE_IO_BACKEND_CONTROLCODE) {
-		XAIE_ERROR("This is supported only in Controlcode Backend %d \n", DevInst->Backend->Type);
-		return XAIE_INVALID_BACKEND;
-	}
-
-	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
-	uint32_t TileId;
-	u32 DataAligner = (DATA_SECTION_ALIGNMENT -
-		(ControlCodeInst->UcPageTextSize % DATA_SECTION_ALIGNMENT));
-	if (DataAligner == DATA_SECTION_ALIGNMENT) {
-		DataAligner = 0U;
-	}
-
-	if (ControlCodeInst->ControlCodefp != NULL) {
-
-		if (!ControlCodeInst->IsJobOpen) {
-			_XAie_StartNewJob(ControlCodeInst);
-		}
-
-		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_TCTS +
-			DataAligner) > ControlCodeInst->PageSizeMax) {
-			_XAie_StartNewJob(ControlCodeInst);
-		}
-
-		TileId = ((Column << 5) | Row);
-		fprintf(ControlCodeInst->ControlCodefp, "WAIT_TCTS\t 0x%x, 0x%x, 0x%x\n",
-				TileId, Channel, NumTokens );
-		ControlCodeInst->CombineCommands = 0;
-		ControlCodeInst->UcPageSize += ISA_OPSIZE_WAIT_TCTS;
-		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_WAIT_TCTS;
-	}
-
-	return XAIE_OK;
 }
 
 #else

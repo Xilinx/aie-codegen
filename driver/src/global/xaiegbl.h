@@ -903,6 +903,8 @@ XAIE_AIG_EXPORT AieRC XAie_EndJob(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_PerfUtilization(XAie_DevInst *DevInst, XAie_PerfInst *PerfInst);
 XAIE_AIG_EXPORT AieRC XAie_ConfigMemInterleaving(XAie_DevInst *DevInst,
 		XAie_LocType *Locs, u32 NumTiles, u8 Enable);
+XAIE_AIG_EXPORT AieRC XAie_GetCtrlPktHndlrStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u32 *Status);
 /*****************************************************************************/
 /*
 *

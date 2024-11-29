@@ -1195,4 +1195,44 @@ AieRC XAie_ConfigMemInterleaving(XAie_DevInst *DevInst,
 	return XAIE_OK;
 }
 
+/*****************************************************************************/
+/**
+ *
+ * This API is to read the control packet handler status of given tile.
+ *
+ * @param	DevInst - Global AIE device instance pointer.
+ * @param	Loc - Tile locatations
+ * @param	Status - Pointer to store the status register value
+ *
+ * @return	XAIE_OK on success and error code on failure.
+ *
+ * @note	None.
+ *
+ ******************************************************************************/
+AieRC XAie_GetCtrlPktHndlrStatus(XAie_DevInst *DevInst, XAie_LocType Loc, u32 *Status)
+{
+	AieRC RC = XAIE_OK;
+	const XAie_CtrlPktHndlrMod *CtrlPktMod;
+	u64 RegAddr;
+	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+
+	CtrlPktMod = DevInst->DevProp.DevMod[TileType].CtrlPktHndlrMod;
+	if (!CtrlPktMod) {
+		XAIE_ERROR("Control packet handler module is not initialised\n");
+		return XAIE_ERR;
+	}
+
+	RegAddr = CtrlPktMod->CtrlPktHndlrRegOff;
+	if (_XAie_IsTileResourceInSharedAddrSpace(DevInst->DevProp.DevGen, TileType) &&
+		(DevInst->AppMode == APPLICATION_B))
+		RegAddr = _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen,
+						CtrlPktMod->CtrlPktHndlrRegOff);
+
+	RC = XAie_Read32(DevInst, RegAddr, Status);
+	if (RC != XAIE_OK)
+		XAIE_ERROR("Failed to read control packet handler status\n");
+
+	return RC;
+}
+
 /** @}@} */

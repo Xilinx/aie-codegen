@@ -908,6 +908,12 @@ typedef struct XAie_ClockMod {
 	const XAie_RegFldAttr NextTileClockCntrl;
 } XAie_ClockMod;
 
+/* This structure captures all attributes related to Control Packet Handler Module */
+typedef struct XAie_CtrlPktHndlrMod {
+	u64 CtrlPktHndlrRegOff;
+	const XAie_RegFldAttr SlvErrOnAccess;
+} XAie_CtrlPktHndlrMod;
+
 /*
  * This structure captures all attributes related to first level interrupt
  * controller.
@@ -1019,6 +1025,7 @@ struct XAie_TileMod {
 	const XAie_UcMod *UcMod;
 	const XAie_NocMod *NocMod;
 	const XAie_StrmMod *StrmSw32b;
+	const XAie_CtrlPktHndlrMod *CtrlPktHndlrMod;
 };
 
 

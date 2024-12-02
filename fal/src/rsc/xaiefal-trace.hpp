@@ -376,6 +376,8 @@ namespace xaiefal {
 			}
 			if (RC != XAIE_OK) {
 				vRscs.clear();
+			} else {
+				reservedId = vRscs[0].RscId;
 			}
 			return RC;
 		}
@@ -687,6 +689,8 @@ namespace xaiefal {
 				vRscs[0].Mod = Mod;
 				vRscs[0].RscId = Slot;
 			}
+
+			reservedId = vRscs[0].RscId;
 			return RC;
 		}
 		AieRC _release() {

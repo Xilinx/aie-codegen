@@ -993,6 +993,7 @@ namespace xaiefal {
 					return 0U;
 
 				return EventMod->NumGroupEvents;
+
 			}
 			default:
 				return 0U;

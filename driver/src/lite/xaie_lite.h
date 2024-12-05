@@ -64,7 +64,8 @@
 #include "xaie_lite_aieml.h"
 #include "xaie_lite_shim_aie2p.h"
 #elif ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
-	 	(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA))
+	 	(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA) || \
+		(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE))
 #include "xaie_lite_aie4.h"
 #include "xaie_lite_shim_aie4.h"
 #else

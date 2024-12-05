@@ -247,7 +247,8 @@
 
 
 #elif ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
-	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA))
+	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA) || \
+	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE))
 
 //To-Do - Update register count ,address and other details with new specification if required
 #ifdef __AIEIPU__

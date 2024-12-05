@@ -46,7 +46,8 @@
 #include "xaie_lite_aieml.h"
 #include "xaie_lite_shim_aie2p.h"
 #elif ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
-	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA))
+	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA) || \
+	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE))
 #include "xaie_lite_aie4.h"
 #include "xaie_lite_shim_aie4.h"
 #else
@@ -71,10 +72,12 @@
 #endif
 
 #define DEV_GEN_AIE4 ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
-						(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA))
+	   			(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA) || \
+	   			(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE))
 
 #define DEV_GEN_DUAL_APP ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
-						(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA))
+	   			(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA) || \
+	   			(XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE))
 
 #define _XAie_LIsDeviceGenAIE4() DEV_GEN_AIE4
 #define _XAie_LIsDeviceGenSupportDualApp() DEV_GEN_DUAL_APP

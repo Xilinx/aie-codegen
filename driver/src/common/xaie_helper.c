@@ -3506,6 +3506,7 @@ u8 _XAie_IsDeviceGenAIE4(u8 DevGen)
 	switch(DevGen) {
 	case XAIE_DEV_GEN_AIE4:
 	case XAIE_DEV_GEN_AIE4_MEDUSA:
+	case XAIE_DEV_GEN_AIE4_SOUNDWAVE:
 		return true;
 	default:
 		return false;
@@ -3532,6 +3533,7 @@ u8 _XAie_IsDeviceGenSupportDualApp(u8 DevGen)
 		switch(DevGen){
 		case XAIE_DEV_GEN_AIE4:
 		case XAIE_DEV_GEN_AIE4_MEDUSA:
+		case XAIE_DEV_GEN_AIE4_SOUNDWAVE:
 			return true;
 		default:
 			return false;
@@ -3650,6 +3652,7 @@ static inline u32 XAie_Mask_Value(u8 devGen)
 	switch(devGen) {
 	case XAIE_DEV_GEN_AIE4:
 	case XAIE_DEV_GEN_AIE4_MEDUSA:
+	case XAIE_DEV_GEN_AIE4_SOUNDWAVE:
 		return XAIE4_MASK_VALUE_APP_B;
 
 	default:

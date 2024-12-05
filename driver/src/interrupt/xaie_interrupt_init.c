@@ -664,6 +664,7 @@ static AieRC _XAie_GroupErrorInit(XAie_DevInst *DevInst)
 		
 		case XAIE_DEV_GEN_AIE4:
 		case XAIE_DEV_GEN_AIE4_MEDUSA:
+		case XAIE_DEV_GEN_AIE4_SOUNDWAVE:
 			/**
 			 * In AIE4, L1 interrupt controller has been removed.
 			 * Hence using the event broadcast switch logic to
@@ -1299,6 +1300,7 @@ AieRC XAie_ErrorHandlingInit(XAie_DevInst *DevInst)
 	switch (DevInst->DevProp.DevGen) {	
 	case XAIE_DEV_GEN_AIE4:
 	case XAIE_DEV_GEN_AIE4_MEDUSA:
+	case XAIE_DEV_GEN_AIE4_SOUNDWAVE:
 		RC = _XAie_ErrorHandlingInitAie4(DevInst);
 		break;
 	default:

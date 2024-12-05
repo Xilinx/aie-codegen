@@ -88,6 +88,9 @@ extern u8 XAieDevType;
 #elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA
 #define XAIE_DEV_SINGLE_MOD Aie4MedusaMod
 #define XAIE_DEV_SINGLE_DEVOPS Aie4MedusaDevOps
+#elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE
+#define XAIE_DEV_SINGLE_MOD Aie4MedusaMod
+#define XAIE_DEV_SINGLE_DEVOPS Aie4MedusaDevOps
 #else
 #ifdef XAIE_DEV_SINGLE_GEN
 #error "Unsupported device defined."
@@ -203,6 +206,10 @@ AieRC XAie_CfgInitialize(XAie_DevInst *InstPtr, XAie_Config *ConfigPtr)
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4;
 		InstPtr->DevOps = &Aie4DevOps;
 	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_MEDUSA) {
+		InstPtr->DevProp.DevMod = Aie4MedusaMod;
+		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_MEDUSA;
+		InstPtr->DevOps = &Aie4MedusaDevOps;
+	}else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_SOUNDWAVE) {
 		InstPtr->DevProp.DevMod = Aie4MedusaMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_MEDUSA;
 		InstPtr->DevOps = &Aie4MedusaDevOps;

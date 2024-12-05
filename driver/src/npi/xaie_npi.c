@@ -57,7 +57,8 @@ static XAie_NpiMod *_XAie_NpiGetMod(XAie_DevInst *DevInst)
 		DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_A0 ||
 		DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_B0 ||
 		DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4 ||
-		DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_MEDUSA) {
+		DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_MEDUSA ||
+		DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_SOUNDWAVE) {
 		return &_XAieMlNpiMod;
 	}
 

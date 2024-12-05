@@ -424,7 +424,7 @@ static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enab
 {
 	AieRC RC = XAIE_OK;
 	u64 RegAddr;
-	const XAie_MemCtrlMod *MCtrlMod;
+	const XAie_MemCtrlMod *MCtrlMod = XAIE_NULL;
 	u8 C, R;
 
 	for(C = 0; C < DevInst->NumCols; C++) {

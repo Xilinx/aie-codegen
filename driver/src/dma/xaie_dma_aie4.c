@@ -332,8 +332,7 @@ AieRC _XAie4_DmaSetMultiDim(XAie_DmaDesc *DmaDesc, XAie_DmaTensor *Tensor)
 
 	for(u8 i = 0U; i < Tensor->NumDim; i++) {
 		const XAie_DmaBdProp *BdProp = DmaDesc->DmaMod->BdProp;
-		if(((u8)i > 0U) && ((Tensor->Dim[i].AieMlDimDesc.StepSize == 0U) ||
-							(Tensor->Dim[i].AieMlDimDesc.StepSize > (u32)BdProp->StepSizeMax))) {
+		if(((u8)i > 0U) && (Tensor->Dim[i].AieMlDimDesc.StepSize > (u32)BdProp->StepSizeMax)) {
 			XAIE_ERROR("Invalid stepsize for dimension %d\n", i);
 			return XAIE_ERR;
 		}

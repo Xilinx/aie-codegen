@@ -1545,15 +1545,25 @@ AieRC _XAie4_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 
 	/* Setup BdWord with the right values from DmaDesc */
 
-	if (_XAie_CheckPrecisionExceeds(BdProp->Buffer->ShimDmaBuff.AddrHigh.Lsb,
+	if ((_XAie_CheckPrecisionExceeds(BdProp->SysProp->AxUser.Lsb,
+			_XAie_MaxBitsNeeded(DmaDesc->AxiDesc.AxUser), MAX_VALID_AIE_REG_BIT_INDEX)) ||
+		(_XAie_CheckPrecisionExceeds(BdProp->SysProp->KeyIdx.Lsb,
+			_XAie_MaxBitsNeeded(DmaDesc->AxiDesc.KeyIdx), MAX_VALID_AIE_REG_BIT_INDEX)) ||
+		(_XAie_CheckPrecisionExceeds(BdProp->Buffer->ShimDmaBuff.AddrHigh.Lsb,
 			_XAie_MaxBitsNeeded((DmaDesc->AddrDesc.Address >> 32U) & 0xFFFFFFFFU),
-			MAX_VALID_AIE_REG_BIT_INDEX)) {
+			MAX_VALID_AIE_REG_BIT_INDEX))) {
 		XAIE_ERROR("Check Precision Exceeds Failed\n");
 		return XAIE_ERR;
 	}
-	BdWord[0U] = XAie_SetField((DmaDesc->AddrDesc.Address >> 32U),
-			BdProp->Buffer->ShimDmaBuff.AddrHigh.Lsb,
-			BdProp->Buffer->ShimDmaBuff.AddrHigh.Mask);
+	BdWord[0U] = XAie_SetField(DmaDesc->AxiDesc.AxUser,
+					BdProp->SysProp->AxUser.Lsb,
+					BdProp->SysProp->AxUser.Mask) |
+			XAie_SetField(DmaDesc->AxiDesc.KeyIdx,
+				BdProp->SysProp->KeyIdx.Lsb,
+				BdProp->SysProp->KeyIdx.Mask) |
+			XAie_SetField((DmaDesc->AddrDesc.Address >> 32U),
+				BdProp->Buffer->ShimDmaBuff.AddrHigh.Lsb,
+				BdProp->Buffer->ShimDmaBuff.AddrHigh.Mask);
 
 	BdWord[1U] = XAie_SetField(DmaDesc->AddrDesc.Address >>	BdProp->Buffer->ShimDmaBuff.AddrLow.Lsb,
 			BdProp->Buffer->ShimDmaBuff.AddrLow.Lsb,
@@ -1661,6 +1671,9 @@ AieRC _XAie4_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		(_XAie_CheckPrecisionExceeds(BdProp->AddrMode->AieMlMultiDimAddr.IterCurr.Lsb,
 			_XAie_MaxBitsNeeded(DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterCurr),
 			MAX_VALID_AIE_REG_BIT_INDEX)) ||
+		(_XAie_CheckPrecisionExceeds(BdProp->SysProp->DataReuse.Lsb,
+			_XAie_MaxBitsNeeded(DmaDesc->AxiDesc.DataReuse),
+			MAX_VALID_AIE_REG_BIT_INDEX)) ||
 		(_XAie_CheckPrecisionExceeds(BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Lsb,
 			_XAie_MaxBitsNeeded(DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[2U].StepSize),
 			MAX_VALID_AIE_REG_BIT_INDEX))) {
@@ -1677,6 +1690,9 @@ AieRC _XAie4_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		XAie_SetField(DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterCurr,
 				BdProp->AddrMode->AieMlMultiDimAddr.IterCurr.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.IterCurr.Mask) |
+		XAie_SetField(DmaDesc->AxiDesc.DataReuse,
+				BdProp->SysProp->DataReuse.Lsb,
+				BdProp->SysProp->DataReuse.Mask) |
 		XAie_SetField((DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[2U].StepSize),
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Mask);
@@ -1704,11 +1720,13 @@ AieRC _XAie4_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.StepSize.Mask);
 
 	if ((_XAie_CheckPrecisionExceeds(BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[3U].StepSize.Lsb,
-			_XAie_MaxBitsNeeded(DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[3U].StepSize),MAX_VALID_AIE_REG_BIT_INDEX)) ||
+			_XAie_MaxBitsNeeded(DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[3U].StepSize), MAX_VALID_AIE_REG_BIT_INDEX)) ||
+		(_XAie_CheckPrecisionExceeds(BdProp->SysProp->IOCoherence.Lsb,
+				_XAie_MaxBitsNeeded(DmaDesc->AxiDesc.IOCoherence), MAX_VALID_AIE_REG_BIT_INDEX)) ||
 		(_XAie_CheckPrecisionExceeds(BdProp->BdEn->OutofOrderBdId.Lsb,
-				_XAie_MaxBitsNeeded(DmaDesc->BdEnDesc.OutofOrderBdId),MAX_VALID_AIE_REG_BIT_INDEX)) ||
+				_XAie_MaxBitsNeeded(DmaDesc->BdEnDesc.OutofOrderBdId), MAX_VALID_AIE_REG_BIT_INDEX)) ||
 		(_XAie_CheckPrecisionExceeds(BdProp->Pkt->PktId.Lsb,
-			_XAie_MaxBitsNeeded(DmaDesc->PktDesc.PktId),MAX_VALID_AIE_REG_BIT_INDEX))) {
+			_XAie_MaxBitsNeeded(DmaDesc->PktDesc.PktId), MAX_VALID_AIE_REG_BIT_INDEX))) {
 		XAIE_ERROR("Check Precision Exceeds Failed\n");
 		return XAIE_ERR;
 	}
@@ -1716,6 +1734,9 @@ AieRC _XAie4_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 	BdWord[8U] = XAie_SetField((DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[3U].StepSize),
 			BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[3U].StepSize.Lsb,
 			BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[3U].StepSize.Mask) |
+		XAie_SetField(DmaDesc->AxiDesc.IOCoherence,
+				BdProp->SysProp->IOCoherence.Lsb,
+				BdProp->SysProp->IOCoherence.Mask) |
 		XAie_SetField(DmaDesc->BdEnDesc.OutofOrderBdId,
 				BdProp->BdEn->OutofOrderBdId.Lsb,
 				BdProp->BdEn->OutofOrderBdId.Mask) |
@@ -2352,6 +2373,23 @@ AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		Addr += 4U;
 	}
 
+	if (_XAie_CheckPrecisionExceedsForRightShift(BdProp->SysProp->AxUser.Lsb,
+			BdProp->SysProp->AxUser.Mask)) {
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
+	DmaDesc->AxiDesc.AxUser = (u64)XAie_GetField(BdWord[0U],
+			BdProp->SysProp->AxUser.Lsb,
+			BdProp->SysProp->AxUser.Mask) & 0xFFU;
+
+	if (_XAie_CheckPrecisionExceedsForRightShift(BdProp->SysProp->KeyIdx.Lsb,
+			BdProp->SysProp->KeyIdx.Mask)) {
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
+	DmaDesc->AxiDesc.KeyIdx = (u64)XAie_GetField(BdWord[0U],
+			BdProp->SysProp->KeyIdx.Lsb,
+			BdProp->SysProp->KeyIdx.Mask) & 0xFFU;
 
 	if (_XAie_CheckPrecisionExceedsForRightShift(BdProp->Buffer->ShimDmaBuff.AddrHigh.Lsb,
 			BdProp->Buffer->ShimDmaBuff.AddrHigh.Mask)) {
@@ -2545,6 +2583,15 @@ AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 				BdProp->AddrMode->AieMlMultiDimAddr.IterCurr.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.IterCurr.Mask) & 0xFFU;
 
+	if (_XAie_CheckPrecisionExceedsForRightShift(BdProp->SysProp->DataReuse.Lsb,
+			BdProp->SysProp->DataReuse.Mask)) {
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
+	DmaDesc->AxiDesc.DataReuse = XAie_GetField(BdWord[6U],
+			BdProp->SysProp->DataReuse.Lsb,
+			BdProp->SysProp->DataReuse.Mask) & 0xFFU;
+
 	if (_XAie_CheckPrecisionExceedsForRightShift(BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Lsb,
 			BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Mask)) {
 		XAIE_ERROR("Check Precision Exceeds Failed\n");
@@ -2595,6 +2642,15 @@ AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		XAie_GetField(BdWord[8U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[3U].StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[3U].StepSize.Mask);
+	
+	if (_XAie_CheckPrecisionExceedsForRightShift(BdProp->SysProp->IOCoherence.Lsb,
+			BdProp->SysProp->IOCoherence.Mask)) {
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
+	DmaDesc->AxiDesc.IOCoherence = XAie_GetField(BdWord[8U],
+			BdProp->SysProp->IOCoherence.Lsb,
+			BdProp->SysProp->IOCoherence.Mask) & 0xFFU;
 
 	if (_XAie_CheckPrecisionExceedsForRightShift(BdProp->BdEn->OutofOrderBdId.Lsb,
 			BdProp->BdEn->OutofOrderBdId.Mask)) {
@@ -2653,6 +2709,31 @@ AieRC _XAie4_DmaSetBdIteration(XAie_DmaDesc *DmaDesc, u32 StepSize, u16 Wrap,
 	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterCurr = IterCurr;
 
 	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API checks for correct Burst length.
+*
+* @param	BurstLen: Burst length to check if it has correct value or not.
+*
+* @return	XAIE_OK on success, Error code on failure.
+*
+* @note		Internal only.
+*
+******************************************************************************/
+AieRC _XAie4_AxiBurstLenCheck(u8 BurstLen)
+{
+	switch (BurstLen) {
+	case 1:
+	case 2:
+	case 4:
+	case 8:
+		return XAIE_OK;
+	default:
+		return XAIE_INVALID_BURST_LENGTH;
+	}
 }
 
 #endif /* XAIE_FEATURE_DMA_ENABLE */

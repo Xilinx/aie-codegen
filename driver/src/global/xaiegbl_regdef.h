@@ -473,6 +473,10 @@ typedef struct {
 	XAie_RegBdFldAttr AxQos;
 	XAie_RegBdFldAttr SecureAccess;
 	XAie_RegBdFldAttr AxCache;
+	XAie_RegBdFldAttr AxUser;
+	XAie_RegBdFldAttr IOCoherence;
+	XAie_RegBdFldAttr KeyIdx;
+	XAie_RegBdFldAttr DataReuse;
 } XAie_DmaSysProp;
 
 /*

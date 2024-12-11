@@ -97,6 +97,8 @@ XAIE_AIG_EXPORT AieRC XAie_DmaEnableBd(XAie_DmaDesc *DmaDesc);
 XAIE_AIG_EXPORT AieRC XAie_DmaDisableBd(XAie_DmaDesc *DmaDesc);
 XAIE_AIG_EXPORT AieRC XAie_DmaSetAxi(XAie_DmaDesc *DmaDesc, u8 Smid, u8 BurstLen, u8 Qos,
 		u8 Cache, u8 Secure);
+XAIE_AIG_EXPORT	AieRC XAie_DmaSetAxi_AxUser(XAie_DmaDesc *DmaDesc, u8 AxUser, u8 IOCoherence, u8 KeyIdx,
+		u8 DataReuse);
 XAIE_AIG_EXPORT AieRC XAie_DmaSetInterleaveEnable(XAie_DmaDesc *DmaDesc, u8 DoubleBuff,
 		u8 IntrleaveCount, u16 IntrleaveCurr);
 XAIE_AIG_EXPORT AieRC XAie_DmaWriteBd(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,

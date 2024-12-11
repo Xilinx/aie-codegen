@@ -361,6 +361,10 @@ typedef struct {
 	u8 AxQos;
 	u8 SecureAccess;
 	u8 AxCache;
+	u8 AxUser;
+	u8 IOCoherence;
+	u8 KeyIdx;
+	u8 DataReuse;
 } XAie_DmaAxiDesc;
 
 typedef struct {

@@ -92,15 +92,7 @@ XAIE_AIG_EXPORT AieRC XAie_DmaEnableCompression(XAie_DmaDesc *DmaDesc);
 XAIE_AIG_EXPORT AieRC XAie_DmaConfigFifoMode(XAie_DmaDesc *DmaDesc,
 		XAie_DmaFifoCounter Counter);
 XAIE_AIG_EXPORT AieRC XAie_DmaGetNumBds(XAie_DevInst *DevInst, XAie_LocType Loc, u8 *NumBds);
-XAIE_AIG_EXPORT AieRC XAie_DmaGetNumBdsPvtBuffPool(XAie_DevInst *DevInst, XAie_LocType Loc,
-		u8 ChNum, XAie_DmaDirection Dir, u8 *NumBds);
-XAIE_AIG_EXPORT AieRC XAie_DmaGetNumBdsGeneric(XAie_DevInst *DevInst, XAie_LocType Loc,
-		u8 ChNum, XAie_DmaDirection Dir, u8 *NumBds);
 XAIE_AIG_EXPORT AieRC XAie_DmaSetNextBd(XAie_DmaDesc *DmaDesc, u16 NextBd, u8 EnableNextBd);
-XAIE_AIG_EXPORT AieRC XAie_DmaSetNextBdPvtBuffPool(XAie_DmaDesc *DmaDesc, 
-			u8 ChNum, XAie_DmaDirection Dir, u16 NextBd, u8 EnableNextBd);
-XAIE_AIG_EXPORT AieRC XAie_DmaSetNextBdGeneric(XAie_DmaDesc *DmaDesc, 
-			u8 ChNum, XAie_DmaDirection Dir, u16 NextBd, u8 EnableNextBd);
 XAIE_AIG_EXPORT AieRC XAie_DmaEnableBd(XAie_DmaDesc *DmaDesc);
 XAIE_AIG_EXPORT AieRC XAie_DmaDisableBd(XAie_DmaDesc *DmaDesc);
 XAIE_AIG_EXPORT AieRC XAie_DmaSetAxi(XAie_DmaDesc *DmaDesc, u8 Smid, u8 BurstLen, u8 Qos,
@@ -113,14 +105,6 @@ XAIE_AIG_EXPORT AieRC XAie_DmaWriteBd(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDe
 		XAie_LocType Loc, u16 BdNum);
 XAIE_AIG_EXPORT AieRC XAie_DmaReadBd(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
 		XAie_LocType Loc, u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaWriteBdPvtBuffPool(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
-		 XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaReadBdPvtBuffPool(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaWriteBdGeneric(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
-		 XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaReadBdGeneric(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u16 BdNum);		
 XAIE_AIG_EXPORT AieRC XAie_DmaChannelResetAll(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_DmaChReset Reset);
 XAIE_AIG_EXPORT AieRC XAie_DmaChannelReset(XAie_DevInst *DevInst, XAie_LocType Loc,
@@ -172,23 +156,10 @@ XAIE_AIG_EXPORT AieRC XAie_DmaTlastEnable(XAie_DmaDesc *DmaDesc);
 XAIE_AIG_EXPORT AieRC XAie_DmaTlastDisable(XAie_DmaDesc *DmaDesc);
 XAIE_AIG_EXPORT AieRC XAie_DmaGetBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 *Len,
 		u16 BdNum);
-
 XAIE_AIG_EXPORT AieRC XAie_DmaUpdateBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Len,
 		u16 BdNum);
 XAIE_AIG_EXPORT AieRC XAie_DmaUpdateBdAddr(XAie_DevInst *DevInst, XAie_LocType Loc, u64 Addr,
 		u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaGetBdLenPvtBuffPool(XAie_DevInst *DevInst, XAie_LocType Loc, 
-		u8 ChNum, XAie_DmaDirection Dir, u32 *Len,	u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaUpdateBdLenPvtBuffPool(XAie_DevInst *DevInst, XAie_LocType Loc,
-		u8 ChNum, XAie_DmaDirection Dir, u32 Len, u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaUpdateBdAddrPvtBuffPool(XAie_DevInst *DevInst, XAie_LocType Loc,
-		u8 ChNum, XAie_DmaDirection Dir, u64 Addr,	u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaGetBdLenGeneric(XAie_DevInst *DevInst, XAie_LocType Loc, 
-		u8 ChNum, XAie_DmaDirection Dir, u32 *Len,	u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaUpdateBdLenGeneric(XAie_DevInst *DevInst, XAie_LocType Loc,
-		u8 ChNum, XAie_DmaDirection Dir, u32 Len, u16 BdNum);
-XAIE_AIG_EXPORT AieRC XAie_DmaUpdateBdAddrGeneric(XAie_DevInst *DevInst, XAie_LocType Loc,
-		u8 ChNum, XAie_DmaDirection Dir, u64 Addr,	u16 BdNum);		
 XAIE_AIG_EXPORT AieRC XAie_DmaSetPadValue(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		u32 PadValue);
 XAIE_AIG_EXPORT AieRC XAie_DmaGetChannelStatus(XAie_DevInst *DevInst, XAie_LocType Loc,

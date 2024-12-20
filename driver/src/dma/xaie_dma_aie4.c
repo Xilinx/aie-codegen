@@ -45,7 +45,50 @@
 #define XAIE4_DMA_STATUS_CHNUM_OFFSET			0x4U
 #define XAIE4_DMA_STATUS_TASK_Q_SIZE_MSB	24
 
-/*********************** Function Definitions *************************/
+XAie4_MemTileDmaBdChMap XAie4_MemTileDmaBdChLut[320] = {
+	/* 0  -  15 */
+	{0,DMA_S2MM, 0},{1,DMA_S2MM, 0},{2,DMA_S2MM, 0},{3,DMA_S2MM, 0},{4,DMA_S2MM, 0},{5,DMA_S2MM, 0},{6,DMA_S2MM, 0},{7,DMA_S2MM, 0},{8,DMA_S2MM, 0},{9,DMA_S2MM, 0},{10,DMA_S2MM, 0},{11,DMA_S2MM, 0},{12,DMA_S2MM, 0},{13,DMA_S2MM, 0},{14,DMA_S2MM, 0},{15,DMA_S2MM, 0},
+	/* 16  -  31 */
+	{0,DMA_S2MM, 1},{1,DMA_S2MM, 1},{2,DMA_S2MM, 1},{3,DMA_S2MM, 1},{4,DMA_S2MM, 1},{5,DMA_S2MM, 1},{6,DMA_S2MM, 1},{7,DMA_S2MM, 1},{8,DMA_S2MM, 1},{9,DMA_S2MM, 1},{10,DMA_S2MM, 1},{11,DMA_S2MM, 1},{12,DMA_S2MM, 1},{13,DMA_S2MM, 1},{14,DMA_S2MM, 1},{15,DMA_S2MM, 1},
+	/* 32  -  47 */
+	{0,DMA_S2MM, 2},{1,DMA_S2MM, 2},{2,DMA_S2MM, 2},{3,DMA_S2MM, 2},{4,DMA_S2MM, 2},{5,DMA_S2MM, 2},{6,DMA_S2MM, 2},{7,DMA_S2MM, 2},{8,DMA_S2MM, 2},{9,DMA_S2MM, 2},{10,DMA_S2MM, 2},{11,DMA_S2MM, 2},{12,DMA_S2MM, 2},{13,DMA_S2MM, 2},{14,DMA_S2MM, 2},{15,DMA_S2MM, 2},
+	/* 48  -  63 */
+	{0,DMA_S2MM, 3},{1,DMA_S2MM, 3},{2,DMA_S2MM, 3},{3,DMA_S2MM, 3},{4,DMA_S2MM, 3},{5,DMA_S2MM, 3},{6,DMA_S2MM, 3},{7,DMA_S2MM, 3},{8,DMA_S2MM, 3},{9,DMA_S2MM, 3},{10,DMA_S2MM, 3},{11,DMA_S2MM, 3},{12,DMA_S2MM, 3},{13,DMA_S2MM, 3},{14,DMA_S2MM, 3},{15,DMA_S2MM, 3},
+	/* 64  -  79 */
+	{0,DMA_S2MM, 4},{1,DMA_S2MM, 4},{2,DMA_S2MM, 4},{3,DMA_S2MM, 4},{4,DMA_S2MM, 4},{5,DMA_S2MM, 4},{6,DMA_S2MM, 4},{7,DMA_S2MM, 4},{8,DMA_S2MM, 4},{9,DMA_S2MM, 4},{10,DMA_S2MM, 4},{11,DMA_S2MM, 4},{12,DMA_S2MM, 4},{13,DMA_S2MM, 4},{14,DMA_S2MM, 4},{15,DMA_S2MM, 4},
+	/* 80  -  95 */
+	{0,DMA_S2MM, 5},{1,DMA_S2MM, 5},{2,DMA_S2MM, 5},{3,DMA_S2MM, 5},{4,DMA_S2MM, 5},{5,DMA_S2MM, 5},{6,DMA_S2MM, 5},{7,DMA_S2MM, 5},{8,DMA_S2MM, 5},{9,DMA_S2MM, 5},{10,DMA_S2MM, 5},{11,DMA_S2MM, 5},{12,DMA_S2MM, 5},{13,DMA_S2MM, 5},{14,DMA_S2MM, 5},{15,DMA_S2MM, 5},
+	/* 96  -  111 */
+	{0,DMA_S2MM, 6},{1,DMA_S2MM, 6},{2,DMA_S2MM, 6},{3,DMA_S2MM, 6},{4,DMA_S2MM, 6},{5,DMA_S2MM, 6},{6,DMA_S2MM, 6},{7,DMA_S2MM, 6},{8,DMA_S2MM, 6},{9,DMA_S2MM, 6},{10,DMA_S2MM, 6},{11,DMA_S2MM, 6},{12,DMA_S2MM, 6},{13,DMA_S2MM, 6},{14,DMA_S2MM, 6},{15,DMA_S2MM, 6},
+	/* 112  -  127 */
+	{0,DMA_S2MM, 7},{1,DMA_S2MM, 7},{2,DMA_S2MM, 7},{3,DMA_S2MM, 7},{4,DMA_S2MM, 7},{5,DMA_S2MM, 7},{6,DMA_S2MM, 7},{7,DMA_S2MM, 7},{8,DMA_S2MM, 7},{9,DMA_S2MM, 7},{10,DMA_S2MM, 7},{11,DMA_S2MM, 7},{12,DMA_S2MM, 7},{13,DMA_S2MM, 7},{14,DMA_S2MM, 7},{15,DMA_S2MM, 7},
+	/* 128  -  143 */
+	{0,DMA_MM2S, 0},{1,DMA_MM2S, 0},{2,DMA_MM2S, 0},{3,DMA_MM2S, 0},{4,DMA_MM2S, 0},{5,DMA_MM2S, 0},{6,DMA_MM2S, 0},{7,DMA_MM2S, 0},{8,DMA_MM2S, 0},{9,DMA_MM2S, 0},{10,DMA_MM2S, 0},{11,DMA_MM2S, 0},{12,DMA_MM2S, 0},{13,DMA_MM2S, 0},{14,DMA_MM2S, 0},{15,DMA_MM2S, 0},
+	/* 144  -  159 */
+	{0,DMA_MM2S, 1},{1,DMA_MM2S, 1},{2,DMA_MM2S, 1},{3,DMA_MM2S, 1},{4,DMA_MM2S, 1},{5,DMA_MM2S, 1},{6,DMA_MM2S, 1},{7,DMA_MM2S, 1},{8,DMA_MM2S, 1},{9,DMA_MM2S, 1},{10,DMA_MM2S, 1},{11,DMA_MM2S, 1},{12,DMA_MM2S, 1},{13,DMA_MM2S, 1},{14,DMA_MM2S, 1},{15,DMA_MM2S, 1},
+	/* 160  -  175 */
+	{0,DMA_MM2S, 2},{1,DMA_MM2S, 2},{2,DMA_MM2S, 2},{3,DMA_MM2S, 2},{4,DMA_MM2S, 2},{5,DMA_MM2S, 2},{6,DMA_MM2S, 2},{7,DMA_MM2S, 2},{8,DMA_MM2S, 2},{9,DMA_MM2S, 2},{10,DMA_MM2S, 2},{11,DMA_MM2S, 2},{12,DMA_MM2S, 2},{13,DMA_MM2S, 2},{14,DMA_MM2S, 2},{15,DMA_MM2S, 2},
+	/* 176  -  191 */
+	{0,DMA_MM2S, 3},{1,DMA_MM2S, 3},{2,DMA_MM2S, 3},{3,DMA_MM2S, 3},{4,DMA_MM2S, 3},{5,DMA_MM2S, 3},{6,DMA_MM2S, 3},{7,DMA_MM2S, 3},{8,DMA_MM2S, 3},{9,DMA_MM2S, 3},{10,DMA_MM2S, 3},{11,DMA_MM2S, 3},{12,DMA_MM2S, 3},{13,DMA_MM2S, 3},{14,DMA_MM2S, 3},{15,DMA_MM2S, 3},
+	/* 192  -  207 */
+	{0,DMA_MM2S, 4},{1,DMA_MM2S, 4},{2,DMA_MM2S, 4},{3,DMA_MM2S, 4},{4,DMA_MM2S, 4},{5,DMA_MM2S, 4},{6,DMA_MM2S, 4},{7,DMA_MM2S, 4},{8,DMA_MM2S, 4},{9,DMA_MM2S, 4},{10,DMA_MM2S, 4},{11,DMA_MM2S, 4},{12,DMA_MM2S, 4},{13,DMA_MM2S, 4},{14,DMA_MM2S, 4},{15,DMA_MM2S, 4},
+	/* 208  -  223 */
+	{0,DMA_MM2S, 5},{1,DMA_MM2S, 5},{2,DMA_MM2S, 5},{3,DMA_MM2S, 5},{4,DMA_MM2S, 5},{5,DMA_MM2S, 5},{6,DMA_MM2S, 5},{7,DMA_MM2S, 5},{8,DMA_MM2S, 5},{9,DMA_MM2S, 5},{10,DMA_MM2S, 5},{11,DMA_MM2S, 5},{12,DMA_MM2S, 5},{13,DMA_MM2S, 5},{14,DMA_MM2S, 5},{15,DMA_MM2S, 5},
+	/* 224  -  239 */
+	{0,DMA_MM2S, 6},{1,DMA_MM2S, 6},{2,DMA_MM2S, 6},{3,DMA_MM2S, 6},{4,DMA_MM2S, 6},{5,DMA_MM2S, 6},{6,DMA_MM2S, 6},{7,DMA_MM2S, 6},{8,DMA_MM2S, 6},{9,DMA_MM2S, 6},{10,DMA_MM2S, 6},{11,DMA_MM2S, 6},{12,DMA_MM2S, 6},{13,DMA_MM2S, 6},{14,DMA_MM2S, 6},{15,DMA_MM2S, 6},
+	/* 240  -  255 */
+	{0,DMA_MM2S, 7},{1,DMA_MM2S, 7},{2,DMA_MM2S, 7},{3,DMA_MM2S, 7},{4,DMA_MM2S, 7},{5,DMA_MM2S, 7},{6,DMA_MM2S, 7},{7,DMA_MM2S, 7},{8,DMA_MM2S, 7},{9,DMA_MM2S, 7},{10,DMA_MM2S, 7},{11,DMA_MM2S, 7},{12,DMA_MM2S, 7},{13,DMA_MM2S, 7},{14,DMA_MM2S, 7},{15,DMA_MM2S, 7},
+	/* 256  -  271 */
+	{0,DMA_MM2S, 8},{1,DMA_MM2S, 8},{2,DMA_MM2S, 8},{3,DMA_MM2S, 8},{4,DMA_MM2S, 8},{5,DMA_MM2S, 8},{6,DMA_MM2S, 8},{7,DMA_MM2S, 8},{8,DMA_MM2S, 8},{9,DMA_MM2S, 8},{10,DMA_MM2S, 8},{11,DMA_MM2S, 8},{12,DMA_MM2S, 8},{13,DMA_MM2S, 8},{14,DMA_MM2S, 8},{15,DMA_MM2S, 8},
+	/* 272  -  287 */
+	{0,DMA_MM2S, 9},{1,DMA_MM2S, 9},{2,DMA_MM2S, 9},{3,DMA_MM2S, 9},{4,DMA_MM2S, 9},{5,DMA_MM2S, 9},{6,DMA_MM2S, 9},{7,DMA_MM2S, 9},{8,DMA_MM2S, 9},{9,DMA_MM2S, 9},{10,DMA_MM2S, 9},{11,DMA_MM2S, 9},{12,DMA_MM2S, 9},{13,DMA_MM2S, 9},{14,DMA_MM2S, 9},{15,DMA_MM2S, 9},
+	/* 288  -  303 */
+	{0,DMA_MM2S,10},{1,DMA_MM2S,10},{2,DMA_MM2S,10},{3,DMA_MM2S,10},{4,DMA_MM2S,10},{5,DMA_MM2S,10},{6,DMA_MM2S,10},{7,DMA_MM2S,10},{8,DMA_MM2S,10},{9,DMA_MM2S,10},{10,DMA_MM2S,10},{11,DMA_MM2S,10},{12,DMA_MM2S,10},{13,DMA_MM2S,10},{14,DMA_MM2S,10},{15,DMA_MM2S,10},
+	/* 304  -  319 */
+	{0,DMA_MM2S,11},{1,DMA_MM2S,11},{2,DMA_MM2S,11},{3,DMA_MM2S,11},{4,DMA_MM2S,11},{5,DMA_MM2S,11},{6,DMA_MM2S,11},{7,DMA_MM2S,11},{8,DMA_MM2S,11},{9,DMA_MM2S,11},{10,DMA_MM2S,11},{11,DMA_MM2S,11},{12,DMA_MM2S,11},{13,DMA_MM2S,11},{14,DMA_MM2S,11},{15,DMA_MM2S,11},
+};
+
+/*********************** Static Function Definitions *************************/
 /*****************************************************************************/
 /**
  *
@@ -67,7 +110,7 @@
  *			D2 padding after must be 0
  *
  ******************************************************************************/
-AieRC _XAie4_DmaMemTileCheckPaddingConfig(XAie_DmaDesc *DmaDesc)
+static AieRC _XAie4_DmaMemTileCheckPaddingConfig(XAie_DmaDesc *DmaDesc)
 {
 	XAie_AieMlDimDesc *DDesc = DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc;
 	XAie_PadDesc *PDesc = DmaDesc->PadDesc;
@@ -101,136 +144,34 @@ AieRC _XAie4_DmaMemTileCheckPaddingConfig(XAie_DmaDesc *DmaDesc)
 	return XAIE_OK;
 }
 
-/*****************************************************************************/
-/**
- * _XAie4_DmaGetChannelCtrlAddr - Retrieves the control address for a specific DMA channel.
- * @DevInst: Pointer to the device instance.
- * @DmaMod: Pointer to the DMA module.
- * @Loc: Location type of the DMA module.
- * @Dir: Direction of the DMA transfer.
- * @ChNum: Channel number for which the control address is to be retrieved.
- *
- * This function calculates and returns the control address for a given DMA channel
- * based on the provided device instance, DMA module, location, direction, and channel number.
- *
- * Return: The control address for the specified DMA channel.
-*****************************************************************************/
-u64 _XAie4_DmaGetChannelCtrlAddr(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-				      XAie_LocType Loc, XAie_DmaDirection Dir, u8 ChNum)
+static u64 _GetChannelStatusAddr(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
+		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir)
 {
-	u8 NumChannels = 0;
-	u64 ChCtrlBase = 0;
+	u8 TileType;
+	u8 NumChannels;
 	u64 Addr = 0;
-	
-	switch (Dir) {
-		case DMA_S2MM:
-			NumChannels = DmaMod->NumChannels;
-			ChCtrlBase = DmaMod->ChCtrlBase;
-			break;
-		case DMA_MM2S:
-			NumChannels = DmaMod->NumMm2sChannels;
-			ChCtrlBase = DmaMod->ChCtrlMm2sBase;
-			break;
-		case DMA_MM2S_CTRL:
-			NumChannels = DmaMod->CtrlMm2sProp->NumChannels;
-			ChCtrlBase = DmaMod->CtrlMm2sProp->ChCtrlBase;
-			break;
-		case DMA_S2MM_TRACE:
-			NumChannels =  DmaMod->TraceS2mmProp->NumChannels;
-			ChCtrlBase = DmaMod->TraceS2mmProp->ChCtrlBase;
-			break;
-		default:
-			XAIE_ERROR("Invalid Channel direction \n");
-			break; 
-	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+
+	if ((TileType == XAIEGBL_TILE_TYPE_MEMTILE) && (Dir == DMA_MM2S))
+		NumChannels = DmaMod->NumMm2sChannels;
+	else
+		NumChannels = DmaMod->NumChannels;
 
 	/*Add App_B base address if ChNum is from second half of the resources*/
-	if (DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) {
-		if (ChNum >= NumChannels) {
-			ChCtrlBase |= _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen, ChCtrlBase);
-			ChNum -= NumChannels;
-		}
+	if (ChNum >= NumChannels) {
+		Addr = XAIE4_MASK_VALUE_APP_B;
+		ChNum -= NumChannels;
 	}
 
-	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		ChCtrlBase + ChNum * (u64)DmaMod->ChIdxOffset;
+	Addr |= DmaMod->ChStatusBase + XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+		ChNum * XAIE4_DMA_STATUS_CHNUM_OFFSET +
+		(u8)Dir * DmaMod->ChStatusOffset;
 
 	return Addr;
 }
 
-/*****************************************************************************/
-/**
- * _XAie4_DmaGetChannelStatusAddr - Get the address of the channel status register
- * @DevInst: Pointer to the device instance
- * @DmaMod: Pointer to the DMA module
- * @Loc: Location type
- * @ChNum: Channel number
- * @Dir: Direction of the channel
- *
- * This function calculates and returns the address of the channel status
- * register for a given DMA module, location, channel number, and direction.
- *
- * Return: Address of the channel status register
-*****************************************************************************/
-u64 _XAie4_DmaGetChannelStatusAddr(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir)
-{
-	u8 NumChannels = 0;
-	u64 ChStatusBase = 0;
-	u64 addr = 0;
-
-	switch (Dir) {
-		case DMA_S2MM:
-			NumChannels = DmaMod->NumChannels;
-			ChStatusBase = DmaMod->ChStatusBase;
-			break;
-		case DMA_MM2S:
-			NumChannels = DmaMod->NumMm2sChannels;
-			ChStatusBase = DmaMod->ChStatusBase + ((u8)Dir * DmaMod->ChStatusOffset);
-			break;
-		case DMA_MM2S_CTRL:
-			NumChannels = DmaMod->CtrlMm2sProp->NumChannels;
-			ChStatusBase = DmaMod->CtrlMm2sProp->ChStatusBase;
-			break;
-		case DMA_S2MM_TRACE:
-			NumChannels =  DmaMod->TraceS2mmProp->NumChannels;
-			ChStatusBase = DmaMod->TraceS2mmProp->ChStatusBase;
-			break;
-		default:
-			XAIE_ERROR("Invalid Channel direction \n");
-			break;
-	}
-	/*Add App_B base address if ChNum is from second half of the resources*/
-	if (DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) {
-		if (ChNum >= NumChannels) {
-			ChStatusBase |= _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen, ChStatusBase);
-			ChNum -= NumChannels;
-		}
-	}
-
-	addr |= DmaMod->ChStatusBase + XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-			ChNum * XAIE4_DMA_STATUS_CHNUM_OFFSET;
-
-	return addr;
-}
-
-/*****************************************************************************/
-/**
- * _XAie4_GetMemTileBdBaseAddr - Retrieves the base address of the memory tile
- * buffer descriptor (BD) for a given DMA module.
- *
- * @DmaMod: Pointer to the DMA module structure.
- * @BdNum: Buffer descriptor number.
- * @ChNum: Channel number.
- * @Dir: Direction of the DMA transfer.
- *
- * This function calculates and returns the base address of the memory tile
- * buffer descriptor based on the provided DMA module, buffer descriptor number,
- * channel number, and direction.
- *
- * Return: The base address of the memory tile buffer descriptor.
-*****************************************************************************/
-u64 _XAie4_GetMemTileBdBaseAddr(const XAie_DmaMod *DmaMod, u16 BdNum, u8 ChNum, XAie_DmaDirection Dir)
+static u64 _GetMemTileBdBaseAddr(const XAie_DmaMod *DmaMod, u8 BdNum, u8 ChNum, u8 Dir)
 {
 	u64 RegAddr = 0;
 	u8 NumChannels;
@@ -255,6 +196,37 @@ u64 _XAie4_GetMemTileBdBaseAddr(const XAie_DmaMod *DmaMod, u16 BdNum, u8 ChNum, 
 	return RegAddr;
 }
 
+static u64 _GetShimTileCtrlMm2sChanBdBaseAddr(const XAie_DmaMod *DmaMod,
+		u16 BdNum, u16 MaxNumBds)
+{
+	u8 ChNum;
+	u64 BdBaseAddr = 0;
+
+	if (((BdNum - MaxNumBds) > UINT16_MAX )||((BdNum - MaxNumBds) < 0)) {
+		XAIE_ERROR("Wrong BdNum passed\n");
+		return XAIE_ERR;
+	}
+
+	/* Get control_mm2s channel number and private pool BdNum from given BdNum */
+	BdNum = BdNum - MaxNumBds;
+	ChNum = BdNum / DmaMod->NumMm2sCtrlBds;
+	BdNum = BdNum % DmaMod->NumMm2sCtrlBds;
+
+	/*Add App_B base address if BD is from second half of the resources*/
+	if (ChNum >= DmaMod->NumMm2sCtrlChannels) {
+		BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
+		ChNum -= DmaMod->NumMm2sCtrlChannels;
+	}
+
+	BdBaseAddr |= DmaMod->BaseAddr +
+			(DmaMod->NumBds * (u64)DmaMod->IdxOffset) + /* size of Shared BD pool */
+			(ChNum * (u32)DmaMod->NumMm2sCtrlBds * (u64)DmaMod->IdxOffset) + /* Size of channel's Private BD pool */
+			(BdNum * (u64)DmaMod->IdxOffset);
+
+	return BdBaseAddr;
+}
+
+/*********************** Global Function Definitions *************************/
 /*****************************************************************************/
 /**
 *
@@ -412,7 +384,7 @@ AieRC _XAie4_DmaGetPendingBdCount(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u64 Addr;
 	u32 Mask, StatusReg, TaskQSize;
 
-	Addr = _XAie4_DmaGetChannelStatusAddr(DevInst, DmaMod, Loc, ChNum, Dir);
+	Addr = _GetChannelStatusAddr(DevInst, DmaMod, Loc, ChNum, Dir);
 	RC = XAie_Read32(DevInst, Addr, &StatusReg);
 	if(RC != XAIE_OK) {
 		return RC;
@@ -472,7 +444,7 @@ AieRC _XAie4_DmaWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u32 Mask, Value;
 	AieRC Status = XAIE_OK;
 
-	Addr = _XAie4_DmaGetChannelStatusAddr(DevInst, DmaMod, Loc, ChNum, Dir);
+	Addr = _GetChannelStatusAddr(DevInst, DmaMod, Loc, ChNum, Dir);
 
 	Mask = DmaMod->ChProp->DmaChStatus->AieMlDmaChStatus.TaskQSize.Mask |
 		DmaMod->ChProp->DmaChStatus->AieMlDmaChStatus.ChannelRunning.Mask |
@@ -530,7 +502,7 @@ AieRC _XAie4_DmaWaitForBdTaskQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u64 Addr;
 	AieRC Status = XAIE_OK;
 
-	Addr = _XAie4_DmaGetChannelStatusAddr(DevInst, DmaMod, Loc, ChNum, Dir);
+	Addr = _GetChannelStatusAddr(DevInst, DmaMod, Loc, ChNum, Dir);
 
 	if ((_XAie_CheckPrecisionExceeds(XAIE4_DMA_STATUS_TASK_Q_SIZE_MSB,
 			_XAie_MaxBitsNeeded(1U), MAX_VALID_AIE_REG_BIT_INDEX))) {
@@ -606,7 +578,7 @@ AieRC _XAie4_DmaGetChannelStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u32 Mask;
 	AieRC RC;
 
-	Addr = _XAie4_DmaGetChannelStatusAddr(DevInst, DmaMod, Loc, ChNum, Dir);
+	Addr = _GetChannelStatusAddr(DevInst, DmaMod, Loc, ChNum, Dir);
 	Mask = DmaMod->ChProp->DmaChStatus->AieMlDmaChStatus.TaskQSize.Mask |
 		DmaMod->ChProp->DmaChStatus->AieMlDmaChStatus.TaskQOverFlow.Mask |
 		DmaMod->ChProp->DmaChStatus->AieMlDmaChStatus.ChannelRunning.Mask |
@@ -666,30 +638,34 @@ AieRC _XAie4_TileDmaUpdateBdLen(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod
 
 /*****************************************************************************/
 /**
- * _XAie4_MemTileDmaUpdateBdLenPvtBuffPool - Updates the buffer descriptor length
- *                                            in the private buffer pool for a memory tile DMA.
- * @DevInst: Pointer to the device instance.
- * @DmaMod: Pointer to the DMA module.
- * @Loc: Location type.
- * @ChNum: Channel number.
- * @Dir: DMA direction.
- * @Len: Length to be updated.
- * @BdNum: Buffer descriptor number.
  *
- * This function updates the length of a buffer descriptor in the private buffer
- * pool for a specified memory tile DMA channel. It takes into account the device
- * instance, DMA module, channel number, direction, location, length, and buffer
- * descriptor number.
+ * This API updates the length of the buffer descriptor in the MEM tile
+ * dma module.
  *
- * Return: AieRC - Status of the operation.
-*****************************************************************************/
-AieRC _XAie4_MemTileDmaUpdateBdLenPvtBuffPool(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-			XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u32 Len, u16 BdNum)
+ * @param	DevInst: Device Instance.
+ * @param	DmaMod: Dma module pointer
+ * @param	Loc: Location of AIE Tile
+ * @param	Len: Length of BD in bytes.
+ * @param	BdNum: Hardware BD number to be written to.
+ *
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note		Internal only. This API accesses the hardware directly and does
+ *		not operate on software descriptor.
+ ******************************************************************************/
+AieRC _XAie4_MemTileDmaUpdateBdLen(XAie_DevInst *DevInst,
+		const XAie_DmaMod *DmaMod, XAie_LocType Loc, u32 Len, u16 BdNum)
 {
 	u64 RegAddr = 0;
 	u32 RegVal, Mask;
-	
-	RegAddr = _XAie4_GetMemTileBdBaseAddr(DmaMod, BdNum, ChNum, Dir) +
+	u8 BdNumTemp, Dir, ChNum;
+
+	/* Get Private pool BD num, and channel info */
+	BdNumTemp = XAie4_MemTileDmaBdChLut[BdNum].BdNum;
+	Dir = XAie4_MemTileDmaBdChLut[BdNum].Dir;
+	ChNum = XAie4_MemTileDmaBdChLut[BdNum].ChNum;
+
+	RegAddr = _GetMemTileBdBaseAddr(DmaMod, BdNumTemp, ChNum, Dir) +
 			(DmaMod->BdProp->BufferLen.Idx * 4U) +
 			XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 
@@ -704,28 +680,6 @@ AieRC _XAie4_MemTileDmaUpdateBdLenPvtBuffPool(XAie_DevInst *DevInst, const XAie_
 	RegVal = XAie_SetField(Len, DmaMod->BdProp->BufferLen.Lsb, Mask);
 
 	return XAie_MaskWrite32(DevInst, RegAddr, Mask, RegVal);
-}
-
-AieRC _XAie4_ShimTileDmaUpdateBdLen_common(XAie_DevInst *DevInst,
-		const XAie_DmaMod *DmaMod, XAie_LocType Loc, u32 Len, u64 BdBaseAddr)
-{
-	u32 RegVal, Mask;
-
-	BdBaseAddr |= (DmaMod->BdProp->BufferLen.Idx * 4U) +
-		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
-
-	/* get mask and Value for the buffer_length */
-	Mask = DmaMod->BdProp->BufferLen.Mask;
-
-	
-	if ((_XAie_CheckPrecisionExceeds(DmaMod->BdProp->BufferLen.Lsb,
-			_XAie_MaxBitsNeeded(Len),MAX_VALID_AIE_REG_BIT_INDEX))) {
-		XAIE_ERROR("Check Precision Exceeds Failed\n");
-		return XAIE_ERR;
-	}
-	RegVal = XAie_SetField(Len, DmaMod->BdProp->BufferLen.Lsb, Mask);
-
-	return XAie_MaskWrite32(DevInst, BdBaseAddr, Mask, RegVal);
 }
 
 /*****************************************************************************/
@@ -748,63 +702,38 @@ AieRC _XAie4_ShimTileDmaUpdateBdLen_common(XAie_DevInst *DevInst,
 AieRC _XAie4_ShimTileDmaUpdateBdLen(XAie_DevInst *DevInst,
 		const XAie_DmaMod *DmaMod, XAie_LocType Loc, u32 Len, u16 BdNum)
 {
-	u64 BdBaseAddr = 0;
+	u64 RegAddr = 0;
+	u32 RegVal, Mask;
+	u16 MaxNumBds;
 
-	/*Add App_B base address if BD is from second half of the resources*/
-	if (BdNum >= DmaMod->NumBds) {
-		BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
-		BdNum -= DmaMod->NumBds;
-	}
-	BdBaseAddr |= (u64)(DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset);
+	/* This is needed to check if BdNum is for control_mm2s channels */
+	MaxNumBds = DmaMod->NumBds * 2;
 
-	return _XAie4_ShimTileDmaUpdateBdLen_common(DevInst, DmaMod, Loc, Len, BdBaseAddr);	
-}
-
-/*****************************************************************************/
-/**
- * _XAie4_ShimTileDmaUpdateBdLenPvtBuffPool - Updates the buffer descriptor length
- *                                             in the private buffer pool for a 
- *                                             specified DMA channel.
- * @DevInst: Pointer to the device instance.
- * @DmaMod: Pointer to the DMA module.
- * @Loc: Location type.
- * @ChNum: DMA channel number.
- * @Dir: Direction of the DMA transfer.
- * @Len: Length to be updated in the buffer descriptor.
- * @BdNum: Buffer descriptor number.
- *
- * This function updates the length of the buffer descriptor in the private
- * buffer pool for a specified DMA channel in the AI Engine. It takes into
- * account the device instance, DMA module, channel number, direction of the
- * transfer, location type, length to be updated, and the buffer descriptor
- * number.
- *
- * Return: A status code indicating success or failure of the operation.
-*****************************************************************************/
-AieRC _XAie4_ShimTileDmaUpdateBdLenPvtBuffPool(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-				XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u32 Len, u16 BdNum)
-{
-	u64 BdBaseAddr = 0;
-	u16 MaxNumBds = 0;
-
-	if(Dir == DMA_MM2S_CTRL) {
-		MaxNumBds = DmaMod->CtrlMm2sProp->NumBds;
-		BdBaseAddr = DmaMod->CtrlMm2sProp->BdBaseAddr;
-		/*Add App_B base address if ChNum is from second half of the resources*/
-		if (ChNum >= DmaMod->CtrlMm2sProp->NumChannels) {
-			BdBaseAddr |= XAIE4_MASK_VALUE_APP_B;
-			ChNum -= DmaMod->CtrlMm2sProp->NumChannels;
+	if (BdNum >= MaxNumBds) {
+		/* BD is for Control MM2S channel */
+		RegAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaMod, BdNum, MaxNumBds);
+	} else {
+		/*Add App_B base address if BD is from second half of the resources*/
+		if (BdNum >= DmaMod->NumBds) {
+			RegAddr = XAIE4_MASK_VALUE_APP_B;
+			BdNum -= DmaMod->NumBds;
 		}
-	} else if(Dir == DMA_S2MM_TRACE) {
-		MaxNumBds = DmaMod->TraceS2mmProp->NumBds;
-		BdBaseAddr = DmaMod->TraceS2mmProp->BdBaseAddr;
+		RegAddr |= (u64)(DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset);
 	}
+	RegAddr += (DmaMod->BdProp->BufferLen.Idx * 4U) +
+		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 
-	BdBaseAddr = BdBaseAddr +
-				(ChNum * (u64)MaxNumBds * (u64)DmaMod->IdxOffset) + 
-				(BdNum * (u64)DmaMod->IdxOffset);
+	/* get mask and Value for the buffer_length */
+	Mask = DmaMod->BdProp->BufferLen.Mask;
 
-	return _XAie4_ShimTileDmaUpdateBdLen_common(DevInst, DmaMod, Loc, Len, BdBaseAddr);	
+	if ((_XAie_CheckPrecisionExceeds(DmaMod->BdProp->BufferLen.Lsb,
+			_XAie_MaxBitsNeeded(Len),MAX_VALID_AIE_REG_BIT_INDEX))) {
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
+	RegVal = XAie_SetField(Len, DmaMod->BdProp->BufferLen.Lsb, Mask);
+
+	return XAie_MaskWrite32(DevInst, RegAddr, Mask, RegVal);
 }
 
 /*****************************************************************************/
@@ -827,14 +756,14 @@ AieRC _XAie4_ShimTileDmaUpdateBdLenPvtBuffPool(XAie_DevInst *DevInst, const XAie
 AieRC _XAie4_TileDmaGetBdLen(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
 		XAie_LocType Loc, u32 *Len, u16 BdNum)
 {
-	u64 BdBaseAddr = 0;
-	u32 RegVal = 0;
+	u64 RegAddr = 0;
+	u32 RegVal;
 	AieRC RC;
 
-	BdBaseAddr = (u64)(DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset) +
+	RegAddr = (u64)(DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset) +
 			XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
 			DmaMod->BdProp->BufferLen.Idx * 4U;
-	RC = XAie_Read32(DevInst, BdBaseAddr, &RegVal);
+	RC = XAie_Read32(DevInst, RegAddr, &RegVal);
 	if(RC != XAIE_OK) {
 		return RC;
 	}
@@ -854,30 +783,35 @@ AieRC _XAie4_TileDmaGetBdLen(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
 
 /*****************************************************************************/
 /**
- * _XAie4_MemTileDmaGetBdLenPvtBuffPool - Retrieves the length of a buffer descriptor
- *                                         from the private buffer pool in a memory tile DMA.
- * @DevInst: Pointer to the device instance.
- * @DmaMod: Pointer to the DMA module.
- * @Loc: Location type.
- * @ChNum: Channel number.
- * @Dir: DMA direction.
- * @Len: Pointer to store the length of the buffer descriptor.
- * @BdNum: Buffer descriptor number.
  *
- * This function retrieves the length of a specified buffer descriptor from the
- * private buffer pool in a memory tile DMA. The length is stored in the location
- * pointed to by @Len.
+ * This API returns the length of the buffer descriptor in the MEM Tile
+ * dma module.
  *
- * Return: AieRC - Status of the operation.
-*****************************************************************************/
-AieRC _XAie4_MemTileDmaGetBdLenPvtBuffPool(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u32 *Len, u16 BdNum)
+ * @param	DevInst: Device Instance.
+ * @param	DmaMod: Dma module pointer
+ * @param	Loc: Location of AIE Tile
+ * @param	Len: Length of BD in bytes.
+ * @param	BdNum: Hardware BD number to be written to.
+ *
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note		Internal only. This API accesses the hardware directly and does
+ *		not operate on software descriptor.
+ ******************************************************************************/
+AieRC _XAie4_MemTileDmaGetBdLen(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
+		XAie_LocType Loc, u32 *Len, u16 BdNum)
 {
+	u8 BdNumTemp, ChNum, Dir;
 	u64 RegAddr = 0;
 	u32 RegVal;
 	AieRC RC;
 
-	RegAddr = _XAie4_GetMemTileBdBaseAddr(DmaMod, BdNum, ChNum, Dir) +
+	/* Get Private pool BD num, and channel info */
+	BdNumTemp = XAie4_MemTileDmaBdChLut[BdNum].BdNum;
+	Dir = XAie4_MemTileDmaBdChLut[BdNum].Dir;
+	ChNum = XAie4_MemTileDmaBdChLut[BdNum].ChNum;
+
+	RegAddr = _GetMemTileBdBaseAddr(DmaMod, BdNumTemp, ChNum, Dir) +
 			XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
 			(DmaMod->BdProp->BufferLen.Idx * 4U);
 	RC = XAie_Read32(DevInst, RegAddr, &RegVal);
@@ -885,33 +819,12 @@ AieRC _XAie4_MemTileDmaGetBdLenPvtBuffPool(XAie_DevInst *DevInst, const XAie_Dma
 		return RC;
 	}
 
-	
+
 	if (_XAie_CheckPrecisionExceedsForRightShift(DmaMod->BdProp->BufferLen.Lsb,
 			DmaMod->BdProp->BufferLen.Mask)) {
 		XAIE_ERROR("Check Precision Exceeds Failed\n");
 		return XAIE_ERR;
 	}
-
-	*Len = (XAie_GetField(RegVal, DmaMod->BdProp->BufferLen.Lsb,
-				DmaMod->BdProp->BufferLen.Mask) +
-			DmaMod->BdProp->LenActualOffset) << XAIE_DMA_32BIT_TXFER_LEN;
-
-	return XAIE_OK;
-}
-
-AieRC _XAie4_ShimTileDmaGetBdLen_common(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-		XAie_LocType Loc, u32 *Len, u64 BdBaseAddr)
-{
-	u32 RegVal;
-	AieRC RC;
-	
-	BdBaseAddr |= XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-			DmaMod->BdProp->BufferLen.Idx * 4U;
-	RC = XAie_Read32(DevInst, BdBaseAddr, &RegVal);
-	if(RC != XAIE_OK) {
-		return RC;
-	}
-
 	*Len = (XAie_GetField(RegVal, DmaMod->BdProp->BufferLen.Lsb,
 				DmaMod->BdProp->BufferLen.Mask) +
 			DmaMod->BdProp->LenActualOffset) << XAIE_DMA_32BIT_TXFER_LEN;
@@ -939,62 +852,47 @@ AieRC _XAie4_ShimTileDmaGetBdLen_common(XAie_DevInst *DevInst, const XAie_DmaMod
 AieRC _XAie4_ShimTileDmaGetBdLen(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
 		XAie_LocType Loc, u32 *Len, u16 BdNum)
 {
-	u64 BdBaseAddr = 0;
+	u16 MaxNumBds;
+	u64 RegAddr = 0;
+	u32 RegVal;
+	AieRC RC;
 
-	/*Add App_B base address if BD is from second half of the resources*/
-	if (BdNum >= DmaMod->NumBds) {
-		BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
-		BdNum -= DmaMod->NumBds;
-	}
+	/* get the maximum BDs that the shim tile can support in
+	 * single app mode*/
+	MaxNumBds = DmaMod->NumBds * 2;
 
-	BdBaseAddr |= DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset;
-
-	return _XAie4_ShimTileDmaGetBdLen_common(DevInst, DmaMod, Loc, Len, BdBaseAddr);
-}
-
-/*****************************************************************************/
-/**
- * _XAie4_ShimTileDmaGetBdLenPvtBuffPool - Retrieves the buffer descriptor length
- * for a given DMA channel in the private buffer pool.
- *
- * @DevInst: Pointer to the device instance.
- * @DmaMod: Pointer to the DMA module.
- * @Loc: Location type.
- * @ChNum: DMA channel number.
- * @Dir: Direction of the DMA transfer.
- * @Len: Pointer to store the length of the buffer descriptor.
- * @BdNum: Buffer descriptor number.
- *
- * This function retrieves the length of the buffer descriptor for a specified
- * DMA channel in the private buffer pool. The length is stored in the location
- * pointed to by @Len.
- *
- * Return: AieRC - Status of the operation.
-*****************************************************************************/
-AieRC _XAie4_ShimTileDmaGetBdLenPvtBuffPool(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u32 *Len, u16 BdNum)
-{
-	u16 MaxNumBds = 0;
-	u64 BdBaseAddr = 0;
-
-	if(Dir == DMA_MM2S_CTRL) {
-		MaxNumBds = DmaMod->CtrlMm2sProp->NumBds;
-		BdBaseAddr = DmaMod->CtrlMm2sProp->BdBaseAddr;
-		/*Add App_B base address if ChNum is from second half of the resources*/
-		if (ChNum >= DmaMod->CtrlMm2sProp->NumChannels) {
-			BdBaseAddr |= XAIE4_MASK_VALUE_APP_B;
-			ChNum -= DmaMod->CtrlMm2sProp->NumChannels;
+	/* If given BdNum is > MaxNumBds, It means it is for
+	 * Control_MM2S channels */
+	if (BdNum >= MaxNumBds) {
+		RegAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaMod, BdNum, MaxNumBds);
+	} else {
+		/*Add App_B base address if BD is from second half of the resources*/
+		if (BdNum >= DmaMod->NumBds) {
+			RegAddr = XAIE4_MASK_VALUE_APP_B;
+			BdNum -= DmaMod->NumBds;
 		}
-	} else if(Dir == DMA_S2MM_TRACE) {
-		MaxNumBds = DmaMod->TraceS2mmProp->NumBds;
-		BdBaseAddr = DmaMod->TraceS2mmProp->BdBaseAddr;
+
+		RegAddr |= DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset;
 	}
 
-	BdBaseAddr = BdBaseAddr +
-				(ChNum * (u64)MaxNumBds * (u64)DmaMod->IdxOffset) + 
-				(BdNum * (u64)DmaMod->IdxOffset);
+	RegAddr |= XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+			DmaMod->BdProp->BufferLen.Idx * 4U;
+	RC = XAie_Read32(DevInst, RegAddr, &RegVal);
+	if(RC != XAIE_OK) {
+		return RC;
+	}
 
-	return _XAie4_ShimTileDmaGetBdLen_common(DevInst, DmaMod, Loc, Len, BdBaseAddr);
+
+	if (_XAie_CheckPrecisionExceedsForRightShift(DmaMod->BdProp->BufferLen.Lsb,
+			DmaMod->BdProp->BufferLen.Mask)) {
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
+	*Len = (XAie_GetField(RegVal, DmaMod->BdProp->BufferLen.Lsb,
+				DmaMod->BdProp->BufferLen.Mask) +
+			DmaMod->BdProp->LenActualOffset) << XAIE_DMA_32BIT_TXFER_LEN;
+
+	return XAIE_OK;
 }
 
 /*****************************************************************************/
@@ -1041,28 +939,34 @@ AieRC _XAie4_TileDmaUpdateBdAddr(XAie_DevInst *DevInst,
 
 /*****************************************************************************/
 /**
- * _XAie4_MemTileDmaUpdateBdAddrPvtBuffPool - Updates the buffer descriptor address
- *                                             in the private buffer pool for a memory tile DMA.
- * @DevInst: Pointer to the device instance.
- * @DmaMod: Pointer to the DMA module.
- * @Loc: Location type.
- * @ChNum: Channel number.
- * @Dir: Direction of the DMA transfer.
- * @Addr: Address to be updated.
- * @BdNum: Buffer descriptor number.
  *
- * This function updates the address of a buffer descriptor in the private buffer
- * pool for a specified memory tile DMA channel and direction.
+ * This API updates the address of the buffer descriptor in the MEM tile
+ * dma module.
  *
- * Return: AieRC - Return code indicating success or failure.
-*****************************************************************************/
-AieRC _XAie4_MemTileDmaUpdateBdAddrPvtBuffPool(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-			XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u64 Addr, u16 BdNum)
+ * @param	DevInst: Device Instance.
+ * @param	DmaMod: Dma module pointer
+ * @param	Loc: Location of AIE Tile
+ * @param	Addr: Buffer address
+ * @param	BdNum: Hardware BD number to be written to.
+ *
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note		Internal only. This API accesses the hardware directly and does
+ *		not operate on software descriptor.
+ ******************************************************************************/
+AieRC _XAie4_MemTileDmaUpdateBdAddr(XAie_DevInst *DevInst,
+		const XAie_DmaMod *DmaMod, XAie_LocType Loc, u64 Addr, u16 BdNum)
 {
 	u64 RegAddr = 0;
 	u32 RegVal, Mask;
+	u8 BdNumTemp, Dir, ChNum;
 
-	RegAddr = _XAie4_GetMemTileBdBaseAddr(DmaMod, BdNum, ChNum, Dir) +
+	/* Get Private pool BD num, and channel info */
+	BdNumTemp = XAie4_MemTileDmaBdChLut[BdNum].BdNum;
+	Dir = XAie4_MemTileDmaBdChLut[BdNum].Dir;
+	ChNum = XAie4_MemTileDmaBdChLut[BdNum].ChNum;
+
+	RegAddr = _GetMemTileBdBaseAddr(DmaMod, BdNumTemp, ChNum, Dir) +
 			XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
 			DmaMod->BdProp->Buffer->TileDmaBuff.BaseAddr.Idx * 4U;
 
@@ -1080,13 +984,47 @@ AieRC _XAie4_MemTileDmaUpdateBdAddrPvtBuffPool(XAie_DevInst *DevInst, const XAie
 	return XAie_MaskWrite32(DevInst, RegAddr, Mask, RegVal);
 }
 
-AieRC _XAie4_ShimTileDmaUpdateBdAddr_common(XAie_DevInst *DevInst,
-		const XAie_DmaMod *DmaMod, XAie_LocType Loc, u64 Addr, u64 BaseAddr)
+/*****************************************************************************/
+/**
+ *
+ * This API updates the address of the buffer descriptor in the SHIM Tile
+ * dma module.
+ *
+ * @param	DevInst: Device Instance.
+ * @param	DmaMod: Dma module pointer
+ * @param	Loc: Location of AIE Tile
+ * @param	Addr: Buffer address
+ * @param	BdNum: Hardware BD number to be written to.
+ *
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note		Internal only. This API accesses the hardware directly and does
+ *		not operate on software descriptor.
+ ******************************************************************************/
+AieRC _XAie4_ShimTileDmaUpdateBdAddr(XAie_DevInst *DevInst,
+		const XAie_DmaMod *DmaMod, XAie_LocType Loc, u64 Addr, u16 BdNum)
 {
 	AieRC RC;
-	u64 RegAddr;
+	u64 RegAddr, BaseAddr = 0;
 	u32 RegVal, Mask;
+	u16 MaxNumBds;
 
+	/* get the maximum BDs that the shim tile can support in
+	 * single app mode*/
+	MaxNumBds = DmaMod->NumBds * 2;
+
+	/* If given BdNum is > MaxNumBds, It means it is for
+	 * Control_MM2S channels */
+	if (BdNum >= MaxNumBds) {
+		BaseAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaMod, BdNum, MaxNumBds);
+	} else {
+		/*Add App_B base address if BD is from second half of the resources*/
+		if (BdNum >= DmaMod->NumBds) {
+			BaseAddr = XAIE4_MASK_VALUE_APP_B;
+			BdNum -= DmaMod->NumBds;
+		}
+		BaseAddr |= (DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset);
+	}
 	BaseAddr |= XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 
 	RegAddr = BaseAddr + (DmaMod->BdProp->Buffer->ShimDmaBuff.AddrLow.Idx * 4U);
@@ -1121,82 +1059,7 @@ ret:
 	return RC;
 }
 
-/*****************************************************************************/
-/**
- *
- * This API updates the address of the buffer descriptor in the SHIM Tile
- * dma module.
- *
- * @param	DevInst: Device Instance.
- * @param	DmaMod: Dma module pointer
- * @param	Loc: Location of AIE Tile
- * @param	Addr: Buffer address
- * @param	BdNum: Hardware BD number to be written to.
- *
- * @return	XAIE_OK on success, Error code on failure.
- *
- * @note		Internal only. This API accesses the hardware directly and does
- *		not operate on software descriptor.
- ******************************************************************************/
-AieRC _XAie4_ShimTileDmaUpdateBdAddr(XAie_DevInst *DevInst,
-		const XAie_DmaMod *DmaMod, XAie_LocType Loc, u64 Addr, u16 BdNum)
-{
-	u64 BdBaseAddr = 0;
 
-	/*Add App_B base address if BD is from second half of the resources*/
-	if (BdNum >= DmaMod->NumBds) {
-		BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
-		BdNum -= DmaMod->NumBds;
-	}
-	
-	BdBaseAddr |= (DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset);
-
-	return _XAie4_ShimTileDmaUpdateBdAddr_common(DevInst, DmaMod, Loc, Addr, BdBaseAddr);
-}
-
-/*****************************************************************************/
-/**
- * _XAie4_ShimTileDmaUpdateBdAddrPvtBuffPool - Updates the buffer descriptor address
- * for a private buffer pool in the Shim Tile DMA.
- *
- * @DevInst: Device instance pointer.
- * @DmaMod: Pointer to the DMA module.
- * @Loc: Location type.
- * @ChNum: Channel number.
- * @Dir: DMA direction.
- * @Addr: Address to be updated.
- * @BdNum: Buffer descriptor number.
- *
- * This function updates the address of a buffer descriptor in the private buffer
- * pool for the specified Shim Tile DMA channel and direction.
- *
- * Return: AieRC - Status of the operation.
-*****************************************************************************/
-AieRC _XAie4_ShimTileDmaUpdateBdAddrPvtBuffPool(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-				XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u64 Addr, u16 BdNum)
-{
-	u64 BdBaseAddr = 0;
-	u16 MaxNumBds = 0;
-
-	if(Dir == DMA_MM2S_CTRL) {
-		MaxNumBds = DmaMod->CtrlMm2sProp->NumBds;
-		BdBaseAddr = DmaMod->CtrlMm2sProp->BdBaseAddr;
-		/*Add App_B base address if ChNum is from second half of the resources*/
-		if (ChNum >= DmaMod->CtrlMm2sProp->NumChannels) {
-			BdBaseAddr |= XAIE4_MASK_VALUE_APP_B;
-			ChNum -= DmaMod->CtrlMm2sProp->NumChannels;
-		}
-	} else if(Dir == DMA_S2MM_TRACE) {
-		MaxNumBds = DmaMod->TraceS2mmProp->NumBds;
-		BdBaseAddr = DmaMod->TraceS2mmProp->BdBaseAddr;
-	}
-	
-	BdBaseAddr = BdBaseAddr +
-				(ChNum * (u64)MaxNumBds * (u64)DmaMod->IdxOffset) + 
-				(BdNum * (u64)DmaMod->IdxOffset);
-
-	return _XAie4_ShimTileDmaUpdateBdAddr_common(DevInst, DmaMod, Loc, Addr, BdBaseAddr);
-}
 
 /*****************************************************************************/
 /**
@@ -1376,30 +1239,31 @@ AieRC _XAie4_TileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 
 /*****************************************************************************/
 /**
- * _XAie4_MemTileDmaWriteBdPvtBuffPool - Writes a buffer descriptor to the private buffer pool
- * in the memory tile DMA.
  *
- * @DevInst: Pointer to the device instance.
- * @DmaDesc: Pointer to the DMA descriptor.
- * @Loc: Location type.
- * @ChNum: Channel number.
- * @Dir: Direction of the DMA transfer.
- * @BdNum: Buffer descriptor number.
+ * This API writes a Dma Descriptor which is initialized and setup by other APIs
+ * into the corresponding registers and register fields in the hardware. This API
+ * is specific to AIE4 Memory Tiles only.
  *
- * This function writes a buffer descriptor to the private buffer pool in the memory tile DMA
- * for the specified channel and direction.
+ * @param	DevInst: Device Instance
+ * @param	DmaDesc: Initialized Dma Descriptor.
+ * @param	Loc: Location of AIE Tile
+ * @param	BdNum: Hardware BD number to be written to.
  *
- * Return: AieRC - Status of the operation.
-*****************************************************************************/
-AieRC _XAie4_MemTileDmaWriteBdPvtBuffPool(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u16 BdNum)
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note		Internal only. For AIE4 Mem Tiles only.
+ *
+ ******************************************************************************/
+AieRC _XAie4_MemTileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
+		XAie_LocType Loc, u16 BdNum)
 {
 	AieRC RC;
 	u64 Addr;
 	u64 BdBaseAddr;
 	u32 BdWord[XAIE4_MEMTILEDMA_NUM_BD_WORDS] = {0};
-	const XAie_DmaMod *DmaMod;	
+	const XAie_DmaMod *DmaMod;
 	const XAie_DmaBdProp *BdProp;
+	u8 ChNum, Dir, BdNumTemp;
 
 	RC = _XAie4_DmaMemTileCheckPaddingConfig(DmaDesc);
 	if (RC != XAIE_OK) {
@@ -1409,7 +1273,12 @@ AieRC _XAie4_MemTileDmaWriteBdPvtBuffPool(XAie_DevInst *DevInst , XAie_DmaDesc *
 	DmaMod = DevInst->DevProp.DevMod[DmaDesc->TileType].DmaMod;
 	BdProp = DmaMod->BdProp;
 
-	BdBaseAddr = _XAie4_GetMemTileBdBaseAddr(DmaMod, BdNum, ChNum, Dir);
+	/* Get Private pool BD num, and channel info */
+	BdNumTemp = XAie4_MemTileDmaBdChLut[BdNum].BdNum;
+	Dir = XAie4_MemTileDmaBdChLut[BdNum].Dir;
+	ChNum = XAie4_MemTileDmaBdChLut[BdNum].ChNum;
+
+	BdBaseAddr = _GetMemTileBdBaseAddr(DmaMod, BdNumTemp, ChNum, Dir);
 
 	/* Setup BdWord with the right values from DmaDesc */
 
@@ -1625,14 +1494,54 @@ AieRC _XAie4_MemTileDmaWriteBdPvtBuffPool(XAie_DevInst *DevInst , XAie_DmaDesc *
 	return XAie_BlockWrite32(DevInst, Addr, BdWord, XAIE4_MEMTILEDMA_NUM_BD_WORDS);
 }
 
-AieRC _XAie4_ShimDmaWriteBd_common(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u16 BdNum, u64 BdBaseAddr)
+/*****************************************************************************/
+/**
+ *
+ * This API writes a Dma Descriptor which is initialized and setup by other APIs
+ * into the corresponding registers and register fields in the hardware. This API
+ * is specific to AIE4 Shim Tiles only.
+ *
+ * @param	DevInst: Device Instance
+ * @param	DmaDesc: Initialized Dma Descriptor.
+ * @param	Loc: Location of AIE Tile
+ * @param	BdNum: Hardware BD number to be written to.
+ *
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note		Internal only. For AIE4 Shim Tiles only.
+ *
+ ******************************************************************************/
+AieRC _XAie4_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
+		XAie_LocType Loc, u16 BdNum)
 {
-	u64 Addr;	
+	u64 Addr;
+	u64 BdBaseAddr = 0;
 	u32 BdWord[XAIE4_SHIMDMA_NUM_BD_WORDS];
+	u16 MaxNumBds;
 	XAie_ShimDmaBdArgs Args;
+	const XAie_DmaMod *DmaMod;
+	const XAie_DmaBdProp *BdProp;
 
-	const XAie_DmaBdProp *BdProp = DmaDesc->DmaMod->BdProp;
+	DmaMod = DevInst->DevProp.DevMod[DmaDesc->TileType].DmaMod;
+	BdProp = DmaMod->BdProp;
+
+	/* get the maximum BDs that the shim tile can support in
+	 * single app mode*/
+	MaxNumBds = DmaMod->NumBds * 2;
+
+	/* If given BdNum is > MaxNumBds, It means it is for
+	 * Control_MM2S channels */
+	if (BdNum >= MaxNumBds) {
+		BdBaseAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaMod, BdNum, MaxNumBds);
+	} else {
+		/*Add App_B base address if BD is from second half of the resources*/
+		if (BdNum >= DmaMod->NumBds) {
+			BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
+			BdNum -= DmaMod->NumBds;
+		}
+
+		BdBaseAddr |= DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset;
+	}
 
 	/* Setup BdWord with the right values from DmaDesc */
 
@@ -1846,85 +1755,6 @@ AieRC _XAie4_ShimDmaWriteBd_common(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc
 	Args.MemInst = DmaDesc->MemInst;
 
 	return XAie_RunOp(DevInst, XAIE_BACKEND_OP_CONFIG_SHIMDMABD, (void *)&Args);
-}
-
-/*****************************************************************************/
-/**
- *
- * This API writes a Dma Descriptor which is initialized and setup by other APIs
- * into the corresponding registers and register fields in the hardware. This API
- * is specific to AIE4 Shim Tiles only.
- *
- * @param	DevInst: Device Instance
- * @param	DmaDesc: Initialized Dma Descriptor.
- * @param	Loc: Location of AIE Tile
- * @param	BdNum: Hardware BD number to be written to.
- *
- * @return	XAIE_OK on success, Error code on failure.
- *
- * @note		Internal only. For AIE4 Shim Tiles only.
- *
- ******************************************************************************/
-AieRC _XAie4_ShimDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u16 BdNum)
-{
-	u64 BdBaseAddr = 0;
-	const XAie_DmaMod *DmaMod = DmaDesc->DmaMod;
-
-	/*Add App_B base address if BD is from second half of the resources*/
-	if (BdNum >= DmaMod->NumBds) {
-		BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
-		BdNum -= DmaMod->NumBds;
-	}
-
-	BdBaseAddr |= DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset;
-
-	return _XAie4_ShimDmaWriteBd_common(DevInst , DmaDesc,
-										Loc, BdNum, BdBaseAddr);
-}
-
-/*****************************************************************************/
-/**
- * _XAie4_ShimDmaWriteBdPvtBuffPool - Writes a buffer descriptor to the private buffer pool
- * 
- * @DevInst: Device instance pointer
- * @DmaDesc: DMA descriptor pointer
- * @Loc: Location type
- * @ChNum: Channel number
- * @Dir: DMA direction
- * @BdNum: Buffer descriptor number
- * 
- * This function writes a buffer descriptor to the private buffer pool for the specified
- * device instance, DMA descriptor, channel number, direction, location, and buffer descriptor number.
- * 
- * Return: AieRC - Return code indicating success or failure of the operation
-*****************************************************************************/
-AieRC _XAie4_ShimDmaWriteBdPvtBuffPool(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u16 BdNum)
-{	
-	u64 BdBaseAddr = 0;	
-	u16 MaxNumBds = 0;	
-	const XAie_DmaMod *DmaMod = DmaDesc->DmaMod;
-
-	if(Dir == DMA_MM2S_CTRL) {
-		MaxNumBds = DmaMod->CtrlMm2sProp->NumBds;
-		BdBaseAddr = DmaMod->CtrlMm2sProp->BdBaseAddr;
-		/*Add App_B base address if ChNum is from second half of the resources*/
-		if (ChNum >= DmaMod->CtrlMm2sProp->NumChannels) {
-			BdBaseAddr |= XAIE4_MASK_VALUE_APP_B;
-			ChNum -= DmaMod->CtrlMm2sProp->NumChannels;
-		}
-	} else if(Dir == DMA_S2MM_TRACE) {
-		MaxNumBds = DmaMod->TraceS2mmProp->NumBds;
-		BdBaseAddr = DmaMod->TraceS2mmProp->BdBaseAddr;
-	}
-
-	BdBaseAddr = BdBaseAddr +
-				(ChNum * (u64)MaxNumBds * (u64)DmaMod->IdxOffset) + 
-				(BdNum * (u64)DmaMod->IdxOffset);
-
-	return _XAie4_ShimDmaWriteBd_common(DevInst , DmaDesc,
-										Loc, BdNum, BdBaseAddr);
 }
 
 /*****************************************************************************/
@@ -2172,33 +2002,38 @@ AieRC _XAie4_TileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 
 /*****************************************************************************/
 /**
- * _XAie4_MemTileDmaReadBdPvtBuffPool - Reads a buffer descriptor from the private buffer pool
- * in a memory tile DMA.
  *
- * @DevInst: Pointer to the device instance.
- * @DmaDesc: Pointer to the DMA descriptor.
- * @Loc: Location type.
- * @ChNum: Channel number.
- * @Dir: Direction of the DMA transfer.
- * @BdNum: Buffer descriptor number.
+ * This API reads a the data from the buffer descriptor registers to fill the
+ * DmaDesc structure. This API is meant for AIE4 memory tiles only.
  *
- * This function reads a buffer descriptor from the private buffer pool in a memory tile DMA
- * based on the provided parameters.
+ * @param	DevInst: Device Instance
+ * @param	DmaDesc: Dma Descriptor to be filled.
+ * @param	Loc: Location of MEM Tile
+ * @param	BdNum: Hardware BD number to be read from.
  *
- * Return: AieRC - Return code indicating success or failure.
-*****************************************************************************/
-AieRC _XAie4_MemTileDmaReadBdPvtBuffPool(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u16 BdNum)
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note		Internal only. For AIE4 Mem Tiles only.
+ *
+ ******************************************************************************/
+AieRC _XAie4_MemTileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
+		XAie_LocType Loc, u16 BdNum)
 {
 	AieRC RC;
 	u64 Addr;
 	u64 BdBaseAddr;
 	u32 BdWord[XAIE4_MEMTILEDMA_NUM_BD_WORDS];
 	const XAie_DmaBdProp *BdProp;
+	u8 BdNumTemp, Dir, ChNum;
 
 	BdProp = DmaDesc->DmaMod->BdProp;
-	
-	BdBaseAddr = _XAie4_GetMemTileBdBaseAddr(DmaDesc->DmaMod, BdNum, ChNum, Dir);
+
+	/* Get Private pool BD num, and channel info */
+	BdNumTemp = XAie4_MemTileDmaBdChLut[BdNum].BdNum;
+	Dir = XAie4_MemTileDmaBdChLut[BdNum].Dir;
+	ChNum = XAie4_MemTileDmaBdChLut[BdNum].ChNum;
+
+	BdBaseAddr = _GetMemTileBdBaseAddr(DmaDesc->DmaMod, BdNumTemp, ChNum, Dir);
 	Addr = BdBaseAddr + XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 
 	/* Setup DmaDesc with values read from bd registers */
@@ -2482,14 +2317,51 @@ AieRC _XAie4_MemTileDmaReadBdPvtBuffPool(XAie_DevInst *DevInst , XAie_DmaDesc *D
 	return XAIE_OK;
 }
 
-AieRC _XAie4_ShimDmaReadBd_common(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u64 BdBaseAddr)
+/*****************************************************************************/
+/**
+ *
+ * This API reads a the data from the buffer descriptor registers to fill the
+ * DmaDesc structure. This API is meant for AIE4 Shim Tiles only.
+ *
+ * @param	DevInst: Device Instance
+ * @param	DmaDesc: Dma Descriptor to be filled.
+ * @param	Loc: Location of AIE Tile
+ * @param	BdNum: Hardware BD number to be read from.
+ *
+ * @return	XAIE_OK on success, Error code on failure.
+ *
+ * @note		Internal only. For AIE4 Shim Tiles only.
+ *
+ ******************************************************************************/
+AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
+		XAie_LocType Loc, u16 BdNum)
 {
 	AieRC RC;
 	u64 Addr;
+	u64 BdBaseAddr = 0;
 	u32 BdWord[XAIE4_SHIMDMA_NUM_BD_WORDS];
-	const XAie_DmaBdProp *BdProp = DmaDesc->DmaMod->BdProp;
-	
+	u16 MaxNumBds;
+	const XAie_DmaBdProp *BdProp;
+
+	BdProp = DmaDesc->DmaMod->BdProp;
+
+	/* get the maximum BDs that the shim tile can support in
+	 * single app mode*/
+	MaxNumBds = DmaDesc->DmaMod->NumBds * 2;
+
+	/* If given BdNum is > MaxNumBds, It means it is for
+	 * Control_MM2S channels */
+	if (BdNum >= MaxNumBds) {
+		BdBaseAddr = _GetShimTileCtrlMm2sChanBdBaseAddr(DmaDesc->DmaMod, BdNum, MaxNumBds);
+	} else {
+		/*Add App_B base address if BD is from second half of the resources*/
+		if (BdNum >= DmaDesc->DmaMod->NumBds) {
+			BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
+			BdNum -= DmaDesc->DmaMod->NumBds;
+		}
+
+		BdBaseAddr |= DmaDesc->DmaMod->BaseAddr + BdNum * (u64)DmaDesc->DmaMod->IdxOffset;
+	}
 	Addr = BdBaseAddr + XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 
 	/* Setup DmaDesc with values read from bd registers */
@@ -2799,84 +2671,6 @@ AieRC _XAie4_ShimDmaReadBd_common(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 			BdProp->Pkt->PktId.Mask) & 0xFFU;
 
 	return XAIE_OK;
-}
-
-/*****************************************************************************/
-/**
- *
- * This API reads a the data from the buffer descriptor registers to fill the
- * DmaDesc structure. This API is meant for AIE4 Shim Tiles only.
- *
- * @param	DevInst: Device Instance
- * @param	DmaDesc: Dma Descriptor to be filled.
- * @param	Loc: Location of AIE Tile
- * @param	BdNum: Hardware BD number to be read from.
- *
- * @return	XAIE_OK on success, Error code on failure.
- *
- * @note		Internal only. For AIE4 Shim Tiles only.
- *
- ******************************************************************************/
-AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-		XAie_LocType Loc, u16 BdNum)
-{
-	u64 BdBaseAddr = 0;
-	const XAie_DmaMod *DmaMod = DmaDesc->DmaMod;
-
-	/*Add App_B base address if BD is from second half of the resources*/
-	if (BdNum >= DmaMod->NumBds) {
-		BdBaseAddr = XAIE4_MASK_VALUE_APP_B;
-		BdNum -= DmaMod->NumBds;
-	}
-
-	BdBaseAddr |= DmaMod->BaseAddr + BdNum * (u64)DmaMod->IdxOffset;
-
-	return _XAie4_ShimDmaReadBd_common(DevInst , DmaDesc, Loc, BdBaseAddr);
-}
-
-/*****************************************************************************/
-/**
- * _XAie4_ShimDmaReadBdPvtBuffPool - Reads a buffer descriptor from the private buffer pool
- * in the Shim DMA.
- *
- * @DevInst: Device instance pointer.
- * @DmaDesc: DMA descriptor pointer.
- * @Loc: Location type.
- * @ChNum: Channel number.
- * @Dir: DMA direction.
- * @BdNum: Buffer descriptor number.
- *
- * This function reads a buffer descriptor from the private buffer pool in the Shim DMA
- * for the specified channel number, direction, and location type.
- *
- * Return: AieRC - Status of the operation.
-*****************************************************************************/
-AieRC _XAie4_ShimDmaReadBdPvtBuffPool(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
-			XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir, u16 BdNum)
-{
-	u64 BdBaseAddr = 0;
-	u16 MaxNumBds = 0;
-
-	const XAie_DmaMod *DmaMod = DmaDesc->DmaMod;
-
-	if(Dir == DMA_MM2S_CTRL) {
-		MaxNumBds = DmaMod->CtrlMm2sProp->NumBds;
-		BdBaseAddr = DmaMod->CtrlMm2sProp->BdBaseAddr;
-		/*Add App_B base address if ChNum is from second half of the resources*/
-		if (ChNum >= DmaMod->CtrlMm2sProp->NumChannels) {
-			BdBaseAddr |= XAIE4_MASK_VALUE_APP_B;
-			ChNum -= DmaMod->CtrlMm2sProp->NumChannels;
-		}
-	} else if(Dir == DMA_S2MM_TRACE) {
-		MaxNumBds = DmaMod->TraceS2mmProp->NumBds;
-		BdBaseAddr = DmaMod->TraceS2mmProp->BdBaseAddr;
-	}
-
-	BdBaseAddr = BdBaseAddr +
-				(ChNum * (u64)MaxNumBds * (u64)DmaMod->IdxOffset) + 
-				(BdNum * (u64)DmaMod->IdxOffset);
-
-	return  _XAie4_ShimDmaReadBd_common(DevInst , DmaDesc, Loc, BdBaseAddr);
 }
 
 /*****************************************************************************/

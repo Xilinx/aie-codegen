@@ -322,7 +322,7 @@ static const  XAie_DmaBdPad Aie4MemTilePadProp =
 };
 
 /* Data structure to capture register offsets and masks for Mem Tile Dma */
-static const  XAie_DmaBdProp Aie4MemTileDmaBdProp =
+static const  XAie_DmaBdProp Aie4MemTileDmaProp =
 {
 	.AddrAlignMask = 0x3,
 	.AddrAlignShift = 0x2,
@@ -423,29 +423,29 @@ static const  XAie_DmaMod Aie4MemTileDmaMod =
 	.TlastSuppress = XAIE_FEATURE_AVAILABLE,	/* Same as AIE2PS */
 	.StartQueueBase = XAIE4GBL_MEM_TILE_MODULE_DMA_S2MM_0_START_QUEUE,
 	.ChCtrlBase = XAIE4GBL_MEM_TILE_MODULE_DMA_S2MM_0_CTRL,
-	.ChCtrlMm2sBase = XAIE4GBL_MEM_TILE_MODULE_DMA_MM2S_0_CTRL,
+	.ChCtrlOffset = 0x60,
 	.NumChannels = 4,	/* number of s2mm channels */
-	.NumMm2sChannels = 6,	/* number of mm2s channels : Actually this should be 5(10) as per AIE4 spec, but to avoid gaps issue kept 6 */
+	.NumMm2sChannels = 6,	/* number of mm2s channels */
 	.ChIdxOffset = 0x8,	/* This is the offset between each channel */
 	.ChStatusBase = XAIE4GBL_MEM_TILE_MODULE_DMA_S2MM_STATUS_0,
 	.ChStatusOffset = 0x30,
 	.PadValueBase = XAIE4GBL_MEM_TILE_MODULE_DMA_MM2S_0_CONSTANT_PAD_VALUE,
-	.BdProp = &Aie4MemTileDmaBdProp,
+	.BdProp = &Aie4MemTileDmaProp,
 	.ChProp = &Aie4MemTileDmaChProp,
 	.DmaBdInit = &_XAie4_MemTileDmaInit,
 	.SetLock = &_XAieMl_DmaSetLock,
 	.SetIntrleave = NULL,
 	.SetMultiDim = &_XAie4_DmaSetMultiDim,
 	.SetBdIter = &_XAie4_DmaSetBdIteration,
-	.WriteBdPvtBuffPool = &_XAie4_MemTileDmaWriteBdPvtBuffPool, 
-	.ReadBdPvtBuffPool = &_XAie4_MemTileDmaReadBdPvtBuffPool,
+	.WriteBd = &_XAie4_MemTileDmaWriteBd,
+	.ReadBd = &_XAie4_MemTileDmaReadBd,
 	.PendingBd = &_XAie4_DmaGetPendingBdCount,
 	.WaitforDone = &_XAie4_DmaWaitForDone,
 	.WaitforBdTaskQueue = &_XAie4_DmaWaitForBdTaskQueue,
 	.BdChValidity = &_XAieMl_DmaCheckBdChValidity,
-	.UpdateBdLenPvtBuffPool = &_XAie4_MemTileDmaUpdateBdLenPvtBuffPool,
-	.GetBdLenPvtBuffPool = &_XAie4_MemTileDmaGetBdLenPvtBuffPool,
-	.UpdateBdAddrPvtBuffPool = &_XAie4_MemTileDmaUpdateBdAddrPvtBuffPool,
+	.UpdateBdLen = &_XAie4_MemTileDmaUpdateBdLen,
+	.GetBdLen = &_XAie4_MemTileDmaGetBdLen,
+	.UpdateBdAddr = &_XAie4_MemTileDmaUpdateBdAddr,
 	.GetChannelStatus = &_XAie4_DmaGetChannelStatus,
 	.AxiBurstLenCheck = NULL,
 };
@@ -536,7 +536,7 @@ static const  XAie_DmaBdMultiDimAddr Aie4TileDmaMultiDimProp =
 };
 
 /* Data structure to capture register offsets and masks for Tile Dma */
-static const  XAie_DmaBdProp Aie4TileDmaBdProp =
+static const  XAie_DmaBdProp Aie4TileDmaProp =
 {
 		.AddrAlignMask = 0x3,
 		.AddrAlignShift = 0x2,
@@ -640,14 +640,14 @@ static const  XAie_DmaMod Aie4TileDmaMod =
 	.TlastSuppress = XAIE_FEATURE_AVAILABLE,
 	.StartQueueBase = XAIE4GBL_MEMORY_MODULE_DMA_S2MM_0_START_QUEUE,
 	.ChCtrlBase = XAIE4GBL_MEMORY_MODULE_DMA_S2MM_0_CTRL,
-	.ChCtrlMm2sBase = XAIE4GBL_MEMORY_MODULE_DMA_MM2S_0_CTRL,
+	.ChCtrlOffset = 0x10,
 	.NumChannels = 2U,  /* Number of s2mm channels */
 	.NumMm2sChannels = 1U, /* Number of mm2s channels */
 	.ChIdxOffset = 0x8,  /* This is the offset between each channel */
 	.ChStatusBase = XAIE4GBL_MEMORY_MODULE_DMA_S2MM_STATUS_0,
 	.ChStatusOffset = 0x10,
 	.PadValueBase = XAIE_FEATURE_UNAVAILABLE,
-	.BdProp = &Aie4TileDmaBdProp,
+	.BdProp = &Aie4TileDmaProp,
 	.ChProp = &Aie4DmaChProp,
 	.DmaBdInit = &_XAie4_TileDmaInit,
 	.SetLock = &_XAieMl_DmaSetLock,
@@ -801,7 +801,7 @@ static const  XAie_DmaBdCompression Aie4ShimDmaCompressionProp =
 };
 
 /* Data structure to capture register offsets and masks for Tile Dma */
-static const  XAie_DmaBdProp Aie4ShimDmaBdProp =
+static const  XAie_DmaBdProp Aie4ShimDmaProp =
 {
 	.AddrAlignMask = 0x3,
 	.AddrAlignShift = 0U,
@@ -888,36 +888,13 @@ static const  XAie_DmaChProp Aie4ShimDmaChProp =
 	.EnCompression.Mask = XAIE4GBL_NOC_MODULE_DMA_S2MM_0_CTRL_COMPRESSION_ENABLE_MASK,
 };
 
-/* Data structure to capture register offsets and masks for shim Tile and
- * ctrl mm2s channel
- */
-static const XAie_DmaCustomChProp Aie4ShimDmaCtrlMm2sProp =
-{
-	.NumBds = 8,	/* Number Bds for each Control MM2S channel */
-	.NumChannels = 1,
-	.BdBaseAddr = XAIE4GBL_NOC_MODULE_DMA_CONTROL_MM2S_0_BD0_0,
-	.ChCtrlBase = XAIE4GBL_NOC_MODULE_DMA_CONTROL_MM2S_0_CTRL,
-	.ChStatusBase = XAIE4GBL_NOC_MODULE_DMA_CONTROL_MM2S_STATUS_0,
-};
-
-/* Data structure to capture register offsets and masks for shim Tile and
- * trace s2mm channel
- */
-static const XAie_DmaCustomChProp Aie4ShimDmaTraceS2mmProp =
-{
-	.NumBds = 4,	/* Number Bds for each Trace S2MM channel */
-	.NumChannels = 1,
-	.BdBaseAddr = XAIE4GBL_NOC_MODULE_DMA_TRACE_S2MM_BD0_0,
-	.ChCtrlBase = XAIE4GBL_NOC_MODULE_DMA_TRACE_S2MM_CTRL,
-	.ChStatusBase = XAIE4GBL_NOC_MODULE_DMA_TRACE_S2MM_STATUS,
-};
-
 /* Shim Dma Module */
 static const  XAie_DmaMod Aie4ShimDmaMod =
 {
 	.BaseAddr = XAIE4GBL_NOC_MODULE_DMA_BD0_0,
 	.IdxOffset = 0x30,		/* This is the offset between each BD */
 	.NumBds = 16U,			/* Number of BDs for AIE4 ShimTile DMA */
+	.NumMm2sCtrlBds = 8,	/* Number Bds for each control mm2s channel */
 	.NumLocks = 16U,
 	.NumAddrDim = 4U,
 	.DoubleBuffering = XAIE_FEATURE_UNAVAILABLE,
@@ -931,16 +908,15 @@ static const  XAie_DmaMod Aie4ShimDmaMod =
 	.TlastSuppress = XAIE_FEATURE_AVAILABLE,
 	.StartQueueBase = XAIE4GBL_NOC_MODULE_DMA_S2MM_0_TASK_QUEUE,
 	.ChCtrlBase = XAIE4GBL_NOC_MODULE_DMA_S2MM_0_CTRL,
-	.ChCtrlMm2sBase = XAIE4GBL_NOC_MODULE_DMA_MM2S_0_CTRL,
-	.NumChannels = 2U,	/* Number of s2mm channels : Actually this should be 1 (2) as per AIE4 spec, but to avoid gaps issue kept 2 */
+	.ChCtrlOffset = 0x10,
+	.NumChannels = 2U,	/* Number of s2mm channels */
 	.NumMm2sChannels = 2U, /* Number of mm2s channels */
+	.NumMm2sCtrlChannels = 1, /* Number of control MM2S channels */
 	.ChIdxOffset = 0x8,  /* This is the offset between each channel */
 	.ChStatusBase = XAIE4GBL_NOC_MODULE_DMA_S2MM_STATUS_0,
 	.ChStatusOffset = 0x10,
 	.PadValueBase = XAIE_FEATURE_UNAVAILABLE,
-	.CtrlMm2sProp = &Aie4ShimDmaCtrlMm2sProp,
-	.TraceS2mmProp = &Aie4ShimDmaTraceS2mmProp,
-	.BdProp = &Aie4ShimDmaBdProp,
+	.BdProp = &Aie4ShimDmaProp,
 	.ChProp = &Aie4ShimDmaChProp,
 	.DmaBdInit = &_XAie4_ShimDmaInit,
 	.SetLock = &_XAieMl_DmaSetLock,
@@ -949,8 +925,6 @@ static const  XAie_DmaMod Aie4ShimDmaMod =
 	.SetBdIter = &_XAie4_DmaSetBdIteration,
 	.WriteBd = &_XAie4_ShimDmaWriteBd,
 	.ReadBd = &_XAie4_ShimDmaReadBd,
-	.WriteBdPvtBuffPool = &_XAie4_ShimDmaWriteBdPvtBuffPool,
-	.ReadBdPvtBuffPool = &_XAie4_ShimDmaReadBdPvtBuffPool,
 	.PendingBd = &_XAie4_DmaGetPendingBdCount,
 	.WaitforDone = &_XAie4_DmaWaitForDone,
 	.WaitforBdTaskQueue = &_XAie4_DmaWaitForBdTaskQueue,
@@ -958,9 +932,6 @@ static const  XAie_DmaMod Aie4ShimDmaMod =
 	.UpdateBdLen = &_XAie4_ShimTileDmaUpdateBdLen,
 	.GetBdLen = &_XAie4_ShimTileDmaGetBdLen,
 	.UpdateBdAddr = &_XAie4_ShimTileDmaUpdateBdAddr,
-	.UpdateBdLenPvtBuffPool = &_XAie4_ShimTileDmaUpdateBdLenPvtBuffPool,
-	.GetBdLenPvtBuffPool = &_XAie4_ShimTileDmaGetBdLenPvtBuffPool,
-	.UpdateBdAddrPvtBuffPool = &_XAie4_ShimTileDmaUpdateBdAddrPvtBuffPool,
 	.GetChannelStatus = &_XAie4_DmaGetChannelStatus,
 	.AxiBurstLenCheck = &_XAie4_AxiBurstLenCheck,
 };

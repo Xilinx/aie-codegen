@@ -981,23 +981,86 @@ AieRC XAie_DmaSetAxi(XAie_DmaDesc *DmaDesc, u8 Smid, u8 BurstLen, u8 Qos,
 	}
 
 	DmaDesc->AxiDesc.SMID = Smid;
-	switch(BurstLen) {
-		case 4:
-			DmaDesc->AxiDesc.BurstLen = 0;
-			break;
-		case 8:
-			DmaDesc->AxiDesc.BurstLen = 1;
-			break;
-		case 16:
-			DmaDesc->AxiDesc.BurstLen = 2;
-			break;
-		case 32:
-			DmaDesc->AxiDesc.BurstLen = 3;
-			break;
+
+	if (!_XAie_IsDeviceGenAIE4(DmaDesc->DevGen)) {
+		switch(BurstLen) {
+			case 4:
+				DmaDesc->AxiDesc.BurstLen = 0;
+				break;
+			case 8:
+				DmaDesc->AxiDesc.BurstLen = 1;
+				break;
+			case 16:
+				DmaDesc->AxiDesc.BurstLen = 2;
+				break;
+			case 32:
+				DmaDesc->AxiDesc.BurstLen = 3;
+				break;
+		}
+	} else {
+		switch(BurstLen) {
+			case 1:
+				DmaDesc->AxiDesc.BurstLen = 0;
+				break;
+			case 2:
+				DmaDesc->AxiDesc.BurstLen = 1;
+				break;
+			case 4:
+				DmaDesc->AxiDesc.BurstLen = 2;
+				break;
+			case 8:
+				DmaDesc->AxiDesc.BurstLen = 3;
+				break;
+		}
 	}
 	DmaDesc->AxiDesc.AxQos = Qos;
 	DmaDesc->AxiDesc.AxCache = Cache;
 	DmaDesc->AxiDesc.SecureAccess = Secure;
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API setups the Enable Bd, Next Bd and UseNxtBd fields in the DMA
+* Descriptor.
+*
+* @param	DmaDesc: Initialized Dma Descriptor.
+* @param	AxUser: AxUSER for future extension.
+* @param	IOCoherence: IO coherent data for AxUSER.
+* @param	KeyIdx: Trusted memory key index for AxUSER.
+* @param	DataReuse: Data reuse for AxUSER.
+*
+* @return	XAIE_OK on success, Error code on failure.
+*
+* @note		The API sets up the value in the dma descriptor and does not
+*		configure the buffer descriptor field in the hardware.
+*
+******************************************************************************/
+AieRC XAie_DmaSetAxi_AxUser(XAie_DmaDesc *DmaDesc, u8 AxUser, u8 IOCoherence, u8 KeyIdx,
+		u8 DataReuse)
+{
+	if((DmaDesc == XAIE_NULL) ||
+			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	if(DmaDesc->TileType != XAIEGBL_TILE_TYPE_SHIMNOC) {
+		XAIE_ERROR("No Axi properties for tile type\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	if (!_XAie_IsDeviceGenAIE4(DmaDesc->DevGen)) {
+		XAIE_ERROR("Properties valid for Aie4 only\n");
+		return XAIE_INVALID_DEVICE;
+	}
+
+	DmaDesc->AxiDesc.AxUser = AxUser;
+	DmaDesc->AxiDesc.IOCoherence = IOCoherence;
+	DmaDesc->AxiDesc.KeyIdx = KeyIdx;
+	DmaDesc->AxiDesc.DataReuse = DataReuse;
 
 	return XAIE_OK;
 }

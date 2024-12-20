@@ -760,7 +760,8 @@ static const  XAie_DmaBdMultiDimAddr Aie4ShimDmaMultiDimProp =
 
 static const  XAie_DmaSysProp Aie4ShimDmaSysProp =
 {
-	/* TODO: Check why SMID is removed in RegDB...?
+	/* the SMID bits have been removed from the BD as the SMID is now entirely 
+	 defined in a privileged register in the NoC-Module	
 	.SMID.Idx = 5U,
 	.SMID.Lsb = XAIEMLGBL_NOC_MODULE_DMA_BD0_5_SMID_LSB,
 	.SMID.Mask = XAIEMLGBL_NOC_MODULE_DMA_BD0_5_SMID_MASK,*/
@@ -770,13 +771,25 @@ static const  XAie_DmaSysProp Aie4ShimDmaSysProp =
 	.AxQos.Idx = 5U,
 	.AxQos.Lsb = XAIE4GBL_NOC_MODULE_DMA_BD0_5_AXQOS_LSB,
 	.AxQos.Mask = XAIE4GBL_NOC_MODULE_DMA_BD0_5_AXQOS_MASK,
-	/* secure_access is defeatured in AIE4 */
+	/* Defeatured in AIE4. All AXI-MM requests are non-secure */
 	.SecureAccess.Idx = 0,
 	.SecureAccess.Lsb = 0,
 	.SecureAccess.Mask = 0,
 	.AxCache.Idx = 7U,
 	.AxCache.Lsb = XAIE4GBL_NOC_MODULE_DMA_BD0_7_AXCACHE_LSB,
 	.AxCache.Mask = XAIE4GBL_NOC_MODULE_DMA_BD0_7_AXCACHE_MASK,
+	.AxUser.Idx = 0,
+	.AxUser.Lsb = XAIE4GBL_NOC_MODULE_DMA_BD0_0_AXUSER_LSB,
+	.AxUser.Mask = XAIE4GBL_NOC_MODULE_DMA_BD0_0_AXUSER_MASK,
+	.IOCoherence.Idx = 8,
+	.IOCoherence.Lsb = XAIE4GBL_NOC_MODULE_DMA_BD0_8_IO_COHERENCE_LSB,
+	.IOCoherence.Mask = XAIE4GBL_NOC_MODULE_DMA_BD0_8_IO_COHERENCE_MASK,
+	.KeyIdx.Idx = 0,
+	.KeyIdx.Lsb = XAIE4GBL_NOC_MODULE_DMA_BD0_0_KEYIDX_LSB,
+	.KeyIdx.Mask = XAIE4GBL_NOC_MODULE_DMA_BD0_0_KEYIDX_MASK,
+	.DataReuse.Idx = 6,
+	.DataReuse.Lsb = XAIE4GBL_NOC_MODULE_DMA_BD0_6_DATA_REUSE_LSB,
+	.DataReuse.Mask = XAIE4GBL_NOC_MODULE_DMA_BD0_6_DATA_REUSE_MASK,
 };
 
 static const  XAie_DmaBdCompression Aie4ShimDmaCompressionProp =
@@ -919,7 +932,7 @@ static const  XAie_DmaMod Aie4ShimDmaMod =
 	.GetBdLen = &_XAie4_ShimTileDmaGetBdLen,
 	.UpdateBdAddr = &_XAie4_ShimTileDmaUpdateBdAddr,
 	.GetChannelStatus = &_XAie4_DmaGetChannelStatus,
-	.AxiBurstLenCheck = &_XAie2P_AxiBurstLenCheck,
+	.AxiBurstLenCheck = &_XAie4_AxiBurstLenCheck,
 };
 #endif /* XAIE_FEATURE_DMA_ENABLE */
 

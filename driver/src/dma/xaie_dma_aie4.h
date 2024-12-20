@@ -87,7 +87,10 @@ AieRC _XAie4_MemTileDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		XAie_LocType Loc, u16 BdNum);
 AieRC _XAie4_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		XAie_LocType Loc, u16 BdNum);
+
 AieRC _XAie4_DmaSetBdIteration(XAie_DmaDesc *DmaDesc, u32 StepSize, u16 Wrap,
 		u8 IterCurr);
+AieRC _XAie4_AxiBurstLenCheck(u8 BurstLen);
+
 #endif /* XAIE_DMA_AIE4_H */
 /** @} */

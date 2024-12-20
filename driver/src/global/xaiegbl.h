@@ -462,6 +462,7 @@ typedef enum {
 	DMA_S2MM,
 	DMA_MM2S,
 	DMA_MM2S_CTRL, /* Added from AIE4 Shim DMA */
+	DMA_S2MM_TRACE,
 	DMA_MAX
 } XAie_DmaDirection;
 

@@ -53,5 +53,5 @@ u8 _XAie_GetMaxElementValue(u8 DevGen, u8 TileType, u8 AppMode,
 u64 _XAie_ChangeRegisterSpace(u8 devGen, u64 regOffset);
 u8 _XAie_IsUcModulePresent(XAie_DevInst* DevInst, u8 TileType);
 u8 _XAie_DmaGetMaxNumChannels(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
-				    u8 TileType, u8 Dir);
+				    u8 TileType, XAie_DmaDirection Dir);
 #endif

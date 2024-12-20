@@ -552,11 +552,21 @@ typedef struct {
 } XAie_DmaChProp;
 
 /*
+ * The typedef contains the attributes of the Dma Channels
+ */
+typedef struct {
+	u8 NumBds;
+	u8 NumChannels;
+	u32 BdBaseAddr;
+	u32 ChCtrlBase;
+	u32 ChStatusBase;
+}XAie_DmaCustomChProp;
+
+/*
  * The typedef contains attributes of Dma Modules for AIE Tiles and Mem Tiles
  */
 struct XAie_DmaMod {
 	u8  NumBds;
-	u8  NumMm2sCtrlBds;
 	u16  NumLocks;
 	u8  ChIdxOffset;
 	u8  NumAddrDim;
@@ -573,13 +583,14 @@ struct XAie_DmaMod {
 	u32 BaseAddr;
 	u32 IdxOffset;
 	u32 ChCtrlBase;
-	u32 ChCtrlOffset;
+	u32 ChCtrlMm2sBase;
 	u8 NumChannels;
 	u8 NumMm2sChannels;
-	u8 NumMm2sCtrlChannels;
 	u32 ChStatusBase;
 	u32 ChStatusOffset;
 	u32 PadValueBase;
+	const XAie_DmaCustomChProp *CtrlMm2sProp;
+	const XAie_DmaCustomChProp *TraceS2mmProp;
 	const XAie_DmaBdProp *BdProp;
 	const XAie_DmaChProp *ChProp;
 	void (*DmaBdInit)(XAie_DmaDesc *Desc);
@@ -594,6 +605,10 @@ struct XAie_DmaMod {
 			XAie_LocType Loc, u16 BdNum);
 	AieRC (*ReadBd)(XAie_DevInst *DevInst, XAie_DmaDesc *Desc,
 			XAie_LocType Loc, u16 BdNum);
+	AieRC (*WriteBdPvtBuffPool)(XAie_DevInst *DevInst, XAie_DmaDesc *Desc, XAie_LocType Loc,
+			u8 ChNum, XAie_DmaDirection Dir, u16 BdNum);
+	AieRC (*ReadBdPvtBuffPool)(XAie_DevInst *DevInst, XAie_DmaDesc *Desc, XAie_LocType Loc,
+			u8 ChNum, XAie_DmaDirection Dir, u16 BdNum);
 	AieRC (*PendingBd)(XAie_DevInst *DevInst, XAie_LocType Loc,
 			const XAie_DmaMod *DmaMod, u8 ChNum,
 			XAie_DmaDirection Dir, u8 *PendingBd);
@@ -610,6 +625,12 @@ struct XAie_DmaMod {
 			XAie_LocType Loc, u32 *Len, u16 BdNum);
 	AieRC (*UpdateBdAddr)(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
 			XAie_LocType Loc, u64 Addr, u16 BdNum);
+	AieRC (*UpdateBdLenPvtBuffPool)(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod, XAie_LocType Loc,
+			u8 ChNum, XAie_DmaDirection Dir, u32 Len, u16 BdNum);
+	AieRC (*GetBdLenPvtBuffPool)(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod, XAie_LocType Loc,
+			u8 ChNum, XAie_DmaDirection Dir, u32 *Len, u16 BdNum);
+	AieRC (*UpdateBdAddrPvtBuffPool)(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod, XAie_LocType Loc,
+			u8 ChNum, XAie_DmaDirection Dir, u64 Addr, u16 BdNum);
 	AieRC (*GetChannelStatus)(XAie_DevInst *DevInst, XAie_LocType Loc,
 			const XAie_DmaMod *DmaMod, u8 ChNum,
 			XAie_DmaDirection Dir, u32 *Status);

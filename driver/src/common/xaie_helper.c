@@ -1716,6 +1716,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 				TxnPtr = _XAie_ReallocTxnBuf_MemInit(TxnPtr - BuffSize,
 						AllocatedBuffSize * 2U, BuffSize);
 				if(TxnPtr == NULL) {
+					free(blockwrite_buffer);
 					return NULL;
 				}
 				AllocatedBuffSize *= 2U;
@@ -1733,6 +1734,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 				TxnPtr = _XAie_ReallocTxnBuf_MemInit(TxnPtr - BuffSize,
 						AllocatedBuffSize * 2U, BuffSize);
 				if(TxnPtr == NULL) {
+					free(blockwrite_buffer);
 					return NULL;
 				}
 				AllocatedBuffSize *= 2U;
@@ -1750,6 +1752,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 				TxnPtr = _XAie_ReallocTxnBuf_MemInit(TxnPtr - BuffSize,
 						AllocatedBuffSize * 2U, BuffSize);
 				if(TxnPtr == NULL) {
+					free(blockwrite_buffer);
 					return NULL;
 				}
 				AllocatedBuffSize *= 2U;
@@ -2742,7 +2745,7 @@ AieRC _XAie_ClearTransaction(XAie_DevInst* DevInst)
 			(Cmd->Opcode >= XAIE_IO_CUSTOM_OP_BEGIN && Cmd->Opcode < XAIE_IO_CUSTOM_OP_NEXT)) &&
 			((void *)(uintptr_t)Cmd->DataPtr != NULL)) {
 			XAIE_DBG("free DataPtr %p\n", Cmd->DataPtr);
-			free((void *)Cmd->DataPtr);
+			free((void *)(uintptr_t)Cmd->DataPtr);
 		}
 	}
 

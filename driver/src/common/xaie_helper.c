@@ -4126,6 +4126,32 @@ u8 XAie_IsDeviceSupportsL1Interrupt(u8 DevGen) {
 
 /*****************************************************************************/
 /**
+* This function is used to check whether device supports AIE4 Features or not .
+*
+* @param    DevGen: Device generation
+* @param    Feature:  AIE4 Features
+* @return   true:  device supports AIE4 features
+*			false: device doesnt supports AIE4 features
+*
+*******************************************************************************/
+u8 XAie_IsFeatureSupportCheck(u8 DevGen, u8 Feature)
+{
+	if (_XAie_IsDeviceGenAIE4(DevGen)){
+		switch(Feature) {
+			case NO_L1_INTERRUPT_SUPPORT:
+			case PERFORMANCE_SNAPSHOT_SUPPORT:
+			case COMBO_EVENTS_8_SUPPORT:
+				return true;
+			default:
+				return false;
+		}
+	}
+	else
+		return false;
+}
+
+/*****************************************************************************/
+/**
 * This function is used to get the number of combo events.
 *
 * @param    DevInst: Device Instance

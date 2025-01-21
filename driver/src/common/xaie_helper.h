@@ -92,6 +92,10 @@
 #define MAX_VALID_U8_BIT_INDEX 8
 #define MAX_VALID_U16_BIT_INDEX 16
 
+#define NO_L1_INTERRUPT_SUPPORT 1
+#define PERFORMANCE_SNAPSHOT_SUPPORT 2
+#define COMBO_EVENTS_8_SUPPORT 3
+
 
 /*
  * __attribute is not supported for windows. remove it conditionally.
@@ -188,6 +192,7 @@ XAIE_AIG_EXPORT u8 XAie_IsTileTypeAndModuleSupportForEvents(XAie_DevInst* DevIns
 XAIE_AIG_EXPORT	u8 XAie_GetMaxElementValue(u8 DevGen, u8 TileType, u8 AppMode, u8 elementValue);
 XAIE_AIG_EXPORT u8 XAie_IsDeviceSupportsL1Interrupt(u8 DevGen);
 XAIE_AIG_EXPORT u8 XAie_GetComboEventsNumber(XAie_DevInst* DevInst, u8 TileType, XAie_ModuleType Module);
+XAIE_AIG_EXPORT u8 XAie_IsFeatureSupportCheck(u8 DevGen, u8 Feature);
 
 /* this below  Functions will be removed , once other teams migrate to above listed functions  */
 XAIE_AIG_EXPORT u8 _XAie_GetTileTypefromLoc(XAie_DevInst *DevInst, XAie_LocType Loc);

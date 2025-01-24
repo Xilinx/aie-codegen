@@ -64,7 +64,7 @@ XAIE_AIG_EXPORT AieRC XAie_PerfCounterSnapshotSet(XAie_DevInst *DevInst, XAie_Lo
 XAIE_AIG_EXPORT AieRC XAie_PerfCounterSnapshotReset(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_ModuleType Module, u8 Counter);
 XAIE_AIG_EXPORT AieRC XAie_PerfCounterSnapshotLoadEventSet(XAie_DevInst *DevInst, XAie_LocType Loc,
-		XAie_ModuleType Module, u32 EventVal);
+		XAie_ModuleType Module, XAie_Events EventVal);
 XAIE_AIG_EXPORT AieRC XAie_PerfCounterSnapshotLoadEventReset(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_ModuleType Module);
 #endif		/* end of protection macro */

@@ -278,7 +278,6 @@ AieRC XAie_PerfCounterControlSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 	AieRC RC;
 	u32 MaxCounterVal;
 	const XAie_PerfMod *PerfMod;
-	const XAie_EvntMod *EvntMod;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -300,10 +299,8 @@ AieRC XAie_PerfCounterControlSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	if(Module == XAIE_PL_MOD) {
 		PerfMod = &DevInst->DevProp.DevMod[TileType].PerfMod[0U];
-		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
 	} else {
 		PerfMod = &DevInst->DevProp.DevMod[TileType].PerfMod[Module];
-		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
 	/* Check for perf counter support for tiletype and module*/
@@ -311,27 +308,13 @@ AieRC XAie_PerfCounterControlSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAIE_ERROR("Perf counters are not suported for tile type %d and module %d\n", TileType, Module);
 		return XAIE_INVALID_ARGS;
 	}
-
-	/* check if the event passed as input is corresponding to the module */
-	if(StartEvent < EvntMod->EventMin || StartEvent > EvntMod->EventMax ||
-		StopEvent < EvntMod->EventMin || StopEvent > EvntMod->EventMax) {
-		XAIE_ERROR("Invalid Event id\n");
-		return XAIE_INVALID_ARGS;
-	}
-
-	/* Subtract the module offset from event number */
-	StartEvent -= EvntMod->EventMin;
-	StopEvent -= EvntMod->EventMin;
-
-	/* Getting the true event number from the enum to array mapping */
-	IntStartEvent = EvntMod->XAie_EventNumber[StartEvent];
-	IntStopEvent = EvntMod->XAie_EventNumber[StopEvent];
-
-	/*checking for valid true event number */
-	if(IntStartEvent == XAIE_EVENT_INVALID ||
-			IntStopEvent == XAIE_EVENT_INVALID) {
-		XAIE_ERROR("Invalid Event id\n");
-		return XAIE_INVALID_ARGS;
+	
+	/* Getting the true event number from the logical event mapping */
+	RC |= XAie_EventLogicalToPhysicalConv(DevInst, Loc, Module, StartEvent, &IntStartEvent);
+	RC |= XAie_EventLogicalToPhysicalConv(DevInst, Loc, Module, StopEvent, &IntStopEvent);
+	if(RC != XAIE_OK) {
+		XAIE_ERROR("Counld not get physical event number\n");
+		return XAIE_ERR;
 	}
 
 	/* Checking for valid Counter */
@@ -419,8 +402,7 @@ AieRC XAie_PerfCounterResetControlSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 	AieRC RC;
 	u32 MaxCounterVal;	
 	const XAie_PerfMod *PerfMod;
-	const XAie_EvntMod *EvntMod;
-
+	
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
@@ -441,10 +423,8 @@ AieRC XAie_PerfCounterResetControlSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	if(Module == XAIE_PL_MOD) {
 		PerfMod = &DevInst->DevProp.DevMod[TileType].PerfMod[0U];
-		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
 	} else {
 		PerfMod = &DevInst->DevProp.DevMod[TileType].PerfMod[Module];
-		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
 	/* Check for perf counter support for tiletype and module*/
@@ -453,22 +433,10 @@ AieRC XAie_PerfCounterResetControlSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return XAIE_INVALID_ARGS;
 	}
 
-	/* check if the event passed as input is corresponding to the module */
-	if(ResetEvent < EvntMod->EventMin || ResetEvent > EvntMod->EventMax) {
-		XAIE_ERROR("Invalid Event id: %d\n", ResetEvent);
-		return XAIE_INVALID_ARGS;
-	}
-
-	/* Subtract the module offset from event number */
-	ResetEvent -= EvntMod->EventMin;
-
-	/* Getting the true event number from the enum to array mapping */
-	IntResetEvent = EvntMod->XAie_EventNumber[ResetEvent];
-
-	/*checking for valid true event number */
-	if(IntResetEvent == XAIE_EVENT_INVALID) {
-		XAIE_ERROR("Invalid Event id: %d\n", ResetEvent);
-		return XAIE_INVALID_ARGS;
+	RC = XAie_EventLogicalToPhysicalConv(DevInst, Loc, Module, ResetEvent, &IntResetEvent);
+	if(RC != XAIE_OK) {
+		XAIE_ERROR("Counld not get physical event number\n");
+		return XAIE_ERR;
 	}
 
 	/* Checking for valid Counter */
@@ -1321,10 +1289,11 @@ AieRC XAie_PerfCounterSnapshotReset(XAie_DevInst *DevInst, XAie_LocType Loc,
 *
 ******************************************************************************/
 AieRC XAie_PerfCounterSnapshotLoadEventSet(XAie_DevInst *DevInst, XAie_LocType Loc,
-		XAie_ModuleType Module, u32 EventVal)
+		XAie_ModuleType Module, XAie_Events SSLoadEventVal)
 {	
 	u64 CounterSsLoadEvtBaseAddr;
 	u8 TileType;
+	u16 IntSSLoadEventVal;
 	AieRC RC;
 	const XAie_PerfMod *PerfMod;
 
@@ -1356,19 +1325,32 @@ AieRC XAie_PerfCounterSnapshotLoadEventSet(XAie_DevInst *DevInst, XAie_LocType L
 	} else {
 		PerfMod = &DevInst->DevProp.DevMod[TileType].PerfMod[Module];
 	}
+
+	/* Check for perf counter support for tiletype and module*/
+	if(PerfMod->MaxCounterVal == 0) {
+		XAIE_ERROR("Perf counters are not suported for tile type %d and module %d\n", TileType, Module);
+		return XAIE_INVALID_ARGS;
+	}
+	
+	/* Getting the true event number from the logical event mapping */
+	RC |= XAie_EventLogicalToPhysicalConv(DevInst, Loc, Module, SSLoadEventVal, &IntSSLoadEventVal);
+	if(RC != XAIE_OK) {
+		XAIE_ERROR("Counld not get physical event number\n");
+		return XAIE_ERR;
+	}
 	
 	/* Compute register address without offset */
 	CounterSsLoadEvtBaseAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
 						PerfMod->PerfCounterSsLoadEvttBaseAddr;	
 
-	RC |= XAie_Write32(DevInst, CounterSsLoadEvtBaseAddr, EventVal);
+	RC |= XAie_Write32(DevInst, CounterSsLoadEvtBaseAddr, IntSSLoadEventVal);
 
 	/* if device in single app and tile is mem/shim tile*/
 	if(_XAie_IsTileResourceInSharedAddrSpace(DevInst->DevProp.DevGen, TileType)  &&
 			(_XAie4_DeviceInSingleAppMode(DevInst->DevProp.DevGen, DevInst->AppMode))) {
 		CounterSsLoadEvtBaseAddr = _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen, CounterSsLoadEvtBaseAddr);
 
-		RC |= XAie_Write32(DevInst, CounterSsLoadEvtBaseAddr, EventVal);
+		RC |= XAie_Write32(DevInst, CounterSsLoadEvtBaseAddr, IntSSLoadEventVal);
 	}
 
 	return RC;

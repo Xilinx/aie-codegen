@@ -1938,6 +1938,12 @@ AieRC XAie_EventLogicalToPhysicalConv(XAie_DevInst *DevInst, XAie_LocType Loc,
 	/* Getting the true event number from the enum to array mapping */
 	*HwEvent = EvntMod->XAie_EventNumber[EventVal];
 
+	/*checking for valid true event number */
+	if(*HwEvent == XAIE_EVENT_INVALID) {
+		XAIE_ERROR("Invalid Event id\n");
+		return XAIE_ERR;
+	}
+
 	return XAIE_OK;
 }
 

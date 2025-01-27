@@ -302,9 +302,9 @@ static AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 			ControlCodeInst->UcPageSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
 		}
 
-        fprintf(ControlCodeInst->ControlCodedatafp,
-        	"\t UC_DMA_BD\t 0, 0x%lx, @WRITE_data_%d, 1, 0, 0\n",
-        	RegOff,  ControlCodeInst->UcbdDataNum);
+		fprintf(ControlCodeInst->ControlCodedatafp,
+                "\t UC_DMA_BD\t 0, 0x%lx, @WRITE_data_%d, 1, 0, 0\n",
+                RegOff,  ControlCodeInst->UcbdDataNum);
 
 		ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
 		fprintf(ControlCodeInst->ControlCodedata2fp, "WRITE_data_%d:\n",
@@ -524,9 +524,9 @@ static AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32
 			}
 
             fprintf(ControlCodeInst->ControlCodedatafp,
-        			"\t UC_DMA_BD\t 0, 0x%lx, @DMAWRITE_data_%d, 0x%x, 0, 0\n",
-                	(RegOff + AdjustedOff),  ControlCodeInst->UcDmaDataNum,
-					(IterationSize - TempItrSize) );
+                    "\t UC_DMA_BD\t 0, 0x%lx, @DMAWRITE_data_%d, 0x%x, 0, 0\n",
+                    (RegOff + AdjustedOff),  ControlCodeInst->UcDmaDataNum,
+					(IterationSize - TempItrSize));
 
 			AdjustedOff += ((IterationSize - TempItrSize) * UC_DMA_WORD_LEN);
 			CompletedSize += (IterationSize - TempItrSize);
@@ -618,7 +618,7 @@ static AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u
 
             fprintf(ControlCodeInst->ControlCodedatafp,
                     "\t UC_DMA_BD\t 0, 0x%lx, @DMAWRITE_data_%d, %d, 0, 0\n\n",
-                    ( RegOff + AdjustedOff),
+                    (RegOff + AdjustedOff),
                     ControlCodeInst->UcDmaDataNum, IterationSize);
 
 			AdjustedOff += (IterationSize * UC_DMA_WORD_LEN);
@@ -626,7 +626,7 @@ static AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u
 			ControlCodeInst->UcDmaDataNum++;
 		}
 	}
-	
+
 	return XAIE_OK;
 }
 
@@ -644,7 +644,7 @@ static AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u
 * @note		Internal only.
 *
 *******************************************************************************/
-static AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u8 Arg_Index, u8 Num_BDs)
+static AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u32 Arg_Index, u8 Num_BDs)
 {
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	u32 DataAligner = (DATA_SECTION_ALIGNMENT -
@@ -1354,11 +1354,11 @@ static AieRC XAie_ControlCodeIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 	return XAIE_FEATURE_NOT_SUPPORTED;
 }
 
-static AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u8 Arg_Offset, u8 Num_BDs)
+static AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u32 Arg_Index, u8 Num_BDs)
 {
 	/* no-op */
 	(void)IOInst;
-	(void)Arg_Offset;
+	(void)Arg_Index;
 	(void)Num_BDs;
 	XAIE_ERROR("Driver is not compiled with ControlCode generation "
 			"backend (__AIECONTROLCODE__)\n");

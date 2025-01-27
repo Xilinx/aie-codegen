@@ -150,7 +150,7 @@ typedef struct XAie_BackendOps {
 			u32 CmdWd1, const char *CmdStr);
 	AieRC (*RunOp)(void *IOInst, XAie_DevInst *DevInst,
 		     XAie_BackendOpCode Op, void *Arg);
-	AieRC (*AddressPatching)(void *IOInst, u8 Arg_Offset, u8 Num_BDs);
+	AieRC (*AddressPatching)(void *IOInst, u32 Arg_Index, u8 Num_BDs);
 	AieRC (*WaitTaskCompleteToken) (XAie_DevInst *DevInst,
 	uint16_t Column, uint16_t Row, uint32_t Channel, uint8_t NumTokens);
 	XAie_MemInst* (*MemAllocate)(XAie_DevInst *DevInst, u64 Size,

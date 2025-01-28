@@ -101,7 +101,7 @@ TEST(EventApis, EventPlMod)
 			XAIE_EVENT_GROUP_0_PL);
 	CHECK_EQUAL(XAIE_OK, RC);
 
-	u8 eventPointer;
+	u16 eventPointer;
 	RC = XAie_EventLogicalToPhysicalConv(&DevInst, TileLoc, XAIE_PL_MOD,
 			XAIE_EVENT_GROUP_0_PL, &eventPointer);
 	CHECK_EQUAL(XAIE_OK, RC);
@@ -169,7 +169,7 @@ TEST(EventApis, EventCoreMod)
 	RC = XAie_EventPCReset(&DevInst, TileLoc, 1);
 	CHECK_EQUAL(XAIE_OK, RC);
 
-	u8 eventPointer;
+	u16 eventPointer;
 	RC = XAie_EventLogicalToPhysicalConv(&DevInst, TileLoc, XAIE_CORE_MOD,
 			XAIE_EVENT_GROUP_0_CORE, &eventPointer);
 	CHECK_EQUAL(XAIE_OK, RC);
@@ -303,7 +303,7 @@ TEST(EventNegs, InvalidDevInst)
 	RC = XAie_EventPCReset(NULL, TileLoc, 1);
 	CHECK_EQUAL(XAIE_INVALID_ARGS, RC);
 
-	u8 eventPointer;
+	u16 eventPointer;
 	RC = XAie_EventLogicalToPhysicalConv(NULL, TileLoc, XAIE_CORE_MOD,
 			XAIE_EVENT_GROUP_0_CORE, &eventPointer);
 	CHECK_EQUAL(XAIE_INVALID_ARGS, RC);
@@ -382,7 +382,7 @@ TEST(EventNegs, InvalidTile)
 	RC = XAie_EventPCReset(&DevInst, TileLoc, 1);
 	CHECK_EQUAL(XAIE_INVALID_TILE, RC);
 
-	u8 eventPointer;
+	u16 eventPointer;
 	RC = XAie_EventLogicalToPhysicalConv(&DevInst, TileLoc, XAIE_CORE_MOD,
 			XAIE_EVENT_GROUP_0_CORE, &eventPointer);
 	CHECK_EQUAL(XAIE_INVALID_TILE, RC);
@@ -439,7 +439,7 @@ TEST(EventNegs, InvalidModule){
 			XAIE_EVENT_GROUP_0_CORE);
 	CHECK_EQUAL(XAIE_INVALID_ARGS, RC);
 
-	u8 eventPointer;
+	u16 eventPointer;
 	RC = XAie_EventLogicalToPhysicalConv(&DevInst, TileLoc, XAIE_CORE_MOD,
 			XAIE_EVENT_GROUP_0_CORE, &eventPointer);
 	CHECK_EQUAL(XAIE_INVALID_ARGS, RC);
@@ -555,7 +555,7 @@ TEST(EventNegs, OtherErrors){
 	RC = XAie_EventSelectStrmPortReset(&DevInst, ShimNocTileLoc, 2);
 	CHECK_EQUAL(XAIE_OK, RC);
 
-	u8 eventPointer;
+	u16 eventPointer;
 	RC = XAie_EventLogicalToPhysicalConv(&DevInst, CoreTileLoc,
 			XAIE_CORE_MOD, XAIE_EVENT_NONE_PL, &eventPointer);
 	CHECK_EQUAL(XAIE_INVALID_ARGS, RC);

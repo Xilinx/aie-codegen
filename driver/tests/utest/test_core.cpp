@@ -471,15 +471,15 @@ TEST(ElfApis, ElfLoad){
 	CHECK_EQUAL(XAIE_OK, RC);
 	RC = XAie_LoadElfPartial(&DevInst, TileLoc,
 			"elf_files/aie_elfs/large_elf",
-			XAIE_LOAD_ELF_BSS | XAIE_LOAD_ELF_DATA);
+			XAIE_LOAD_ELF_BSS | XAIE_LOAD_ELF_DATA, 1);
 	CHECK_EQUAL(XAIE_OK, RC);
 
 	RC = XAie_LoadElfPartial(&DevInst, TileLoc,
-			"elf_files/aie_elfs/large_elf", XAIE_LOAD_ELF_TXT);
+			"elf_files/aie_elfs/large_elf", XAIE_LOAD_ELF_TXT, 1);
 	CHECK_EQUAL(XAIE_OK, RC);
 
 	RC = XAie_LoadElfPartial(&DevInst, TileLoc,
-			"elf_files/aie_elfs/large_elf", XAIE_LOAD_ELF_ALL);
+			"elf_files/aie_elfs/large_elf", XAIE_LOAD_ELF_ALL, 1);
 	CHECK_EQUAL(XAIE_OK, RC);
 
 #elif AIE_GEN == 2

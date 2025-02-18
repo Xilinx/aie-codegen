@@ -54,7 +54,6 @@
 #define HEADER_SIZE						16*/
 
 /************************** Constant Definitions *****************************/
-static u8 is_shim_bd;
 
 /****************************** Type Definitions *****************************/
 typedef struct {
@@ -75,6 +74,9 @@ typedef struct {
 	u8   CombineCommands;
 	u8   IsJobOpen;
 	u8   IsPageOpen;
+	u8   IsShimBd;
+	u8   FirstBWWithinPageOccured;
+	u8   FirstWriteWithinPageOccured;
 	char *ScrachpadName;
 } XAie_ControlCodeIO;
 
@@ -204,6 +206,8 @@ static void _XAie_StartNewPage(XAie_ControlCodeIO  *ControlCodeInst) {
 	ControlCodeInst->UcPageSize 	 = PAGE_HEADER_SIZE + ISA_OPSIZE_EOF;
 	ControlCodeInst->CombineCommands = 0;
 	ControlCodeInst->IsPageOpen 	 = 1;
+	ControlCodeInst->FirstBWWithinPageOccured = 0;
+	ControlCodeInst->FirstWriteWithinPageOccured = 0;
 }
 
 /*****************************************************************************/
@@ -268,9 +272,18 @@ static void _XAie_StartNewJob(XAie_ControlCodeIO  *ControlCodeInst) {
 static AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 {
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
-	u32 DataAligner = (DATA_SECTION_ALIGNMENT -
-		((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) % DATA_SECTION_ALIGNMENT));
-	if (DataAligner == DATA_SECTION_ALIGNMENT) {
+	u32 DataAligner = 0;
+
+	if(ControlCodeInst->FirstWriteWithinPageOccured == 0) {
+		DataAligner = (DATA_SECTION_ALIGNMENT -
+			((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) % DATA_SECTION_ALIGNMENT));
+		ControlCodeInst->FirstWriteWithinPageOccured = 1;
+	}
+	else {
+		DataAligner = (DATA_SECTION_ALIGNMENT -
+			(ControlCodeInst->UcPageTextSize % DATA_SECTION_ALIGNMENT));
+	}
+	if(DataAligner == DATA_SECTION_ALIGNMENT) {
 		DataAligner = 0U;
 	}
 
@@ -460,7 +473,7 @@ static AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32
 {
 	u32 CompletedSize = 0;
 	u32 IterationSize;
-	u32 DataAligner;
+	u32 DataAligner = 0;
 	u32 TempItrSize = 0;
 	u64 AdjustedOff = 0;
 
@@ -473,8 +486,15 @@ static AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32
 				_XAie_StartNewJob(ControlCodeInst);
 			}
 
-			DataAligner = (DATA_SECTION_ALIGNMENT -
-				((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) % DATA_SECTION_ALIGNMENT));
+			if( (ControlCodeInst->FirstBWWithinPageOccured == 0) || (ControlCodeInst->IsShimBd == 1) ) {
+				DataAligner = (DATA_SECTION_ALIGNMENT -
+					((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) % DATA_SECTION_ALIGNMENT));
+				ControlCodeInst->FirstBWWithinPageOccured = 1;
+			}
+			else {
+				DataAligner = (DATA_SECTION_ALIGNMENT -
+					(ControlCodeInst->UcPageTextSize % DATA_SECTION_ALIGNMENT));
+			}
 			if (DataAligner == DATA_SECTION_ALIGNMENT) {
 				DataAligner = 0U;
 			}
@@ -485,7 +505,7 @@ static AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32
 				_XAie_StartNewJob(ControlCodeInst);
 			}
 
-			if(is_shim_bd){
+			if(ControlCodeInst->IsShimBd){
 				ControlCodeInst->CombineCommands = 0;
 			}
 
@@ -866,7 +886,7 @@ static AieRC XAie_ControlCodeIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 		     XAie_BackendOpCode Op, void *Arg)
 {
 	AieRC RC = XAIE_OK;
-	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
 	switch(Op) {
 		case XAIE_BACKEND_OP_NPIWR32:
@@ -898,13 +918,13 @@ static AieRC XAie_ControlCodeIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 		}
 		case XAIE_BACKEND_OP_CONFIG_SHIMDMABD:
 		{
-			is_shim_bd = 1;
+			ControlCodeInst->IsShimBd = 1;
 			XAie_ShimDmaBdArgs *BdArgs =
 				(XAie_ShimDmaBdArgs *)Arg;
 
 			XAie_ControlCodeIO_BlockWrite32(IOInst, BdArgs->Addr,
 				BdArgs->BdWords, BdArgs->NumBdWords);
-			is_shim_bd = 0;
+			ControlCodeInst->IsShimBd = 0;
 			break;
 		}
 		case XAIE_BACKEND_OP_REQUEST_TILES:

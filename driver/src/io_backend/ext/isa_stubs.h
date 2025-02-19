@@ -7,6 +7,15 @@
 #define _ISA_STUBS_H_
 
 #include <stdint.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "xaie_helper.h"
+#include "xaie_io.h"
+#include "xaie_io_common.h"
+#include "xaie_io_privilege.h"
+#include "xaie_npi.h"
 
 // macro define
 

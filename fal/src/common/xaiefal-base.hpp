@@ -116,9 +116,14 @@ namespace xaiefal {
 			XAieGroupEventMapCore[3] = XAIE_EVENT_GROUP_CORE_PROGRAM_FLOW_CORE;
 			XAieGroupEventMapCore[4] = XAIE_EVENT_GROUP_ERRORS_0_CORE;
 			XAieGroupEventMapCore[5] = XAIE_EVENT_GROUP_ERRORS_1_CORE;
-			XAieGroupEventMapCore[6] = XAIE_EVENT_GROUP_STREAM_SWITCH_CORE;
-			XAieGroupEventMapCore[7] = XAIE_EVENT_GROUP_BROADCAST_CORE;
-			XAieGroupEventMapCore[8] = XAIE_EVENT_GROUP_USER_EVENT_CORE;
+			XAieGroupEventMapCore[6] = XAIE_EVENT_GROUP_ERRORS_2_CORE;
+			XAieGroupEventMapCore[7] = XAIE_EVENT_GROUP_STREAM_SWITCH_CORE;
+			XAieGroupEventMapCore[8] = XAIE_EVENT_GROUP_BROADCAST_CORE;
+			XAieGroupEventMapCore[9] = XAIE_EVENT_GROUP_USER_EVENT_CORE;
+			XAieGroupEventMapCore[10] = XAIE_EVENT_GROUP_WATCHPOINT_CORE;
+			XAieGroupEventMapCore[11] = XAIE_EVENT_GROUP_DMA_ACTIVITY_CORE;
+			XAieGroupEventMapCore[12] = XAIE_EVENT_GROUP_LOCK_CORE;
+			XAieGroupEventMapCore[13] = XAIE_EVENT_GROUP_MEMORY_CONFLICT_CORE;
 
 			XAieGroupEventMapMem[0] = XAIE_EVENT_GROUP_0_MEM;
 			XAieGroupEventMapMem[1] = XAIE_EVENT_GROUP_WATCHPOINT_MEM;
@@ -136,6 +141,9 @@ namespace xaiefal {
 			XAieGroupEventMapPl[4] = XAIE_EVENT_GROUP_STREAM_SWITCH_PL;
 			XAieGroupEventMapPl[5] = XAIE_EVENT_GROUP_BROADCAST_A_PL;
 			XAieGroupEventMapPl[6] = XAIE_EVENT_GROUP_USER_EVENT_PL;
+			XAieGroupEventMapPl[7] = XAIE_EVENT_DMA_GROUP_ACTIVITY_UC;
+			XAieGroupEventMapPl[8] = XAIE_EVENT_CORE_PROGRAM_FLOW_GROUP_ERRORS_UC;
+			XAieGroupEventMapPl[9] = XAIE_EVENT_CORE_GROUP_PC_STATUS_EVENT_UC;
 
 			XAieGroupEventMapMemTile[0] = XAIE_EVENT_GROUP_0_MEM_TILE;
 			XAieGroupEventMapMemTile[1] = XAIE_EVENT_GROUP_WATCHPOINT_MEM_TILE;
@@ -229,9 +237,9 @@ namespace xaiefal {
 		}
 
 		// TODO: Configure group event should be moved to c driver
-		uint32_t XAieGroupEventMapCore[9];
+		uint32_t XAieGroupEventMapCore[14];
 		uint32_t XAieGroupEventMapMem[8];
-		uint32_t XAieGroupEventMapPl[8];
+		uint32_t XAieGroupEventMapPl[10];
 		uint32_t XAieGroupEventMapMemTile[9];
 	private:
 		XAie_DevInst *Dev;
@@ -931,7 +939,12 @@ namespace xaiefal {
 			if (XAie_CheckModule(AieHandle->dev(), Loc, XAIE_CORE_MOD)
 				== XAIE_OK) {
 				StartM = XAIE_CORE_MOD;
-				EndM = XAIE_MEM_MOD;
+
+				if(XAie_IsFeatureSupportCheck(AieHandle->dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
+					EndM = XAIE_CORE_MOD;
+				} else {
+					EndM = XAIE_MEM_MOD;
+				}
 			} else if (XAie_CheckModule(AieHandle->dev(), Loc,
 				XAIE_PL_MOD) == XAIE_OK) {
 				StartM = XAIE_PL_MOD;
@@ -1053,7 +1066,7 @@ namespace xaiefal {
 			Module = XAIE_CORE_MOD;
 		} else if (Event < XAIE_EVENT_NONE_PL ||
 				(Event >= XAIE_EVENT_NONE_MEM_TILE &&
-				 Event <= XAIE_EVENT_USER_EVENT_1_MEM_TILE)) {
+				 Event <= XAIE_EVENT_USER_EVENT_7_MEM_TILE)) {
 			Module = XAIE_MEM_MOD;
 		} else {
 			Module = XAIE_PL_MOD;

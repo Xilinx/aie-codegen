@@ -92,9 +92,11 @@
 #define MAX_VALID_U8_BIT_INDEX 8
 #define MAX_VALID_U16_BIT_INDEX 16
 
-#define NO_L1_INTERRUPT_SUPPORT 1
-#define PERFORMANCE_SNAPSHOT_SUPPORT 2
-#define COMBO_EVENTS_8_SUPPORT 3
+/*the below Macros are to capture AIE4 features*/
+#define NO_L1_INTERRUPT_SUPPORT 1		/* L1 interuupt is removed */
+#define PERFORMANCE_SNAPSHOT_SUPPORT 2	/*performance snapshot registers are added */
+#define COMBO_EVENTS_8_SUPPORT 3	/*4 additional combo events are added*/
+#define NO_MEM_MOD_IN_AIE_TILE	4	/*core and mem module in AIE tile are combined*/
 
 
 /*

@@ -83,7 +83,8 @@ namespace xaiefal {
 					if (Loc.Col == vLocs[i].Col && Loc.Row == vLocs[i].Row) {
 						RC = XAIE_OK;
 						if (TileType == XAIEGBL_TILE_TYPE_AIETILE) {
-							if (Mod == XAIE_MEM_MOD) {
+							if ((Mod == XAIE_MEM_MOD) &&
+									(!XAie_IsFeatureSupportCheck(AieHd->dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE))) {
 								Event = XAIE_EVENT_BROADCAST_0_MEM;
 							} else {
 								Event = XAIE_EVENT_BROADCAST_0_CORE;
@@ -163,6 +164,13 @@ namespace xaiefal {
 			AieRC RC = XAIE_OK;
 			int i = 0;
 			uint32_t TType;
+			uint8_t loop_iterate = 2;
+
+			/* If there is no MEM module in AIE tile, there will be only resource added
+			 * in the resource list*/
+			if(XAie_IsFeatureSupportCheck(dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)){
+				loop_iterate = 1;
+			}
 
 			for(auto r = vRscs.begin(); r != vRscs.end();) {
 				uint8_t un_block = 0;
@@ -182,12 +190,12 @@ namespace xaiefal {
 						}
 					}
 
-					if ((r + 2) != vRscs.end()) {
-						if  ((*(r + 2)).Loc.Col < ((*r).Loc.Col ))  {
+					if ((r + loop_iterate) != vRscs.end()) {
+						if  ((*(r + loop_iterate)).Loc.Col < ((*r).Loc.Col ))  {
 							un_block |= XAIE_EVENT_BROADCAST_WEST;
-						} else if  ((*(r + 2)).Loc.Col > ((*r).Loc.Col))  {
+						} else if  ((*(r + loop_iterate)).Loc.Col > ((*r).Loc.Col))  {
 							un_block |= XAIE_EVENT_BROADCAST_EAST;
-						} else if ((*(r + 2)).Loc.Row > ((*r).Loc.Row))  {
+						} else if ((*(r + loop_iterate)).Loc.Row > ((*r).Loc.Row))  {
 							un_block |= XAIE_EVENT_BROADCAST_NORTH;
 						} else {
 							un_block |= XAIE_EVENT_BROADCAST_SOUTH;
@@ -207,8 +215,10 @@ namespace xaiefal {
 						}
 
 					} else {
-						un_block |= XAIE_EVENT_BROADCAST_EAST;
-						un_block_n |= XAIE_EVENT_BROADCAST_WEST;
+						if(!XAie_IsFeatureSupportCheck(dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)){
+							un_block |= XAIE_EVENT_BROADCAST_EAST;
+							un_block_n |= XAIE_EVENT_BROADCAST_WEST;
+						}
 					}
 
 					RC = XAie_EventBroadcastUnblockDir(dev(),
@@ -216,29 +226,34 @@ namespace xaiefal {
 									XAIE_EVENT_SWITCH_A,
 									(*r).RscId,
 									XAIE_EVENT_BROADCAST_ALL);
-					RC = XAie_EventBroadcastUnblockDir(dev(),
-									(*(r+1)).Loc, (*(r + 1)).Mod,
-									XAIE_EVENT_SWITCH_A,
-									(*(r + 1)).RscId,
-									XAIE_EVENT_BROADCAST_ALL);
 					RC = XAie_EventBroadcastBlockDir(dev(),
 									(*r).Loc, (*r).Mod,
 									XAIE_EVENT_SWITCH_A,
 									(*r).RscId,
 									XAIE_EVENT_BROADCAST_ALL & (~un_block));
-					RC = XAie_EventBroadcastBlockDir(dev(),
-									(*(r + 1)).Loc, (*(r+1)).Mod,
-									XAIE_EVENT_SWITCH_A,
-									(*(r + 1)).RscId,
-									XAIE_EVENT_BROADCAST_ALL & (~un_block_n));
+					if(!XAie_IsFeatureSupportCheck(dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)){
+						RC = XAie_EventBroadcastUnblockDir(dev(),
+										(*(r+1)).Loc, (*(r + 1)).Mod,
+										XAIE_EVENT_SWITCH_A,
+										(*(r + 1)).RscId,
+										XAIE_EVENT_BROADCAST_ALL);
 
-					r += 2;
+						RC = XAie_EventBroadcastBlockDir(dev(),
+										(*(r + 1)).Loc, (*(r+1)).Mod,
+										XAIE_EVENT_SWITCH_A,
+										(*(r + 1)).RscId,
+										XAIE_EVENT_BROADCAST_ALL & (~un_block_n));
+					}
+
+					r += loop_iterate;
 				} else {
 					if (r != vRscs.begin()) {
 						if  ((*(r - 1)).Loc.Col < ((*r).Loc.Col ))  {
 							un_block = XAIE_EVENT_BROADCAST_WEST;
 						} else if  ((*(r - 1)).Loc.Col > ((*r).Loc.Col))  {
 							un_block = XAIE_EVENT_BROADCAST_EAST;
+						}  else if ((*(r - 1)).Loc.Row < ((*r).Loc.Row))  {
+							un_block |= XAIE_EVENT_BROADCAST_SOUTH;
 						} else {
 							un_block = XAIE_EVENT_BROADCAST_NORTH;
 						}
@@ -248,31 +263,44 @@ namespace xaiefal {
 							un_block |= XAIE_EVENT_BROADCAST_WEST;
 						} else if  ((*(r + 1)).Loc.Col > ((*r).Loc.Col))  {
 							un_block |= XAIE_EVENT_BROADCAST_EAST;
+						} else if ((*(r + 1)).Loc.Row < ((*r).Loc.Row))  {
+							un_block |= XAIE_EVENT_BROADCAST_SOUTH;
 						} else {
 							un_block |= XAIE_EVENT_BROADCAST_NORTH;
 						}
 					}
-					RC = XAie_EventBroadcastUnblockDir(dev(),
-						(*r).Loc, (*r).Mod,
-						XAIE_EVENT_SWITCH_A,
-						(*r).RscId,
-						XAIE_EVENT_BROADCAST_ALL);
-					RC = XAie_EventBroadcastUnblockDir(dev(),
-						(*r).Loc, (*r).Mod,
-						XAIE_EVENT_SWITCH_B,
-						(*r).RscId,
-						XAIE_EVENT_BROADCAST_ALL);
-					RC = XAie_EventBroadcastBlockDir(dev(),
-						(*r).Loc, (*r).Mod,
-						XAIE_EVENT_SWITCH_A,
-						(*r).RscId,
-						XAIE_EVENT_BROADCAST_ALL & (~(un_block | XAIE_EVENT_BROADCAST_EAST)));
+					un_block_n = un_block;
+					if(!XAie_IsFeatureSupportCheck(dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)){
+						un_block |= XAIE_EVENT_BROADCAST_EAST;
+						un_block_n |= XAIE_EVENT_BROADCAST_WEST;
+					}
 
+					RC = XAie_EventBroadcastUnblockDir(dev(),
+						(*r).Loc, (*r).Mod,
+						XAIE_EVENT_SWITCH_A,
+						(*r).RscId,
+						XAIE_EVENT_BROADCAST_ALL);
 					RC = XAie_EventBroadcastBlockDir(dev(),
 						(*r).Loc, (*r).Mod,
-						XAIE_EVENT_SWITCH_B,
+						XAIE_EVENT_SWITCH_A,
 						(*r).RscId,
-						XAIE_EVENT_BROADCAST_ALL & (~(un_block | XAIE_EVENT_BROADCAST_WEST)));
+						XAIE_EVENT_BROADCAST_ALL & (~(un_block)));
+
+					/*for devices with no MEM module in AIE tile, there is only one switch in
+					 * MEM tile and PL tile*/
+					if(!XAie_IsFeatureSupportCheck(dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)){
+						RC = XAie_EventBroadcastUnblockDir(dev(),
+							(*r).Loc, (*r).Mod,
+							XAIE_EVENT_SWITCH_B,
+							(*r).RscId,
+							XAIE_EVENT_BROADCAST_ALL);
+
+						RC = XAie_EventBroadcastBlockDir(dev(),
+							(*r).Loc, (*r).Mod,
+							XAIE_EVENT_SWITCH_B,
+							(*r).RscId,
+							XAIE_EVENT_BROADCAST_ALL & (~(un_block_n)));
+					}
 
 					r++;
 				}
@@ -372,8 +400,10 @@ namespace xaiefal {
 				if (TType == XAIEGBL_TILE_TYPE_AIETILE) {
 					R.Mod = XAIE_CORE_MOD;
 					vR.push_back(R);
-					R.Mod = XAIE_MEM_MOD;
-					vR.push_back(R);
+					if(!XAie_IsFeatureSupportCheck(Dev->dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
+						R.Mod = XAIE_MEM_MOD;
+						vR.push_back(R);
+					}
 				} else if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
 					R.Mod = XAIE_MEM_MOD;
 					vR.push_back(R);

@@ -4141,6 +4141,7 @@ u8 XAie_IsFeatureSupportCheck(u8 DevGen, u8 Feature)
 			case NO_L1_INTERRUPT_SUPPORT:
 			case PERFORMANCE_SNAPSHOT_SUPPORT:
 			case COMBO_EVENTS_8_SUPPORT:
+			case NO_MEM_MOD_IN_AIE_TILE:
 				return true;
 			default:
 				return false;

@@ -350,30 +350,26 @@ void _XAie4_MemTileDmaInit(XAie_DmaDesc* Desc)
 AieRC _XAie4_DmaSetMultiDim(XAie_DmaDesc *DmaDesc, XAie_DmaTensor *Tensor)
 {
 	/* As there is no config bits for D0_StepSize this check is not needed,
-	 * means, app dont need to set the D0_StepSize at all for AIE4, For now printing a
+	 * means app dont need to set the D0_StepSize at all for AIE4, For now printing a
 	 * warning message
 	 */
 	if ( (Tensor->NumDim > 0) && (Tensor->Dim[0].AieMlDimDesc.StepSize != 1U) ) {
 		XAIE_WARN("AIE4 : D0_Stepsize is removed (assumed to be always 1, i.e. linear accesses)\n");
-		return XAIE_ERR;
 	}
 
 	for(u8 i = 0U; i < Tensor->NumDim; i++) {
 		const XAie_DmaBdProp *BdProp = DmaDesc->DmaMod->BdProp;
 		if(((u8)i > 0U) && (Tensor->Dim[i].AieMlDimDesc.StepSize > (u32)BdProp->StepSizeMax)) {
-			XAIE_ERROR("Invalid stepsize for dimension %d\n", i);
+			XAIE_ERROR("Invalid stepsize for dimension %d with stepsize %d\n",
+					i, Tensor->Dim[i].AieMlDimDesc.StepSize);
 			return XAIE_ERR;
 		}
 		/* In AIE4 Wrap Size Max is 511 for AIE Tile, 4095 for MemTile 
 		   and shimTile.*/
 		if(((u8)i > 0U) && (Tensor->Dim[i].AieMlDimDesc.Wrap > (u16)BdProp->WrapMax)) {
-			XAIE_ERROR("Invalid wrap for dimension %d\n", i);
+			XAIE_ERROR("Invalid wrap for dimension %d with wrap %d\n",
+					i, Tensor->Dim[i].AieMlDimDesc.Wrap);
 			return XAIE_ERR;
-		}
-		//There is no wrap parameter on the highest dimension. So it should passed as zero
-		if(((u8)i == (Tensor->NumDim - 1)) && (Tensor->Dim[i].AieMlDimDesc.Wrap != 0)) {
-			XAIE_WARN("There is no wrap parameter on the highest dimension. Dn-1_wrapSize must be 0 %d\n", i);
-			Tensor->Dim[i].AieMlDimDesc.Wrap = 0;
 		}
 	}
 

@@ -99,7 +99,8 @@ XAIE_AIG_EXPORT AieRC XAie_NpiSetPartProtectedReg(XAie_DevInst *DevInst, u8 enab
 XAIE_AIG_EXPORT AieRC XAie_PowerOnReset(XAie_DevInst *DevInst, XAie_PartPorOpts *PorOptions);
 XAIE_AIG_EXPORT AieRC XAie_TileClockControl(XAie_DevInst *DevInst, XAie_LocType *Locs,u8 NumTiles, u8 Enable);
 XAIE_AIG_EXPORT AieRC XAie_ConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie_ShimOpts *ShimOptions);
-XAIE_AIG_EXPORT AieRC XAie_ClearBCPort(XAie_DevInst *DevInst, u8 BcChan, u8 Col);
+XAIE_AIG_EXPORT AieRC XAie_ClearBCPort(XAie_DevInst *DevInst, u8 BcChan);
+XAIE_AIG_EXPORT AieRC XAie_TrigColIntr(XAie_DevInst *DevInst, u8 BcChan);
 XAIE_AIG_EXPORT AieRC XAie_PauseMem(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_CfgPrivilegeHwErrIrq(XAie_DevInst *DevInst, XAie_HwErrCfg HwErrCf);
 XAIE_AIG_EXPORT AieRC XAie_WakeupShimUc(XAie_DevInst *DevInst, u8 ColNum);

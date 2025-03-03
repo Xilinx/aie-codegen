@@ -1790,7 +1790,7 @@ static inline AieRC _XAie_LConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie
 * @return   XAIE_OK on success, error code on failure
 *
 *******************************************************************************/
-static inline AieRC _XAie_LClearBCPort(XAie_DevInst *DevInst, u8 BcChan, u8 Col) {
+static inline AieRC _XAie_LClearBCPort(XAie_DevInst *DevInst, u8 BcChan) {
 
 	u32 RegOff;
 	u64 RegAddr;
@@ -1811,13 +1811,84 @@ static inline AieRC _XAie_LClearBCPort(XAie_DevInst *DevInst, u8 BcChan, u8 Col)
 	else
 		return XAIE_INVALID_APP_MODE;
 
-	/* The caller of this API Will shift the base address to the actual column number in
-           partition. So need to add Row, Column value into register base address. */
+        /* The caller of this API Will shift the base address to the actual column number in
+           partition. So no need to add Column value into register base address and this register
+           is in Shim Tile, So Row will be always zero.  */
 	RegAddr = (RegOff + (u32)(BcChan * XAIE_PL_BROADCAST_CHAN_OFFSET));
 	_XAie_LPartWrite32(DevInst, RegAddr, 0);
 
 	return XAIE_OK;
 }
+
+
+/*****************************************************************************/
+/**
+* This API Trigger the Broadcast Interrupt
+*
+* @param    DevInst: AI engine partition device instance pointer
+* @param    BcChan: Broadcast Channel number to be written
+*
+* @return   XAIE_OK on success, error code on failure
+*
+*******************************************************************************/
+static inline AieRC _XAie_LTrigColIntr(XAie_DevInst *DevInst, u8 BcChan) {
+
+        u32 RegOff;
+        u64 RegAddr;
+
+        if(BcChan < XAIE_PL_BROADCAST_CHAN13 || BcChan > XAIE_PL_BROADCAST_CHAN15) {
+                XAIE_ERROR("Invalid BroadCast Channel Number\n");
+                return XAIE_INVALID_ARGS;
+        }
+
+	/*Before Trigger the column interrupt need to block all direction except
+	  South direction to avoid interrupt propage into neighbour columns.*/
+        if((DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) ||
+                (DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE)) {
+                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_A_BLOCK_WEST_SET;
+		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
+
+                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_A_BLOCK_NORTH_SET;
+		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
+
+                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_A_BLOCK_EAST_SET;
+		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
+	}
+        else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
+                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_B_BLOCK_WEST_SET;
+		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
+
+                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_B_BLOCK_NORTH_SET;
+		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
+
+                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_B_BLOCK_EAST_SET;
+		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
+	}
+        else
+                return XAIE_INVALID_APP_MODE;
+
+
+        /* This API will be called from NPMPU firmware in secure mode. So for APP B
+           register address needs to be physical. Below condition checks for Application
+           mode and based on that assigning proper register address. */
+        if((DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) ||
+                (DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE))
+                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_A_0;
+        else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B)
+                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_B_0;
+        else
+                return XAIE_INVALID_APP_MODE;
+
+        /* The caller of this API Will shift the base address to the actual column number in
+           partition. So no need to add Column value into register base address and this register
+	   is in Shim Tile, So Row will be always zero.  */
+        RegAddr = (RegOff + (u32)(BcChan * XAIE_PL_BROADCAST_CHAN_OFFSET));
+
+        _XAie_LPartWrite32(DevInst, RegAddr, 1);
+
+        return XAIE_OK;
+}
+
 
 /*****************************************************************************/
 /**

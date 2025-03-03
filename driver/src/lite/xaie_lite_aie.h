@@ -449,6 +449,24 @@ static inline AieRC _XAie_LConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie
 
 /*****************************************************************************/
 /**
+*  This API Trigger the Broadcast Interrupt
+*
+* @param    DevInst: AI engine partition device instance pointer
+* @param    BcChan: Broadcast Channel number to be written
+*
+* @return   XAIE_OK on success, error code on failure
+*
+*******************************************************************************/
+static inline AieRC _XAie_LTrigColIntr(XAie_DevInst *DevInst, u8 BcChan)
+{
+	(void *)DevInst;
+	(void)BcChan;
+
+	return XAIE_NOT_SUPPORTED;
+}
+
+/*****************************************************************************/
+/**
 * This API Clears the Broadcast Interrupt
 *
 * @param    DevInst: AI engine partition device instance pointer
@@ -458,11 +476,10 @@ static inline AieRC _XAie_LConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie
 * @return   XAIE_OK on success, error code on failure
 *
 *******************************************************************************/
-static inline AieRC _XAie_LClearBCPort(XAie_DevInst *DevInst, u8 BcChan, u8 Col)
+static inline AieRC _XAie_LClearBCPort(XAie_DevInst *DevInst, u8 BcChan)
 {
         (void *)DevInst;
         (void)BcChan;
-        (void)Col;
 
         return XAIE_NOT_SUPPORTED;
 }

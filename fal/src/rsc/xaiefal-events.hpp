@@ -107,7 +107,7 @@ namespace xaiefal {
 					vOutEvents.push_back((XAie_Events)((uint32_t)BaseEvent + vRscs[0].RscId));
 				} else {
 					for (uint32_t i = 0; i < (uint32_t)vOps.size(); i++) {
-						vOutEvents.push_back((XAie_Events)((uint32_t)BaseEvent + i));
+						vOutEvents.push_back((XAie_Events)((uint32_t)BaseEvent + vRscs[0].RscId + i));
 					}
 				}
 				RC = XAIE_OK;
@@ -163,15 +163,28 @@ namespace xaiefal {
 				if (vRscs.size() <= 2) {
 					/*
 					 * Only two input events, it can be combo0 or
-					 * combo1
+					 * combo1 or Combo4 or Combo5
+					 * reservedId are assigned based on the
+					 * RscId of the event
 					 */
 					if (vRscs[0].RscId < 2) {
 						reservedId = 0;
-					} else {
+					} else if (vRscs[0].RscId == 2){
 						reservedId = 1;
+					} else if (vRscs[0].RscId == 4){
+						reservedId = 3;
+					} else {
+						reservedId = 4;
 					}
 				} else {
-					reservedId = 2;
+					/*For the list of four combo events it may be
+					 *  combo 0-3 or combo 4-7 */
+					if ((vRscs.size() <= 4) && (vRscs[0].RscId == 0)) {
+						reservedId = 2;
+					} else {
+						reservedId = 5;
+					}
+
 				}
 			}
 			return RC;
@@ -192,8 +205,12 @@ namespace xaiefal {
 
 				if (vRscs[i].RscId == 0) {
 					ComboId = XAIE_EVENT_COMBO0;
-				} else {
+				} else if (vRscs[i].RscId == 2) {
 					ComboId = XAIE_EVENT_COMBO1;
+				} else if (vRscs[i].RscId == 4) {
+					ComboId = XAIE_EVENT_COMBO4;
+				} else {
+					ComboId = XAIE_EVENT_COMBO5;
 				}
 				if (i == 0) {
 					StartCId = ComboId;
@@ -214,12 +231,17 @@ namespace xaiefal {
 				}
 			}
 			if (RC == XAIE_OK && vOps.size() == 3) {
+				if(vRscs[0].RscId == 0)
+					StartCId = XAIE_EVENT_COMBO2;
+				else
+					StartCId = XAIE_EVENT_COMBO6;
+
 				RC = XAie_EventComboConfig(dev(), Loc, Mod,
-					XAIE_EVENT_COMBO2, vOps[2], vEvents[0], vEvents[0]);
+						StartCId, vOps[2], vEvents[0], vEvents[0]);
 				if (RC != XAIE_OK) {
 					Logger::log(LogLevel::FAL_ERROR) << "combo event " << __func__ << " (" <<
 						(uint32_t)Loc.Col << "," << (uint32_t)Loc.Row <<
-						" Mod=" << Mod <<  " failed to config combo " << XAIE_EVENT_COMBO2 << std::endl;
+						" Mod=" << Mod <<  " failed to config combo " << StartCId << std::endl;
 				}
 			}
 			return RC;
@@ -231,12 +253,16 @@ namespace xaiefal {
 				if (i == 0) {
 					if (vRscs[i].RscId == 0) {
 						ComboId = XAIE_EVENT_COMBO0;
-					} else {
+					} else if (vRscs[i].RscId == 2) {
 						ComboId = XAIE_EVENT_COMBO1;
+					} else if (vRscs[i].RscId == 4) {
+						ComboId = XAIE_EVENT_COMBO4;
+					} else {
+						ComboId = XAIE_EVENT_COMBO5;
 					}
+				}
 					XAie_EventComboReset(dev(), Loc, Mod, ComboId);
 					ComboId = (XAie_EventComboId)((uint32_t)ComboId + 1);
-				}
 			}
 			return XAIE_OK;
 		}

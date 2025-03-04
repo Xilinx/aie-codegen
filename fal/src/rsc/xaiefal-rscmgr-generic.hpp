@@ -738,6 +738,8 @@ namespace xaiefal {
 		 */
 		uint32_t getMaxRsc(XAie_LocType Loc, XAie_ModuleType Mod, XAieRscType Type) {
 			uint8_t TileType = XAie_GetTileTypefromLoc(dev(), Loc);
+			if (TileType >= XAIEGBL_TILE_TYPE_MAX)
+				return 0;
 
 			auto vMaxRscs = RscMaps[TileType].MaxRscs[Type];
 			for (auto x : vMaxRscs)

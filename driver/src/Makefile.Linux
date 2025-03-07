@@ -23,12 +23,26 @@ INTERNALDIR = ../internal
 EXTERNAL_INCLUDEFILES = ./*/xaie_clock.h ./*/xaie_reset.h ./*/xaie_core.h ./*/xaie_dma.h ./*/xaie_elfloader.h ./*/xaie_events.h ./*/xaie_events_aie.h ./*/xaie_events_aieml.h ./*/xaie_interrupt.h ./*/xaie_lite.h ./*/xaie_lite_util.h ./*/xaie_locks.h ./*/xaie_mem.h ./*/xaie_perfcnt.h ./*/xaie_plif.h ./*/xaie_ss.h ./*/xaie_timer.h ./*/xaie_trace.h ./*/xaie_util_events.h ./*/xaiegbl.h ./*/xaiegbl_dynlink.h ./*/xaiegbl_defs.h ./*/xaiegbl_regdef.h ./*/xaie_io.h ./*/xaie_feature_config.h ./*/xaie_helper.h ./*/xaie_lite_hwcfg.h ./*/xaie_txn.h ./*/xaie_noc.h
 EXTERNAL_INCLUDEDIR = ../externalInclude
 
+SWIG_INCLUDEFILES = ./io_backend/swig/swig_socket_interface.h ./*/xaiegbl.h ./io_backend/ext/isa_stubs.h ./io_backend/ext/xaie_socket.c ./io_backend/ext/main_rts.h ./*/xaie_clock.h ./*/xaie_dma.h ./*/xaie_events.h ./*/xaie_feature_config.h ./*/xaie_helper.h ./*/xaie_io.h  ./io_backend/xaie_io_internal.h  ./io_backend/privilege/xaie_io_privilege.h ./io_backend/swig/swig_socket_backend_interface.i ./global/xaiegbl.c ./*/xaiegbl_defs.h ./*/xaiegbl_dynlink.h ./*/xaiegbl_regdef.h ./*/xaie_locks.h ./io_backend/ext/xaie_io_common.h ./*/xaie_helper_internal.h ./npi/xaie_npi.h ./io_backend/ext/xaie_controlcode.c
+SWIG_INCLUDEDIR = ../swigInclude
+
 NAME := xaiengine
 MAJOR = 3
 MINOR = 5
 VERSION = $(MAJOR).$(MINOR)
 
-all: include lib$(NAME).so
+ifdef D__SWIGINTERFACE__
+  BACKEND_TARGET = swig
+  EXTRA_CFLAGS += -D__SWIGINTERFACE__
+  INCLUDEFILES += $(SWIG_INCLUDEFILES)
+endif
+
+all: include lib$(NAME).so $(BACKEND_TARGET)
+swig: include lib$(NAME).so $(BACKEND_TARGET) swigInclude
+
+swigInclude:
+	mkdir $(SWIG_INCLUDEDIR)/ -p
+	$(CP) $(SWIG_INCLUDEFILES) $(SWIG_INCLUDEDIR)/
 
 externalInclude:
 	mkdir $(EXTERNAL_INCLUDEDIR)/xaiengine -p
@@ -53,6 +67,13 @@ lib$(NAME).so: lib$(NAME).so.$(VERSION)
 
 %.o: %.c include
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -I$(INTERNALDIR) -I$(INTERNALDIR)/xaiengine -c -fPIC $< -o $@
+
+swig: include lib$(NAME).so
+CFLAGS_swig += -Wall -Wextra --std=c11 -D__SWIGINTERFACE__ -D__SOCKET__
+ifeq ($(MAKECMDGOALS) ,swig)
+%.o: %.c include
+	$(CC) $(CFLAGS_swig) -I$(SWIG_INCLUDEDIR) -I$(INTERNALDIR) -I$(INTERNALDIR)/xaiengine -c -fPIC $< -o $@
+endif
 
 baremetal: include lib$(NAME).so
 CFLAGS_bare += -Wall -Wextra --std=c11 -D__AIEBAREMETAL__
@@ -89,11 +110,6 @@ ifeq ($(MAKECMDGOALS) ,compileraiengine)
 	$(CC) $(CFLAGS_compileraiengine) -I$(INTERNALDIR) -I$(INTERNALDIR)/xaiengine -c -fPIC $< -o $@
 endif
 
-
-
-
-
-
 doc-generate:
 	mkdir -p $(DOCS_DIR)
 	doxygen $(DOXYGEN_CONFIG_FILE)
@@ -107,3 +123,4 @@ clean:
 	rm -rf $(INCLUDEDIR)
 	rm -rf $(INTERNALDIR)
 	rm -rf $(EXTERNAL_INCLUDEDIR)
+	rm -rf $(SWIG_INCLUDEDIR)

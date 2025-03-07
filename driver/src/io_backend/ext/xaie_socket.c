@@ -43,20 +43,23 @@
 #include "xaie_io_common.h"
 #include "xaie_io_privilege.h"
 #include "xaie_npi.h"
+#ifdef __SWIGINTERFACE__
+#include "swig_socket_interface.h"
+#endif
 
 /***************************** Macro Definitions *****************************/
+#ifndef __SWIGINTERFACE__
 #define XAIE_IO_SOCKET_CMDBUFSIZE	48U
 #define XAIE_IO_SOCKET_RDBUFSIZE	11U /* "0xDEADBEEF\n" */
+#endif
 
 /****************************** Type Definitions *****************************/
 #ifdef __AIESOCKET__
-
 typedef struct XAie_SocketIO {
 	u64 BaseAddr;
 	u64 NpiBaseAddr;
 	int SocketFd;
 } XAie_SocketIO;
-
 #endif /* __AIESOCKET__ */
 /************************** Function Definitions *****************************/
 #ifdef __AIESOCKET__
@@ -273,6 +276,90 @@ static AieRC XAie_SocketIO_Read32(void *IOInst, u64 RegOff, u32 *Data)
 	return XAIE_OK;
 }
 
+#ifdef __SWIGINTERFACE__
+/*****************************************************************************/
+/**
+*
+* This is the public interface memory IO function to initialize the global IO instance
+*
+* @param	None.
+*
+* @return	None.
+*
+* @note		The global IO instance is a singleton and any further attempt
+* to initialize just increments the reference count. Internal only.
+*
+*******************************************************************************/
+int XAie_SocketIO_swig_Init(Swig_DevInst *DevInst) {
+	AieRC RC;
+	RC = XAie_SocketIO_Init(DevInst);
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the public interface memory IO function to write 32bit data to the specified address.
+*
+* @param	IOInst: IO instance pointer
+* @param	RegOff: Register offset to read from.
+* @param	Value: 32-bit data to be written.
+*
+* @return	None.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+int XAie_SocketIO_swig_Write32(Swig_SocketIO IOInst, u64 RegOff, u32 Value) {
+	AieRC RC;
+	void *IOInst_swig = &IOInst;
+	RC = XAie_SocketIO_Write32(IOInst_swig,RegOff,Value);
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the public interface memory IO function to read 32bit data from the specified address.
+*
+* @param	IOInst: IO instance pointer
+* @param	RegOff: Register offset to read from.
+* @param	Data: u32 Data variable
+*
+* @return	Data read from the register
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+int XAie_SocketIO_swig_Read32(Swig_SocketIO IOInst, u64 RegOff, u32 Data) {
+	AieRC RC;
+	void *IOInst_swig = &IOInst;
+	RC = XAie_SocketIO_Read32(IOInst_swig,RegOff,&Data);
+	return Data;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the public interface memory IO function to free the global IO instance
+*
+* @param	IOInst: IO Instance pointer.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		The global IO instance is a singleton and freed when
+* the reference count reaches a zero. Internal only.
+*
+*******************************************************************************/
+int XAie_SocketIO_swig_Finish(Swig_SocketIO IOInst) {
+	AieRC RC;
+	void *IOInst_swig = &IOInst;
+	RC = XAie_SocketIO_Finish(IOInst_swig);
+	return RC;
+}
+
+#endif // __SWIGINTERFACE__
+
 /*****************************************************************************/
 /**
 *
@@ -431,7 +518,6 @@ static void _XAie_SocketIO_NpiWrite32(void *IOInst, u32 RegOff, u32 RegVal)
 		XAIE_ERROR("Failed to submit socket command: %s\n", CmdBuf);
 		return;
 	}
-
 	XAIE_DBG("SEND NPI: %s", CmdBuf);
 }
 
@@ -527,6 +613,7 @@ static AieRC _XAie_SocketIO_NpiMaskPoll(void *IOInst, u64 RegOff, u32 Mask,
 	return Ret;
 }
 
+#ifndef __SWIGINTERFACE__
 static AieRC XAie_SocketIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 		XAie_BackendOpCode Op, void *Arg)
 {
@@ -582,6 +669,7 @@ static AieRC XAie_SocketIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 
 	return XAIE_OK;
 }
+#endif //__SWIGINTERFACE__
 
 static XAie_MemInst* XAie_SocketMemAllocate(XAie_DevInst *DevInst, u64 Size,
 		XAie_MemCacheProp Cache)
@@ -773,6 +861,7 @@ static AieRC XAie_SocketIO_CmdWrite(void *IOInst, u8 Col, u8 Row, u8 Command,
 	return XAIE_ERR;
 }
 
+#ifndef __SWIGINTERFACE__
 const XAie_Backend SocketBackend =
 {
 	.Type = XAIE_IO_BACKEND_SOCKET,
@@ -797,5 +886,6 @@ const XAie_Backend SocketBackend =
 	.Ops.SubmitTxn = NULL,
 	.Ops.AddressPatching = NULL,
 };
+#endif // __SWIGINTERFACE__
 
 /** @} */

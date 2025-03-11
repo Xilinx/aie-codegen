@@ -120,11 +120,6 @@ AieRC _XAie_EccOnDM(XAie_DevInst *DevInst, XAie_LocType Loc)
 	const XAie_MemMod *MemMod;
 	const XAie_EvntMod *EvntMod;
 
-	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))
-	{
-		return XAIE_FEATURE_NOT_SUPPORTED;
-	}
-
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 
 	/* Check if tile is shim noc or shim pl */

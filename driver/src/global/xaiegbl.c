@@ -243,7 +243,10 @@ AieRC XAie_CfgInitialize(XAie_DevInst *InstPtr, XAie_Config *ConfigPtr)
 	if ((InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE2IPU) ||
 		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE2P) ||
 		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_A0) ||
-		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_B0)) {
+		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_B0) ||
+		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE4) ||
+		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE4_SOUNDWAVE) ||
+		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE4_MEDUSA)) {
 		InstPtr->EccStatus = XAIE_DISABLE;
 
 	} else {
@@ -767,7 +770,10 @@ AieRC XAie_TurnEccOn(XAie_DevInst *DevInst)
 	if ((DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2IPU) ||
 		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2P) ||
 		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_A0) ||
-		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_B0)) {
+		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_B0) ||
+		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4) ||
+		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_SOUNDWAVE) ||
+		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_MEDUSA)) {
 		XAIE_ERROR("ECC feature not supported\n");
 		return XAIE_FEATURE_NOT_SUPPORTED;
 	}

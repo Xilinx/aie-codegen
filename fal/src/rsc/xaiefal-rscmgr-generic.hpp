@@ -270,8 +270,8 @@ namespace xaiefal {
 
 			for (uint32_t i = 0; i < RscReq.size(); i++) {
 				uint8_t TType = XAie_GetTileTypefromLoc(dev(), RscReq[i].Loc);
-				if(TType >= XAIEGBL_TILE_TYPE_MAX) {
-					Logger::log(LogLevel::FAL_ERR) << __func__ <<
+				if (TType >= XAIEGBL_TILE_TYPE_MAX) {
+					Logger::log(LogLevel::FAL_ERROR) << __func__ <<
 						" Invalid Tile Type" << std::endl;
 					return XAIE_INVALID_TILE;
 				}
@@ -743,8 +743,11 @@ namespace xaiefal {
 		 */
 		uint32_t getMaxRsc(XAie_LocType Loc, XAie_ModuleType Mod, XAieRscType Type) {
 			uint8_t TileType = XAie_GetTileTypefromLoc(dev(), Loc);
-			if (TileType >= XAIEGBL_TILE_TYPE_MAX)
-				return 0;
+			if (TileType >= XAIEGBL_TILE_TYPE_MAX) {
+				Logger::log(LogLevel::FAL_ERROR) << __func__ <<
+					" Invalid Tile Type" << std::endl;
+				return XAIE_INVALID_TILE;
+			}
 
 			auto vMaxRscs = RscMaps[TileType].MaxRscs[Type];
 			for (auto x : vMaxRscs)

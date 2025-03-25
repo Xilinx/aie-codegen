@@ -170,15 +170,18 @@ AieRC _XAie_CoreWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	if (BusyPoll != XAIE_ENABLE){
 		Status = XAie_MaskPoll(DevInst, EventRegAddr, Mask, Value, TimeOut);
+		if (Status != XAIE_OK) {
+			XAIE_ERROR("Core Wait Done MaskPoll time out : %d\n", TimeOut);
+			return XAIE_CORE_STATUS_TIMEOUT;
+		}	
 	} else {
 		Status = XAie_MaskPollBusy(DevInst, EventRegAddr, Mask, Value, TimeOut);
+		if (Status != XAIE_OK) {
+			XAIE_ERROR("Core Wait Done MaskPollBusy time out : %d\n", TimeOut);
+			return XAIE_CORE_STATUS_TIMEOUT;
+		}	
 	}
-
-	if (Status != XAIE_OK) {
-		XAIE_ERROR("Core Wait Done poll time out\n");
-		return XAIE_CORE_STATUS_TIMEOUT;
-	}
-
+	
 	return Status;
 }
 

@@ -534,7 +534,7 @@ static AieRC _XAie_EventSelectStrmPortConfig(XAie_DevInst *DevInst,
 		 XAie_SetField(Select_32b_512b, Port_32b_512b_Lsb, Port_32b_512b_Mask) ;
 	RegAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) + RegOffset;
 
-	return XAie_MaskWrite32(DevInst, RegAddr, PortIdMask | PortMstrSlvMask,
+	return XAie_MaskWrite32(DevInst, RegAddr, PortIdMask | PortMstrSlvMask | Port_32b_512b_Mask,
 			FldVal);
 }
 
@@ -618,7 +618,7 @@ AieRC XAie_EventSelectStrmPortReset(XAie_DevInst *DevInst, XAie_LocType Loc,
 	} else if (TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
 		TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
 		if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))
-			Port = _32B_CTRL;  	/*CTRL is part of 32b stream-switch for AIE4*/
+			Port = DMA;
 		else
 			Port = CTRL;
 	} else if (TileType == XAIEGBL_TILE_TYPE_MEMTILE) {

@@ -86,6 +86,22 @@ AieRC XAie_DataMemWrWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 		MemAddr = MemMod->MemAddr;
 	}
 
+	/* calculate MemSize for App_A and App_B*/
+	if ((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+				DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE) &&
+				(TileType == XAIEGBL_TILE_TYPE_MEMTILE )) {
+		if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
+			/*L2 address  for App_A is [0x00000, 0x40000 * L2_Split)*/
+			MemSize = 256 * 1024 * DevInst->L2Split ;
+		} else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
+			/*L2 address for APP_B is [0x40000*L2_Split, L2_Capacity)*/
+			MemSize = MemSize - (256 * 1024 * DevInst->L2Split);
+		} else {
+			XAIE_ERROR("Invalid APPmode\n");
+			return XAIE_INVALID_APP_MODE;
+		}
+	}
+
 	if(Addr >= MemSize) {
 		XAIE_ERROR("Address out of range\n");
 		return XAIE_INVALID_DATA_MEM_ADDR;
@@ -144,6 +160,22 @@ AieRC XAie_DataMemRdWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 		MemMod = DevInst->DevProp.DevMod[TileType].MemMod;
 		MemSize = MemMod->Size;
 		MemAddr = MemMod->MemAddr;
+	}
+
+	/* calculate MemSize for App_A and App_B*/
+	if ((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+				DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE) &&
+				(TileType == XAIEGBL_TILE_TYPE_MEMTILE )) {
+		if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
+			/*L2 address  for App_A is [0x00000, 0x40000 * L2_Split)*/
+			MemSize = 256 * 1024 * DevInst->L2Split ;
+		} else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
+			/*L2 address for APP_B is [0x40000*L2_Split, L2_Capacity)*/
+			MemSize = MemSize - (256 * 1024 * DevInst->L2Split);
+		} else {
+			XAIE_ERROR("Invalid APPmode\n");
+			return XAIE_INVALID_APP_MODE;
+		}
 	}
 
 	if(Addr >= MemSize) {
@@ -296,11 +328,28 @@ AieRC XAie_DataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 		MemAddr = MemMod->MemAddr;
 	}
 
+	/* calculate MemSize for App_A and App_B*/
+	if ((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+				DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE) &&
+				(TileType == XAIEGBL_TILE_TYPE_MEMTILE )) {
+		if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
+			/*L2 address  for App_A is [0x00000, 0x40000 * L2_Split)*/
+			MemSize = 256 * 1024 * DevInst->L2Split ;
+		} else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
+			/*L2 address for APP_B is [0x40000*L2_Split, L2_Capacity)*/
+			MemSize = MemSize - (256 * 1024 * DevInst->L2Split);
+		} else {
+			XAIE_ERROR("Invalid APPmode\n");
+			return XAIE_INVALID_APP_MODE;
+		}
+	}
+
 	/* Check for any size overflow */
 	if((u64)Addr + Size > MemSize) {
 		XAIE_ERROR("Size of source block overflows tile data memory\n");
 		return XAIE_ERR_OUTOFBOUND;
 	}
+
 
 	RC = _XAie_DataMemoryBlockWrite(DevInst, Loc, Addr, MemAddr, CharSrc,
 					Size);
@@ -422,6 +471,22 @@ AieRC XAie_DataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 		MemMod = DevInst->DevProp.DevMod[TileType].MemMod;
 		MemSize = MemMod->Size;
 		MemAddr = MemMod->MemAddr;
+	}
+
+	/* calculate MemSize for App_A and App_B*/
+	if ((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+				DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE) &&
+				(TileType == XAIEGBL_TILE_TYPE_MEMTILE )) {
+		if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
+			/*L2 address  for App_A is [0x00000, 0x40000 * L2_Split)*/
+			MemSize = 256 * 1024 * DevInst->L2Split ;
+		} else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
+			/*L2 address for APP_B is [0x40000*L2_Split, L2_Capacity)*/
+			MemSize = MemSize - (256 * 1024 * DevInst->L2Split);
+		} else {
+			XAIE_ERROR("Invalid APPmode\n");
+			return XAIE_INVALID_APP_MODE;
+		}
 	}
 
 	/* Check for any size overflow */

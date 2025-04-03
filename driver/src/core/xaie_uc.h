@@ -44,6 +44,14 @@ AieRC _XAie_UcCoreGetStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u32 *CoreStatus, const struct XAie_UcMod *UcMod);
 XAIE_AIG_EXPORT AieRC XAie_UcModuleEventSelect(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 SelectId);
+XAIE_AIG_EXPORT AieRC XAie_UcModuleEventPCEnable(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u8 PCEventId, u16 PCAddr);
+XAIE_AIG_EXPORT AieRC XAie_UcModuleEventPCDisable(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u8 PCEventId);
+XAIE_AIG_EXPORT AieRC XAie_UcModuleEventPCReset(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u8 PCEventId);
+
+
 
 #endif /* XAIE_FEATURE_UC_ENABLE */
 

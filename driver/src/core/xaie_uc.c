@@ -33,6 +33,10 @@
 #ifdef XAIE_FEATURE_UC_ENABLE
 
 #include "xaie_helper_internal.h"
+
+/***************************** Macro Definitions *****************************/
+#define XAIE_UC_MOD_EVENT_PC_RESET		0xFFFFU
+
 /************************** Function Definitions *****************************/
 /*****************************************************************************/
 /**
@@ -578,6 +582,217 @@ AieRC XAie_UcModuleEventSelect(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	return XAie_Write32(DevInst, RegAddr, SelectId);
 }
+/*****************************************************************************/
+/**
+*
+* This API enables, disables or resets the program counter event in the
+* UC module.
+*
+* @param	DevInst: Device Instance
+* @param	Loc: Location of AIE Tile
+* @param	Module: Module of tile.
+*			for AIE Tile - XAIE_MEM_MOD or XAIE_CORE_MOD,
+*			for Shim tile - XAIE_PL_MOD,
+*			for Mem tile - XAIE_MEM_MOD.
+* @param	PCEventId: PC Event index.
+* @param	PCAddr: PC event on this instruction address.
+* @param	Valid: XAIE_ENABLE or XAIE_DISABLE to enable or disable PC
+*		       event.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		Internal Only.
+*
+******************************************************************************/
+static AieRC _XAie_UcModuleEventPCConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u8 PCEventId, u16 PCAddr, u8 Valid)
+{
+	AieRC RC;
+	u64 RegAddr;
+	u32 RegOffset, FldVal;
+	u8 TileType;
+	const XAie_UcMod *UcMod;
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+
+	if((TileType != XAIEGBL_TILE_TYPE_SHIMNOC)) {
+		XAIE_ERROR("Invalid tile type\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	if(!_XAie_IsUcModulePresent(DevInst, TileType)) {
+		XAIE_ERROR("Invalid Device Type/ No UcModule\n");
+		return XAIE_INVALID_DEVICE;
+	}
+
+	UcMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_SHIMNOC].UcMod;
+
+	if(PCEventId >= UcMod->NumPCEvents) {
+		XAIE_ERROR("Invalid PC event ID\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	RegOffset = UcMod->UcModuleBasePCEventRegOff + (u32)PCEventId * 4U;
+	RegAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) + RegOffset;
+
+	if(Valid == XAIE_DISABLE) {
+		if (_XAie_CheckPrecisionExceeds(UcMod->PCValid.Lsb,
+				_XAie_MaxBitsNeeded(Valid), MAX_VALID_AIE_REG_BIT_INDEX)) {
+			XAIE_ERROR("Check Precision Exceeds Failed\n");
+			return XAIE_ERR;
+		}
+		FldVal = XAie_SetField(Valid, UcMod->PCValid.Lsb,
+				UcMod->PCValid.Mask);
+
+		if(PCAddr == XAIE_UC_MOD_EVENT_PC_RESET) {
+			RC = XAie_Write32(DevInst, RegAddr, FldVal);
+			return RC;
+		}
+
+		RC = XAie_MaskWrite32(DevInst, RegAddr, UcMod->PCValid.Mask,
+				FldVal);
+		if(RC != XAIE_OK) {
+			return RC;
+		}
+	} else {
+		if ((_XAie_CheckPrecisionExceeds(UcMod->PCAddr.Lsb,
+				_XAie_MaxBitsNeeded(PCAddr), MAX_VALID_AIE_REG_BIT_INDEX)) ||
+			_XAie_CheckPrecisionExceeds(UcMod->PCValid.Lsb,
+				_XAie_MaxBitsNeeded(Valid), MAX_VALID_AIE_REG_BIT_INDEX)) {
+			XAIE_ERROR("Check Precision Exceeds Failed\n");
+			return XAIE_ERR;
+		}
+		FldVal = XAie_SetField(PCAddr, UcMod->PCAddr.Lsb,
+				UcMod->PCAddr.Mask) |
+			 XAie_SetField(Valid, UcMod->PCValid.Lsb,
+				UcMod->PCValid.Mask);
+		RC = XAie_Write32(DevInst, RegAddr, FldVal);
+
+		return RC;
+	}
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API sets up program counter event in the UC module
+*
+* @param	DevInst: Device Instance
+* @param	Loc: Location of AIE Tile
+* @param	PCEventId: PC Event index.
+* @param	PCAddr: PC event on this instruction address.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		None.
+*
+******************************************************************************/
+AieRC XAie_UcModuleEventPCEnable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 PCEventId,
+		u16 PCAddr)
+{
+	u8 TileType;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid device instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if((TileType != XAIEGBL_TILE_TYPE_SHIMNOC)) {
+		XAIE_ERROR("Invalid tile type\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	if(!_XAie_IsUcModulePresent(DevInst, TileType)) {
+		XAIE_ERROR("Invalid Device Type/ No UcModule\n");
+		return XAIE_INVALID_DEVICE;
+	}
+
+	return _XAie_UcModuleEventPCConfig(DevInst, Loc, PCEventId, PCAddr,
+			XAIE_ENABLE);
+}
+
+/*****************************************************************************/
+/**
+*
+* This API disables program counter event in the UC module
+*
+* @param	DevInst: Device Instance
+* @param	Loc: Location of AIE Tile
+* @param	PCEventId: PC Event index.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		None.
+*
+******************************************************************************/
+AieRC XAie_UcModuleEventPCDisable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 PCEventId)
+{
+	u8 TileType;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid device instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if(TileType != XAIEGBL_TILE_TYPE_SHIMNOC) {
+		XAIE_ERROR("Invalid tile type\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	if(!_XAie_IsUcModulePresent(DevInst, TileType)) {
+		XAIE_ERROR("Invalid Device Type/ No UcModule\n");
+		return XAIE_INVALID_DEVICE;
+	}
+
+	return _XAie_UcModuleEventPCConfig(DevInst, Loc, PCEventId, 0U, XAIE_DISABLE);
+}
+
+/*****************************************************************************/
+/**
+*
+* This API resets program counter event register in the UC module. Valid and
+* PC address bit fields are set to zero.
+*
+* @param	DevInst: Device Instance
+* @param	Loc: Location of AIE Tile
+* @param	PCEventId: PC Event index.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		None.
+*
+******************************************************************************/
+AieRC XAie_UcModuleEventPCReset(XAie_DevInst *DevInst, XAie_LocType Loc, u8 PCEventId)
+{
+	u8 TileType;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid device instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if(TileType != XAIEGBL_TILE_TYPE_SHIMNOC) {
+		XAIE_ERROR("Invalid tile type\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	if(!_XAie_IsUcModulePresent(DevInst, TileType)) {
+		XAIE_ERROR("Invalid Device Type/ No UcModule\n");
+		return XAIE_INVALID_DEVICE;
+	}
+
+	return _XAie_UcModuleEventPCConfig(DevInst, Loc, PCEventId,
+		XAIE_UC_MOD_EVENT_PC_RESET, XAIE_DISABLE);
+}
+
 
 
 #endif /* XAIE_FEATURE_UC_ENABLE */

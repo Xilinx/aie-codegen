@@ -2120,7 +2120,7 @@ static const  XAie_StrmPort Aie4ShimStrmSlaveSlot[SS_PORT_TYPE_MAX] =
                 .PortBaseAddr = 0,
         },
         {       /* West */
-                .NumPorts = 1,
+                .NumPorts = 2,
                 .PortBaseAddr = XAIE4GBL_PL_MODULE_STREAM_SWITCH_SUBORDINATE_WEST_0_SLOT0,
         },
         {       /* North */
@@ -2128,7 +2128,7 @@ static const  XAie_StrmPort Aie4ShimStrmSlaveSlot[SS_PORT_TYPE_MAX] =
                 .PortBaseAddr = XAIE4GBL_PL_MODULE_STREAM_SWITCH_SUBORDINATE_NORTH_0_SLOT0,
         },
         {       /* East */
-                .NumPorts = 1,
+                .NumPorts = 2,
                 .PortBaseAddr = XAIE4GBL_PL_MODULE_STREAM_SWITCH_SUBORDINATE_EAST_0_SLOT0,
         },
         {       /* Trace */

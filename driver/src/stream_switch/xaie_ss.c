@@ -142,9 +142,9 @@ static AieRC _GetMaxNumSsPorts(XAie_DevInst *DevInst, u8 TileType,
 					break;
 
 				case XAIEGBL_TILE_TYPE_SHIMNOC:
-					/* For SHIM tiles WEST & EAST port PortPtr will have full number of ports */
+					/* For SHIM tiles number of ports is only 1*/
 					if ((PortType == EAST) || (PortType == WEST) ||
-						(PortType == _32B_EAST) || (PortType == _32B_WEST)){
+						(PortType == _32B_EAST) || (PortType == _32B_WEST) || (PortType == DMA_Trace)) {
 						*MaxNumPorts = PortPtr->NumPorts;
 					} else {
 						if((PortPtr->NumPorts * 2 ) > UINT8_MAX){
@@ -1637,6 +1637,209 @@ AieRC XAie_StrmSwDeterministicMergeDisable(XAie_DevInst *DevInst,
 {
 	return _XAie_StrmSwDeterministicMergeCtrl(DevInst, Loc, Arbitor,
 			XAIE_DISABLE);
+}
+
+/**
+ * _XAie_StrmSwRegisterClear - Clears the stream switch register configuration
+ *
+ * @DevInst: Pointer to the AI engine device instance.
+ * @TileType: Type of the tile (e.g., AI engine tile, memory tile, etc.).
+ * @StrmPortConfig: Pointer to the stream port configuration structure.
+ * @PortTypeStart: Starting port type for the stream switch.
+ * @PortTypeEnd: Ending port type for the stream switch.
+ * @PortIntf: Interface type of the stream port.
+ * @Row: Row index of the tile in the AI engine array.
+ * @Col: Column index of the tile in the AI engine array.
+ * @NoOfRegs: Number of registers to clear.
+ *
+ * This function clears the configuration of the stream switch registers
+ * for a specified range of ports and interface type in the AI engine tile.
+ * It is used to reset the stream switch configuration to a default state.
+ *
+ * Return: AieRC status code indicating success or failure of the operation.
+ */
+
+static AieRC _XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 TileType, const XAie_StrmPort *StrmPortConfig,
+			StrmSwPortType PortTypeStart, StrmSwPortType PortTypeEnd, XAie_StrmPortIntf PortIntf, u8 Row, u8 Col, u8 NoOfRegs)
+{
+	AieRC RC = 0;
+	u8 PortType = 0;
+	u64 RegAddr = 0;
+	u32 PortBaseAddr;
+	u8 NumPorts;
+	const XAie_StrmPort *PortConfig;
+
+	for(PortType = PortTypeStart; PortType < PortTypeEnd; PortType++) {
+		PortConfig = &StrmPortConfig[PortType];
+		if(PortConfig != NULL) {
+			PortBaseAddr = PortConfig->PortBaseAddr;
+			NumPorts = PortConfig->NumPorts;
+			//XAIE_DBG("StrmPortConfig : PortType = %d, NumPorts = %d\n", PortType, PortConfig->NumPorts);
+
+			// To skip MasterPort southX and SlavePort NorthX in AIE4 only
+			if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) && (TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
+				if ((DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE)) {
+					if (((PortIntf == XAIE_STRMSW_MASTER) && (PortType == SOUTH)) ||
+						((PortIntf == XAIE_STRMSW_SLAVE) && (PortType == NORTH))) {
+						RegAddr = 0;
+						RC = 0;
+						NumPorts = NumPorts/2;
+						RegAddr |= XAie_GetTileAddr(DevInst, Row, Col) + PortBaseAddr;
+						RC |= XAie_BlockSet32(DevInst, RegAddr, 0, (u32)NumPorts * NoOfRegs);
+						if(RC != XAIE_OK) {
+							XAIE_ERROR("Failed to reset port registers for PortInf : %d, portType = %d in row = %d : col = %d, NoOfRegs = %d\n",
+								PortIntf, PortType, Row, Col, NoOfRegs);
+							return RC;
+						}
+						PortBaseAddr = PortBaseAddr + ((u32)NumPorts * NoOfRegs * 4) + ( NoOfRegs * 4);
+					}
+				}
+			}
+
+			RegAddr = 0;
+			RC = 0;
+
+			RegAddr |= XAie_GetTileAddr(DevInst, Row, Col) + PortBaseAddr;
+			RC |= XAie_BlockSet32(DevInst, RegAddr, 0, (u32)NumPorts * NoOfRegs);
+			if(RC != XAIE_OK) {
+				XAIE_ERROR("Failed to reset port registers for PortInf : %d, portType = %d in row = %d : col = %d, NoOfRegs = %d\n",
+					PortIntf, PortType, Row, Col, NoOfRegs);
+				return RC;
+			}
+
+			//Resetting APP B address spce registers in single app mode for AIE4 only
+			if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+				if (((TileType == XAIEGBL_TILE_TYPE_MEMTILE) || (TileType == XAIEGBL_TILE_TYPE_SHIMNOC)) &&
+					(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE)) {
+
+					if (TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
+						/* These ports doesnt exist in APP B space*/
+						if ((PortType == EAST) || (PortType == WEST) ||
+							(PortType == _32B_EAST) || (PortType == _32B_WEST) || (PortType == DMA_Trace)) {
+								continue;
+						}
+					}
+					RegAddr = XAIE4_MASK_VALUE_APP_B;
+					RC = 0;
+
+					RegAddr |= XAie_GetTileAddr(DevInst, Row, Col) + PortBaseAddr;
+					RC |= XAie_BlockSet32(DevInst, RegAddr, 0, (u32)NumPorts * NoOfRegs);
+					if(RC != XAIE_OK) {
+						XAIE_ERROR("Failed to reset port registers for PortInf : %d, portType = %d in row = %d : col = %d, NoOfRegs = %d\n",
+							PortIntf, PortType, Row, Col, NoOfRegs);
+						return RC;
+					}
+				}
+			}
+		}
+	}
+	return XAIE_OK;
+}
+
+/**
+ * XAie_StrmSwDeterministicMergeRegisterClear - Clears the deterministic merge
+ * register for the stream switch in the AI Engine.
+ *
+ * @DevInst: Pointer to the AI Engine device instance.
+ * @StrmMod: Pointer to the stream module configuration.
+ * @TileType: Type of the tile where the operation is performed.
+ * @Row: Row coordinate of the tile.
+ * @Col: Column coordinate of the tile.
+ *
+ * This function clears the deterministic merge register for the stream switch
+ * in the specified tile of the AI Engine. It ensures that the stream switch
+ * is reset to its default state for deterministic merging functionality.
+ *
+ * Return: A status code of type AieRC indicating success or failure of the
+ * operation.
+ */
+AieRC XAie_StrmSwDeterministicMergeRegisterClear(XAie_DevInst *DevInst, const XAie_StrmMod *StrmMod, u8 TileType, u8 Row, u8 Col)
+{
+	AieRC RC = 0;
+	u64 RegAddr = 0;
+
+	RegAddr |= XAie_GetTileAddr(DevInst, Row, Col) + StrmMod->DetMerge->ConfigBase;
+	RC |= XAie_BlockSet32(DevInst, RegAddr, 0, StrmMod->DetMerge->NumArbitors * 3);		//3 here is two arb sub registers and ctrl register for arbiter.
+	if(RC != XAIE_OK) {
+		XAIE_ERROR("Failed to reset deterministic merge registers in row = %d : col = %d\n", Row, Col);
+		return RC;
+	}
+
+	//Resetting APP B address spce registers in single app mode for AIE4 only
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		if (((TileType == XAIEGBL_TILE_TYPE_MEMTILE) || (TileType == XAIEGBL_TILE_TYPE_SHIMNOC)) &&
+			(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE)) {
+
+			RegAddr = XAIE4_MASK_VALUE_APP_B;
+			RC = 0;
+
+			RegAddr |= XAie_GetTileAddr(DevInst, Row, Col) + StrmMod->DetMerge->ConfigBase;
+			RC |= XAie_BlockSet32(DevInst, RegAddr, 0, StrmMod->DetMerge->NumArbitors * 3);
+			if(RC != XAIE_OK) {
+				XAIE_ERROR("Failed to reset deterministic merge registers in row = %d : col = %d\n", Row, Col);
+				return RC;
+			}
+		}
+	}
+	return XAIE_OK;
+}
+
+/**
+ * XAie_StrmSwRegisterClear - Clears the stream switch registers for all tiles
+ *                            in the device instance.
+ * @DevInst: Pointer to the device instance.
+ *
+ * This function iterates over all columns and rows of the device instance,
+ * identifies the tile type, and clears the stream switch registers for both
+ * manager and slave ports. It handles both 512B and 32B port types if the
+ * device generation is AIE4.
+ *
+ * Return: XAIE_OK on success, or an error code on failure.
+ */
+AieRC XAie_StrmSwRegisterClear(XAie_DevInst *DevInst)
+{
+	AieRC RC = 0;
+	u8 TileType;
+	u8 Col = 0, Row = 0;
+
+	const XAie_StrmMod *StrmMod;
+
+	for(Col = 0; Col < DevInst->NumCols; Col++) {
+		for(Row = 0; Row < DevInst->NumRows; Row++) {
+			//XAIE_DBG("\n\n*************Col = %d, Row = %d*******************\n", Col, Row);
+			XAie_LocType Loc = XAie_TileLoc(Col, Row);
+			TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+			if(TileType == XAIEGBL_TILE_TYPE_MAX) {
+				XAIE_ERROR("Invalid Tile Type\n");
+				return XAIE_INVALID_TILE;
+			}
+
+			StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw;
+
+			RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->MstrConfig, _512B_PORT_START, _512B_PORT_END, XAIE_STRMSW_MASTER, Row, Col, 1);
+			RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvConfig, _512B_PORT_START, _512B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 1);
+			RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvSlotConfig, _512B_PORT_START, _512B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 4);
+
+			//TODO: Raman, Issue with AIE4 registers, need to debug.
+			//RC |= XAie_StrmSwDeterministicMergeRegisterClear(DevInst, StrmMod, TileType, Row, Col);
+
+			if(RC != XAIE_OK)
+				return RC;
+
+			if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+				//XAIE_DBG("\n\n\nResetting 32B\n\n\n");
+				StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw32b;
+
+				RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->MstrConfig, _32B_PORT_START, _32B_PORT_END, XAIE_STRMSW_MASTER, Row, Col, 1);
+				RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvConfig, _32B_PORT_START, _32B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 1);
+				RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvSlotConfig, _32B_PORT_START, _32B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 4);
+
+				if(RC != XAIE_OK)
+					return RC;
+			}
+		}
+	}
+	return XAIE_OK;
 }
 
 #endif /* XAIE_FEATURE_SS_ENABLE */

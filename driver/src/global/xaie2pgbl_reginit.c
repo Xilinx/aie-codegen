@@ -375,7 +375,7 @@ static const  XAie_StrmPort Aie2PShimStrmSlv[SS_PORT_TYPE_MAX] =
 		.PortBaseAddr = XAIE2PGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_EAST_0,
 	},
 	{	/* Trace */
-		.NumPorts = 2,
+		.NumPorts = 1,
 		.PortBaseAddr = XAIE2PGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_TRACE
 	}
 };

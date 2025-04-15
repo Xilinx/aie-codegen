@@ -402,6 +402,35 @@ static void _XAie_PrivilegeSetHwErrIrq(XAie_DevInst *DevInst,
 
 /*****************************************************************************/
 /**
+ *
+ * This API enables the HW Err interrupt handler and sets NoC interrupt ID to
+ * which the error interrupts from HW Err interrupt controller shall be driven
+ * to.
+ *
+ * This API configures all the HW Err interrupt controllers within a given
+ * partition in one go.
+ *
+ * @param	DevInst: Device Instance
+ *
+ * @note	None.
+ *
+ ******************************************************************************/
+AieRC XAie_CfgPrivilegeHwErrIrq(XAie_DevInst *DevInst, XAie_HwErrCfg HwErrCfg)
+{
+	AieRC RC = XAIE_OK;
+
+	if((DevInst == XAIE_NULL) ||
+	   (DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+	_XAie_PrivilegeSetHwErrIrq(DevInst, HwErrCfg);
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
 *
 * This API enables / disables generation of interrupt from desired application
 * L2 interrupt handler.
@@ -992,36 +1021,6 @@ AieRC XAie_ConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie_ShimOpts *ShimO
 	} else {
 		return XAIE_OK;
 	}
-}
-
-/*****************************************************************************/
-/**
- *
- * This API enables the HW Err interrupt handler and sets NoC interrupt ID to
- * which the error interrupts from HW Err interrupt controller shall be driven
- * to.
- *
- * This API configures all the HW Err interrupt controllers within a given
- * partition in one go.
- *
- * @param	DevInst: Device Instance
- *
- * @note	None.
- *
- ******************************************************************************/
-AieRC XAie_CfgPrivilegeHwErrIrq(XAie_DevInst *DevInst, XAie_HwErrCfg HwErrCfg)
-{
-	AieRC RC = XAIE_OK;
-
-	if((DevInst == XAIE_NULL) ||
-	   (DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
-		XAIE_ERROR("Invalid Device Instance\n");
-		return XAIE_INVALID_ARGS;
-	}
-
-	_XAie_PrivilegeSetHwErrIrq(DevInst, HwErrCfg);
-
-	return XAIE_OK;
 }
 
 #endif /* XAIE_FEATURE_PRIVILEGED_ENABLE && XAIE_FEATURE_LITE */

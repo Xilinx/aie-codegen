@@ -1174,6 +1174,7 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	ControlCodeInst->UcPageTextSize	= 0;
 	ControlCodeInst->IsJobOpen  	= 0;
 	ControlCodeInst->IsPageOpen  	= 0;
+	ControlCodeInst->NumShimBDsChained = 0;
 	ControlCodeInst->ControlCodefp      = fopen(FileName, "w");
 	ControlCodeInst->ControlCodedatafp  = fopen(TEMP_ASM_FILE1, "w+");
 	ControlCodeInst->ControlCodedata2fp = fopen(TEMP_ASM_FILE2, "w+");

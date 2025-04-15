@@ -435,22 +435,16 @@ namespace xaiefal {
 					Mod == XAIE_MEM_MOD) {
 				if (RscType == static_cast<XAieRscType>(XAIE_RSC_TYPE_ANY)) {
 					MemModNumRscs = MaxNumRscs - 1;
-					if (!XAie_IsFeatureSupportCheck(DevInst->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
-						CoreMemModNumRscs = MaxNumRscs - 2;
-					}
+					CoreMemModNumRscs = MaxNumRscs - 2;
 				} else if (RscType == XAIE_PCEVENT) {
 					MemModNumRscs = 0;
-					if (!XAie_IsFeatureSupportCheck(DevInst->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
-						CoreMemModNumRscs = 0;
-					}
+					CoreMemModNumRscs = 0;
 				} else {
 					MemModNumRscs = 1;
-					if (!XAie_IsFeatureSupportCheck(DevInst->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
-						if (RscType == XAIE_SSEVENT) {
-							CoreMemModNumRscs = 0;
-						} else {
-							CoreMemModNumRscs = 1;
-						}
+					if (RscType == XAIE_SSEVENT) {
+						CoreMemModNumRscs = 0;
+					} else {
+						CoreMemModNumRscs = 1;
 					}
 				}
 			}
@@ -471,9 +465,7 @@ namespace xaiefal {
 			// Calculate number of resource statistics
 			NumStats += NumShimTiles * ShimModNumRscs;
 			NumStats += NumCoreTiles * CoreModNumRscs;
-			if (!XAie_IsFeatureSupportCheck(DevInst->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
-				NumStats += NumCoreTiles * CoreMemModNumRscs;
-			}
+			NumStats += NumCoreTiles * CoreMemModNumRscs;
 			NumStats += (NumTiles - NumShimTiles - NumCoreTiles) * MemModNumRscs;
 
 			std::vector<XAieUserRscStat> RscsStats(NumStats);
@@ -525,30 +517,28 @@ namespace xaiefal {
 					}
 
 					// Core tiles, mem modules
-					if (!XAie_IsFeatureSupportCheck(DevInst->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
-						if (CoreMemModNumRscs == 0) {
+					if (CoreMemModNumRscs == 0) {
+						continue;
+					}
+					if (CoreMemModNumRscs == 1) {
+						RscsStats[i].Loc = L;
+						RscsStats[i].Mod = XAIE_MEM_MOD;
+						RscsStats[i].RscType = RscType;
+						RscsStats[i].NumRscs = 0;
+						i++;
+						continue;
+					}
+					for (uint8_t Rsc = static_cast<uint8_t>(XAIE_PERFCOUNT);
+						Rsc < static_cast<uint8_t>(XAIE_MAXRSC); Rsc++) {
+						if (Rsc == static_cast<uint8_t>(XAIE_PCEVENT) ||
+							Rsc == static_cast<uint8_t>(XAIE_SSEVENT)) {
 							continue;
 						}
-						if (CoreMemModNumRscs == 1) {
-							RscsStats[i].Loc = L;
-							RscsStats[i].Mod = XAIE_MEM_MOD;
-							RscsStats[i].RscType = RscType;
-							RscsStats[i].NumRscs = 0;
-							i++;
-							continue;
-						}
-						for (uint8_t Rsc = static_cast<uint8_t>(XAIE_PERFCOUNT);
-							Rsc < static_cast<uint8_t>(XAIE_MAXRSC); Rsc++) {
-							if (Rsc == static_cast<uint8_t>(XAIE_PCEVENT) ||
-								Rsc == static_cast<uint8_t>(XAIE_SSEVENT)) {
-								continue;
-							}
-							RscsStats[i].Loc = L;
-							RscsStats[i].Mod = XAIE_MEM_MOD;
-							RscsStats[i].RscType = static_cast<XAieRscType>(Rsc);
-							RscsStats[i].NumRscs = 0;
-							i++;
-						}
+						RscsStats[i].Loc = L;
+						RscsStats[i].Mod = XAIE_MEM_MOD;
+						RscsStats[i].RscType = static_cast<XAieRscType>(Rsc);
+						RscsStats[i].NumRscs = 0;
+						i++;
 					}
 				} else {
 					// Other tiles

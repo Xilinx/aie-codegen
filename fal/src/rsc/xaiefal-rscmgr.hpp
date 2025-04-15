@@ -88,17 +88,12 @@ namespace xaiefal {
 					uint32_t NumRscs;
 
 					/*
-					 * AIE tiles have two sets of bcast channels
-					 * for memory and core module (for legacy devices)
+					 * AIE tiles have to sets of bcast channels
+					 * for memory and core module
 					 */
 					NumAieRows = dev()->NumRows - dev()->AieTileRowStart;
-
-					if (XAie_IsFeatureSupportCheck(dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
-						NumRscs = (dev()->NumCols * dev()->NumRows) ;
-					} else {
-						NumRscs = (dev()->NumCols * dev()->NumRows) +
-							(dev()->NumCols * NumAieRows);
-					}
+					NumRscs = (dev()->NumCols * dev()->NumRows) +
+						(dev()->NumCols * NumAieRows);
 
 					vRequests.resize(NumRscs);
 					BcastAll = true;
@@ -312,14 +307,9 @@ namespace xaiefal {
 			uint32_t NumRscs, NumTiles;
 			AieRC RC = XAIE_OK;
 
-			if (XAie_IsFeatureSupportCheck(dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
-				NumRscs = dev()->NumCols * dev()->NumRows ;
-			} else {
-				NumRscs = dev()->AieTileNumRows * dev()->NumCols * 2
-								+ (dev()->NumRows - dev()->AieTileNumRows)
-								* dev()->NumCols;
-			}
-
+			NumRscs = dev()->AieTileNumRows * dev()->NumCols * 2
+				+ (dev()->NumRows - dev()->AieTileNumRows)
+				* dev()->NumCols;
 			vBcastRscs.resize(NumRscs);
 
 			vBcastRscs[0].RscId = XAIE_ECC_BCAST_ID;
@@ -380,14 +370,9 @@ namespace xaiefal {
 			uint32_t NumRscs;
 			AieRC RC = XAIE_OK;
 
-			if (XAie_IsFeatureSupportCheck(dev()->DevProp.DevGen, NO_MEM_MOD_IN_AIE_TILE)) {
-				NumRscs = dev()->NumCols * dev()->NumRows ;
-			} else {
-				NumRscs = dev()->AieTileNumRows * dev()->NumCols * 2
-								+ (dev()->NumRows - dev()->AieTileNumRows)
-								* dev()->NumCols;
-			}
-
+			NumRscs = dev()->AieTileNumRows * dev()->NumCols * 2
+				+ (dev()->NumRows - dev()->AieTileNumRows)
+				* dev()->NumCols;
 			vRscs.resize(NumRscs);
 
 			vRscs[0].RscId = XAIE_ERROR_BCAST_ID;

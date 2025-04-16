@@ -446,8 +446,10 @@ static AieRC _XAie_EventSelectStrmPortConfig(XAie_DevInst *DevInst,
 	AieRC RC;
 	u64 RegAddr;
 	u32 RegOffset, FldVal, PortIdMask, PortMstrSlvMask, Port_32b_512b_Mask;
-	u8 TileType,  PortIdx, Select_32b_512b,Port_32b_512b_Lsb;
-	int SelectRegOffId, PortIdLsb, PortMstrSlvLsb;
+	u8 TileType,  PortIdx, Select_32b_512b;
+	int SelectRegOffId, SelectRegOffBit;
+	int MaxSelectRegOffId, MaxSelectRegOffBit;
+	u32 PortIdLsb, PortMstrSlvLsb,Port_32b_512b_Lsb;
 	const XAie_StrmMod *StrmMod;
 	const XAie_EvntMod *EvntMod;
 
@@ -491,40 +493,55 @@ static AieRC _XAie_EventSelectStrmPortConfig(XAie_DevInst *DevInst,
 	}
 
 	SelectRegOffId = SelectId / EvntMod->StrmPortSelectIdsPerReg;
+	SelectRegOffBit = SelectId % EvntMod->StrmPortSelectIdsPerReg;
 
-	if(SelectRegOffId > UINT8_MAX){
+	/*CERT-C Coverity check*/
+	MaxSelectRegOffId = (int)EvntMod->NumStrmPortSelectIds /
+						(int)EvntMod->StrmPortSelectIdsPerReg ;
+	MaxSelectRegOffBit = (int)EvntMod->NumStrmPortSelectIds %
+						(int)EvntMod->StrmPortSelectIdsPerReg ;
+
+
+	if((SelectRegOffId > MaxSelectRegOffId) ||
+			(SelectRegOffBit > MaxSelectRegOffBit)) {
 		XAIE_ERROR("Value Exceeds UINT8_MAX\n");
 		return XAIE_ERR;
 	}
-	RegOffset = (EvntMod->BaseStrmPortSelectRegOff + (u32)((u8)SelectRegOffId * 4U));
-	PortIdLsb = EvntMod->PortIdOff *
-			(SelectId % EvntMod->StrmPortSelectIdsPerReg);
 
-	if(PortIdLsb > MAX_VALID_AIE_REG_BIT_INDEX - 1  ||  PortIdLsb < 0){
+	RegOffset = (EvntMod->BaseStrmPortSelectRegOff + (u32)(SelectRegOffId * 4U));
+	PortIdLsb = (u32)EvntMod->PortIdOff * SelectRegOffBit ;
+
+	/*CERT-C Coverity check*/
+	if(PortIdLsb > MAX_VALID_AIE_REG_BIT_INDEX - 1 ){
 		XAIE_ERROR("Value Exceeds UINT8_MAX\n");
 		return XAIE_ERR;
 	}
 
-	PortIdMask = EvntMod->PortIdMask << (u8)PortIdLsb;
-	PortMstrSlvLsb = EvntMod->PortMstrSlvOff + 8U *
-				(SelectId % EvntMod->StrmPortSelectIdsPerReg);
+	PortIdMask = (u32)EvntMod->PortIdMask << PortIdLsb;
+	PortMstrSlvLsb = EvntMod->PortMstrSlvOff + (8U *  SelectRegOffBit);
+	PortMstrSlvMask = EvntMod->PortMstrSlvMask << (8U * SelectRegOffBit);
 
-	if(PortMstrSlvLsb > MAX_VALID_AIE_REG_BIT_INDEX - 1  ||  PortMstrSlvLsb < 0){
+	/*CERT-C Coverity check*/
+	if(PortMstrSlvLsb > MAX_VALID_AIE_REG_BIT_INDEX - 1){
 		XAIE_ERROR("Value Exceeds UINT8_MAX\n");
 		return XAIE_ERR;
 	}
-	PortMstrSlvMask = EvntMod->PortMstrSlvMask << (8U *
-				(SelectId % EvntMod->StrmPortSelectIdsPerReg));
-	Port_32b_512b_Lsb = EvntMod->Port32b512bOff + 8U *
-				(SelectId % EvntMod->StrmPortSelectIdsPerReg);
-	Port_32b_512b_Mask = EvntMod->Port32b512bMask << (8U *
-				(SelectId % EvntMod->StrmPortSelectIdsPerReg));
 
+	Port_32b_512b_Lsb = EvntMod->Port32b512bOff + (8U * SelectRegOffBit) ;
+	Port_32b_512b_Mask = EvntMod->Port32b512bMask << (8U * SelectRegOffBit) ;
+
+	/*CERT-C Coverity check*/
+	if(Port_32b_512b_Lsb > MAX_VALID_AIE_REG_BIT_INDEX - 1 ){
+		XAIE_ERROR("Value Exceeds UINT8_MAX\n");
+		return XAIE_ERR;
+	}
+
+	/*CERT-C Coverity check*/
 	if (_XAie_CheckPrecisionExceeds((u8)PortIdLsb,
 			_XAie_MaxBitsNeeded(PortIdx), MAX_VALID_AIE_REG_BIT_INDEX)  ||
 		_XAie_CheckPrecisionExceeds((u8)PortMstrSlvLsb,
 			_XAie_MaxBitsNeeded((u32)PortIntf), MAX_VALID_AIE_REG_BIT_INDEX) ||
-			_XAie_CheckPrecisionExceeds(Port_32b_512b_Lsb,
+			_XAie_CheckPrecisionExceeds((u8)Port_32b_512b_Lsb,
 				_XAie_MaxBitsNeeded(Select_32b_512b), MAX_VALID_AIE_REG_BIT_INDEX)){
 		XAIE_ERROR("Check Precision Exceeds Failed\n");
 		return XAIE_ERR;
@@ -1741,6 +1758,12 @@ static AieRC _XAie_EventPCConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
 				EvntMod->PCValid.Mask);
 
 		if(PCAddr == XAIE_EVENT_PC_RESET) {
+			if (_XAie_CheckPrecisionExceeds(EvntMod->PCAddr.Lsb,
+					_XAie_MaxBitsNeeded(0), MAX_VALID_AIE_REG_BIT_INDEX)) {
+				XAIE_ERROR("Check Precision Exceeds Failed\n");
+				return XAIE_ERR;
+			}
+
 			FldVal |= XAie_SetField(0U, EvntMod->PCAddr.Lsb,
 						EvntMod->PCAddr.Mask);
 			RC = XAie_Write32(DevInst, RegAddr, FldVal);

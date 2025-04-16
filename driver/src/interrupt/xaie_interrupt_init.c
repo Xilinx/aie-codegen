@@ -956,7 +956,7 @@ static AieRC _XAie_ErrorHandlingInitAie(XAie_DevInst *DevInst)
 		L1BroadcastIdSwB = L1IntrMod->IntrCtrlL1IrqId(DevInst, Loc,
 				XAIE_EVENT_SWITCH_B);
 		RC = XAie_IntrCtrlL1IrqSet(DevInst, Loc, XAIE_EVENT_SWITCH_B,
-				L1BroadcastIdSwB);
+				(u8)L1BroadcastIdSwB);
 		if(RC != XAIE_OK) {
 			XAIE_ERROR("Failed to configure L1 IRQ line\n");
 			return RC;
@@ -982,7 +982,7 @@ static AieRC _XAie_ErrorHandlingInitAie(XAie_DevInst *DevInst)
 			 */
 			RC = _XAie_FindNextNoCTile(DevInst, Loc, &NextLoc);
 			if (RC != XAIE_OK) {
-				L1BroadcastIdSwB = XAIE_ERROR_L2_ENABLE;
+				L1BroadcastIdSwB = XAIE_ERROR_L1_ENABLE;
 			} else {
 				if ((_XAie_CheckPrecisionExceeds((L1BroadcastIdSwB + 1U),
 					_XAie_MaxBitsNeeded(1U),MAX_VALID_AIE_REG_BIT_INDEX))) {
@@ -1025,7 +1025,7 @@ static AieRC _XAie_ErrorHandlingInitAie(XAie_DevInst *DevInst)
 
 			RC = XAie_EventBroadcastBlockDir(DevInst, Loc,
 					XAIE_PL_MOD, XAIE_EVENT_SWITCH_B,
-					L1BroadcastIdSwB, BroadcastDirSwB);
+					(u8)L1BroadcastIdSwB, BroadcastDirSwB);
 			if(RC != XAIE_OK) {
 				XAIE_ERROR("Failed to block broadcasts in shim tile switch B\n");
 				return RC;
@@ -1064,7 +1064,7 @@ static AieRC _XAie_ErrorHandlingInitAie(XAie_DevInst *DevInst)
 static AieRC _XAie_ErrorHandlingInitAie4AieTile(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	u32 BroadcastBlockDir;
+	u8 BroadcastBlockDir;
 	AieRC RC;
 
 	if (TileType != XAIEGBL_TILE_TYPE_AIETILE) {
@@ -1108,7 +1108,7 @@ static AieRC _XAie_ErrorHandlingInitAie4AieTile(XAie_DevInst *DevInst, XAie_LocT
 static AieRC _XAie_ErrorHandlingInitAie4MemTile(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	u32 BroadcastBlockDir;
+	u8 BroadcastBlockDir;
 	AieRC RC;
 
 	if (TileType != XAIEGBL_TILE_TYPE_MEMTILE) {
@@ -1152,7 +1152,8 @@ static AieRC _XAie_ErrorHandlingInitAie4MemTile(XAie_DevInst *DevInst, XAie_LocT
 static AieRC _XAie_ErrorHandlingInitAie4ShimTile(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	u32 BroadcastBitMap, BroadcastBlockDir;
+	u32 BroadcastBitMap;
+	u8 BroadcastBlockDir;
 	AieRC RC;
 
 	if ((TileType != XAIEGBL_TILE_TYPE_SHIMNOC) &&

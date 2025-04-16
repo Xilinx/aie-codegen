@@ -4524,11 +4524,6 @@ u8 _XAie_CheckPrecisionExceeds(u32 Lsb, u8 ValueBitCount, u8 MaxValidBitPos)
 *******************************************************************************/
 u8 _XAie_MaxBitsNeeded(u64 value)
 {
-    // Calculate the number of bits needed to represent the value
-    if (value == 0) {
-        return 1; // Special case for zero
-    }
-
     u8 bits = 0;
     while (value) {
         bits++;

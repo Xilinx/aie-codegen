@@ -143,6 +143,13 @@ AieRC XAie_CoreDisable(XAie_DevInst *DevInst, XAie_LocType Loc)
 	CoreMod = DevInst->DevProp.DevMod[TileType].CoreMod;
 
 	Mask = CoreMod->CoreCtrl->CtrlEn.Mask;
+
+	/*CERT-C Coverity check*/
+	if (_XAie_CheckPrecisionExceeds(CoreMod->CoreCtrl->CtrlEn.Lsb,
+			_XAie_MaxBitsNeeded(0U), MAX_VALID_AIE_REG_BIT_INDEX)) {
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
 	Value = (u32)(0U << CoreMod->CoreCtrl->CtrlEn.Lsb);
 	RegAddr = CoreMod->CoreCtrl->RegOff +
 		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
@@ -272,6 +279,13 @@ AieRC XAie_CoreUnreset(XAie_DevInst *DevInst, XAie_LocType Loc)
 
 	CoreMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_AIETILE].CoreMod;
 	Mask = CoreMod->CoreCtrl->CtrlRst.Mask;
+
+	/*CERT-C Coverity Check*/
+	if ((_XAie_CheckPrecisionExceeds(CoreMod->CoreCtrl->CtrlRst.Lsb,
+			_XAie_MaxBitsNeeded(0U),MAX_VALID_AIE_REG_BIT_INDEX))) {
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
 	Value = (u32)(0U << CoreMod->CoreCtrl->CtrlRst.Lsb);
 	RegAddr = CoreMod->CoreCtrl->RegOff +
 		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
@@ -398,6 +412,14 @@ AieRC XAie_CoreWaitForDisable(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	CoreMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_AIETILE].CoreMod;
 	Mask = CoreMod->CoreSts->En.Mask;
+
+	/*CERT-C Coverity check*/
+	if (_XAie_CheckPrecisionExceeds(CoreMod->CoreSts->En.Lsb,
+			_XAie_MaxBitsNeeded(0U), MAX_VALID_AIE_REG_BIT_INDEX)) {
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
+
 	Value = (u32)(0U << CoreMod->CoreSts->En.Lsb);
 	return _XAie_CoreWaitStatus(DevInst, Loc, TimeOut, Mask, Value,
 				XAIE_DISABLE);
@@ -435,7 +457,7 @@ AieRC XAie_CoreWaitForDisableBusy(XAie_DevInst *DevInst, XAie_LocType Loc,
 	CoreMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_AIETILE].CoreMod;
 
 	if (_XAie_CheckPrecisionExceeds(CoreMod->CoreSts->En.Lsb,
-			_XAie_MaxBitsNeeded(0), MAX_VALID_AIE_REG_BIT_INDEX)) {
+			_XAie_MaxBitsNeeded(0U), MAX_VALID_AIE_REG_BIT_INDEX)) {
 		XAIE_ERROR("Check Precision Exceeds Failed\n");
 		return XAIE_ERR;
 	}

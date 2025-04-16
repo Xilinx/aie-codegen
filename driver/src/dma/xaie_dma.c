@@ -2375,7 +2375,7 @@ AieRC XAie_DmaChannelSetStartQueueGeneric(XAie_DevInst *DevInst,
 {
 	AieRC RC;
 	u8 TileType;
-	u8 StartBd;
+	u16 StartBd;
 	u8 MaxNumChannels;
 	u8 MaxNumBds;
 	u32 Val = 0;

@@ -255,7 +255,7 @@ static const u8 _XAie4_MemTile_DualAppPortsConectivityMatrix[MEMTILE_DUALAPP_SUB
 };
 
 static const u8 _XAie4_ShimTile_PortsConectivityMatrix[SHIMTILE_SUBRDNT_MAX][SHIMTILE_MNGR_MAX] = {
-		      /*S2M0  TS2M S2M2  W0  W1  N0  N1  N2  N3  E0  E1  NC0  NC1  TC0  TC1  32b0  32b1*/
+		      /*S2M0  TS2M S2M1  W0  W1  N0  N1  N2  N3  E0  E1  NC0  NC1  TC0  TC1  32b0  32b1*/
 	/* M2S0 */ { 1,    0,	0,   1,  1,  1,  1,  1,  1,  1,  1,  1,   0,   1,   0,    1,    1 },
 	/* M2S1 */ { 0,    0,	0,   1,  1,  1,  1,  1,  1,  1,  1,  1,   0,   1,   0,    1,    1 },
 	/* M2S2 */ { 0,    0,	1,   1,  1,  1,  1,  1,  1,  1,  1,  0,   1,   0,   1,    1,    1 },
@@ -539,6 +539,7 @@ AieRC _XAie4_ShimTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst,
 	u8 SubrntePortIdx = 0;
 	u8 MngrPortIdx = 0;
 	u8 DualAppMode;
+	u8 AddPlaceInMatrixTable = 0;
 
 	if (DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE)
 		DualAppMode = 0;
@@ -577,6 +578,10 @@ AieRC _XAie4_ShimTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst,
 	switch (Master) {
 	case DMA:
 		MngrPortIdx = DualAppMode ? SHIMTILE_DUALAPP_MNGR_S2MM : SHIMTILE_MNGR_S2MM;
+		/* for S2MM1 port, MstrPortNum will be 1, but in matrix table S2MM1 port index is 2.
+		 * as there is TS2MM port in bw S2MM0 and S2MM1*/
+		if(MstrPortNum == 1)
+			AddPlaceInMatrixTable = 1;
 		break;
 	case WEST:
 		if (DualAppMode)
@@ -610,7 +615,7 @@ AieRC _XAie4_ShimTile_StrmSwCheckPortValidity(XAie_DevInst *DevInst,
 		/* Any port that is not shown in connectivity matrix is fully connected */
 		return XAIE_OK;
 	}
-	MngrPortIdx += MstrPortNum;
+	MngrPortIdx += MstrPortNum + AddPlaceInMatrixTable;
 
 	if (DualAppMode) {
 		/* Safe check to see if the indexes are out of connectivity matrix bound */

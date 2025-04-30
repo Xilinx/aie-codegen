@@ -97,7 +97,7 @@ ifeq ($(MAKECMDGOALS) ,cdo)
 endif
 
 controlcode: include lib$(NAME).so
-CFLAGS_controlcode += -Wall -Wextra --Werror --std=c11 -D__AIECONTROLCODE__
+CFLAGS_controlcode += -Wall -Wextra -Werror --std=c11 -D__AIECONTROLCODE__
 ifeq ($(MAKECMDGOALS) ,controlcode)
 %.o: %.c include
 	$(CC) $(CFLAGS_controlcode) -I$(INTERNALDIR) -I$(INTERNALDIR)/xaiengine -c -fPIC $< -o $@

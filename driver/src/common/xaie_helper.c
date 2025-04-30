@@ -2955,8 +2955,8 @@ XAie_ModeSelect XAie_GetModeConfig(XAie_DevInst *DevInst)
 	if (Backend->Ops.GetConfigMode != NULL) {
 		return Backend->Ops.GetConfigMode((void *)DevInst->IOInst);
 	} else {
-		XAIE_ERROR("GetConfigMode function pointer points to NULL\n");
-		return XAIE_NOT_SUPPORTED;
+		XAIE_ERROR("GetConfigMode function pointer points to NULL, hence returned mode is XAIE_INVALID_MODE\n");
+		return XAIE_INVALID_MODE;
 	}
 }
 

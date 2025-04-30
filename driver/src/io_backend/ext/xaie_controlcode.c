@@ -1745,8 +1745,8 @@ XAie_ModeSelect XAie_GetConfigMode(void *IOInst)
 	/* no-op */
 	(void)IOInst;
 	XAIE_ERROR("Driver is not compiled with ControlCode generation "
-		"backend (__AIECONTROLCODE__)\n");
-	return XAIE_INVALID_BACKEND;
+		"backend (__AIECONTROLCODE__), hence default mode returned by this API is XAIE_INVALID_MODE\n");
+	return XAIE_INVALID_MODE;
 }
 
 #endif /* __AIECONTROLCODE__ */

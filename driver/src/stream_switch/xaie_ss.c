@@ -1737,7 +1737,7 @@ static AieRC _XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 TileType, const
 }
 
 /**
- * XAie_StrmSwDeterministicMergeRegisterClear - Clears the deterministic merge
+ * _XAie_StrmSwDeterministicMergeRegisterClear - Clears the deterministic merge
  * register for the stream switch in the AI Engine.
  *
  * @DevInst: Pointer to the AI Engine device instance.
@@ -1753,7 +1753,7 @@ static AieRC _XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 TileType, const
  * Return: A status code of type AieRC indicating success or failure of the
  * operation.
  */
-AieRC XAie_StrmSwDeterministicMergeRegisterClear(XAie_DevInst *DevInst, const XAie_StrmMod *StrmMod, u8 TileType, u8 Row, u8 Col)
+AieRC _XAie_StrmSwDeterministicMergeRegisterClear(XAie_DevInst *DevInst, const XAie_StrmMod *StrmMod, u8 TileType, u8 Row, u8 Col)
 {
 	AieRC RC = 0;
 	u64 RegAddr = 0;
@@ -1796,49 +1796,51 @@ AieRC XAie_StrmSwDeterministicMergeRegisterClear(XAie_DevInst *DevInst, const XA
  *
  * Return: XAIE_OK on success, or an error code on failure.
  */
-AieRC XAie_StrmSwRegisterClear(XAie_DevInst *DevInst)
+AieRC XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 Col, u8 Row)
 {
 	AieRC RC = 0;
 	u8 TileType;
-	u8 Col = 0, Row = 0;
 
 	const XAie_StrmMod *StrmMod;
+	
+	//XAIE_DBG("\n\n*************Col = %d, Row = %d*******************\n", Col, Row);
 
-	for(Col = 0; Col < DevInst->NumCols; Col++) {
-		for(Row = 0; Row < DevInst->NumRows; Row++) {
-			//XAIE_DBG("\n\n*************Col = %d, Row = %d*******************\n", Col, Row);
-			XAie_LocType Loc = XAie_TileLoc(Col, Row);
-			TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-			if(TileType == XAIEGBL_TILE_TYPE_MAX) {
-				XAIE_ERROR("Invalid Tile Type\n");
-				return XAIE_INVALID_TILE;
-			}
-
-			StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw;
-
-			RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->MstrConfig, _512B_PORT_START, _512B_PORT_END, XAIE_STRMSW_MASTER, Row, Col, 1);
-			RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvConfig, _512B_PORT_START, _512B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 1);
-			RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvSlotConfig, _512B_PORT_START, _512B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 4);
-
-			//TODO: Raman, Issue with AIE4 registers, need to debug.
-			//RC |= XAie_StrmSwDeterministicMergeRegisterClear(DevInst, StrmMod, TileType, Row, Col);
-
-			if(RC != XAIE_OK)
-				return RC;
-
-			if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
-				//XAIE_DBG("\n\n\nResetting 32B\n\n\n");
-				StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw32b;
-
-				RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->MstrConfig, _32B_PORT_START, _32B_PORT_END, XAIE_STRMSW_MASTER, Row, Col, 1);
-				RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvConfig, _32B_PORT_START, _32B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 1);
-				RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvSlotConfig, _32B_PORT_START, _32B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 4);
-
-				if(RC != XAIE_OK)
-					return RC;
-			}
-		}
+	if(DevInst == XAIE_NULL) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
 	}
+
+	XAie_LocType Loc = XAie_TileLoc(Col, Row);
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if(TileType == XAIEGBL_TILE_TYPE_MAX) {
+		XAIE_ERROR("Invalid Tile Type\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw;
+
+	RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->MstrConfig, _512B_PORT_START, _512B_PORT_END, XAIE_STRMSW_MASTER, Row, Col, 1);
+	RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvConfig, _512B_PORT_START, _512B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 1);
+	RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvSlotConfig, _512B_PORT_START, _512B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 4);
+
+	//TODO: Raman, Issue with AIE4 registers, need to debug.
+	RC |= _XAie_StrmSwDeterministicMergeRegisterClear(DevInst, StrmMod, TileType, Row, Col);
+
+	if(RC != XAIE_OK)
+		return RC;
+
+	if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		//XAIE_DBG("\n\n\nResetting 32B\n\n\n");
+		StrmMod = DevInst->DevProp.DevMod[TileType].StrmSw32b;
+
+		RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->MstrConfig, _32B_PORT_START, _32B_PORT_END, XAIE_STRMSW_MASTER, Row, Col, 1);
+		RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvConfig, _32B_PORT_START, _32B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 1);
+		RC |= _XAie_StrmSwRegisterClear(DevInst, TileType, StrmMod->SlvSlotConfig, _32B_PORT_START, _32B_PORT_END, XAIE_STRMSW_SLAVE, Row, Col, 4);
+
+		if(RC != XAIE_OK)
+			return RC;
+	}
+
 	return XAIE_OK;
 }
 

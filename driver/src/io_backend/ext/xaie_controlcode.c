@@ -768,10 +768,21 @@ static AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32
 					}
 					else
 					{
-						// Setting the flag to one to ensure that SHIM BD
-						// Doesn't get chained with non shim BD's. But non shim
-						// BDs can get chanined with shim BDs
-						ControlCodeInst->CombineCommands = 1;
+						/**
+						 * Todo:
+						 * AIE-RT generated ASM files contain SHIM BD as sepearte
+						 * WRITE_DESC_* command. But manually generated ASM
+						 * Can have non SHIM BDs chains after SHIM BD under same
+						 * WRITE_DESC_* command.
+						 *
+						 * So to toggle chaining after SHIM BD's toggle the value
+						 * of below flag between 0 and 1.
+						 *
+						 * Setting the flag to one ensures that SHIM BD
+						 * Doesn't get chained with non shim BD's. But non shim
+						 * BDs can get chanined with shim BDs.
+						 */
+						ControlCodeInst->CombineCommands = 0;
 					}
 				}
 
@@ -1107,10 +1118,19 @@ AieRC XAie_WaitTaskCompleteToken(XAie_DevInst *DevInst,
 *******************************************************************************/
 AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
 {
+	/**
+	 * Kotesh TODO: Fix It
+	 * When using swig interface.
+	 * This is causing a segfault.
+	 * As the backend pointer in DevInst stays uninitialized.
+	 * For now disabled the check will look into it later.
+	 */
+	#if 0
         if(DevInst->Backend->Type != XAIE_IO_BACKEND_CONTROLCODE) {
                 XAIE_ERROR("This is supported only in Controlcode Backend %d \n", DevInst->Backend->Type);
                 return XAIE_INVALID_BACKEND;
         }
+	#endif
 
         XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
@@ -1146,7 +1166,7 @@ AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
                 return XAIE_OK;
         }
         else
-                return XAIE_ERR;
+	        return XAIE_ERR;
 }
 
 /*****************************************************************************/

@@ -285,6 +285,54 @@ typedef struct XAie_CoreIntMod {
 	u32 CoreSPOff;
 	u32 CoreLROff;
 } XAie_CoreIntMod;
+
+/*
+ * This typedef contains the attributes for shim uC MDM performance counter
+ * event setting register
+ */
+ typedef struct {
+	u8 MaxEventId;
+	u32 RegOff;
+	u32 Mask;
+} XAie_RegUcMdmPerfEvents;
+
+/*
+ * This typedef contains the attributes for shim uC MDM performance counter
+ * control register
+ */
+typedef struct {
+	u32 RegOff;
+	XAie_RegFldAttr Clear;
+	XAie_RegFldAttr Start;
+	XAie_RegFldAttr Stop;
+	XAie_RegFldAttr Sample;
+	XAie_RegFldAttr Reset;
+} XAie_RegUcMdmPerfCtrl;
+
+/*
+ * This typedef contains the attributes for shim uC MDM performance counter
+ * status register
+ */
+typedef struct {
+	u32 RegOff;
+	XAie_RegFldAttr Full;
+	XAie_RegFldAttr Overflow;
+} XAie_RegUcMdmPerfSts;
+
+/*
+ * This typedef contains the attributes for shim uC Microblaze Debug Module (MDM)
+ */
+typedef struct {
+	u32 PerfCntReadRegOff;
+	u32 PerfCntWriteRegOff;
+	const XAie_RegUcMdmPerfEvents *PerfEvents;
+	const XAie_RegUcMdmPerfCtrl *PerfCtrl;
+	const XAie_RegUcMdmPerfSts *PerfSts;
+	u8 NumEventCounters;
+	u8 NumLatencyCounters;
+	u8 CounterWidth;
+} XAie_UcMdm;
+
 /*
  * The typedef contains the attributes of uC Modules
  */
@@ -306,6 +354,7 @@ typedef struct XAie_UcMod {
 	XAie_RegFldAttr PCValid;
 	const XAie_RegUcCoreCtrl *CoreCtrl;
 	const XAie_RegUcCoreSts *CoreSts;
+	const XAie_UcMdm *UcMdm;
 	AieRC (*Wakeup)(XAie_DevInst *DevInst, XAie_LocType Loc,
 		const struct XAie_UcMod *UcMod);
 	AieRC (*Sleep)(XAie_DevInst *DevInst, XAie_LocType Loc,

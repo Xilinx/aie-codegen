@@ -187,6 +187,46 @@ static const  XAie_RegUcCoreSts Aie4UcCoreStsReg =
 		XAIE4GBL_UC_MODULE_CORE_STATUS_SLEEP_MASK}
 };
 
+static const XAie_RegUcMdmPerfEvents Aie4UcMdmPerfEvents = {
+	.RegOff = XAIE4GBL_UC_MODULE_MDM_PCCTRLR,
+	.MaxEventId = 63U,
+	.Mask = XAIE4GBL_UC_MODULE_MDM_PCCTRLR_MASK,
+};
+
+static const XAie_RegUcMdmPerfCtrl Aie4UcMdmPerfCtrl = {
+	.RegOff =  XAIE4GBL_UC_MODULE_MDM_PCCMDR,
+	.Clear = {XAIE4GBL_UC_MODULE_MDM_PCCMDR_CLEAR_LSB,
+		XAIE4GBL_UC_MODULE_MDM_PCCMDR_CLEAR_MASK},
+	.Start = {XAIE4GBL_UC_MODULE_MDM_PCCMDR_START_LSB,
+		XAIE4GBL_UC_MODULE_MDM_PCCMDR_START_MASK},
+	.Stop = {XAIE4GBL_UC_MODULE_MDM_PCCMDR_STOP_LSB,
+		XAIE4GBL_UC_MODULE_MDM_PCCMDR_STOP_MASK},
+	.Sample = {XAIE4GBL_UC_MODULE_MDM_PCCMDR_SAMPLE_LSB,
+		XAIE4GBL_UC_MODULE_MDM_PCCMDR_SAMPLE_MASK},
+	.Reset = {XAIE4GBL_UC_MODULE_MDM_PCCMDR_RESET_LSB,
+		XAIE4GBL_UC_MODULE_MDM_PCCMDR_RESET_MASK},
+
+};
+
+static const XAie_RegUcMdmPerfSts Aie4UcMdmPerfSts = {
+	.RegOff = XAIE4GBL_UC_MODULE_MDM_PCSR,
+	.Full = {XAIE4GBL_UC_MODULE_MDM_PCSR_FULL_LSB,
+		XAIE4GBL_UC_MODULE_MDM_PCSR_FULL_MASK},
+	.Overflow = {XAIE4GBL_UC_MODULE_MDM_PCSR_OVERFLOW_LSB,
+		XAIE4GBL_UC_MODULE_MDM_PCSR_OVERFLOW_MASK},
+};
+
+static const XAie_UcMdm Aie4UcMdm = {
+	.PerfCntReadRegOff = XAIE4GBL_UC_MODULE_MDM_PCDRR,
+	.PerfCntWriteRegOff = XAIE4GBL_UC_MODULE_MDM_PCWR,
+	.PerfEvents = &Aie4UcMdmPerfEvents,
+	.PerfCtrl = &Aie4UcMdmPerfCtrl,
+	.PerfSts = &Aie4UcMdmPerfSts,
+	.NumEventCounters = 5U,
+	.NumLatencyCounters = 1U,
+	.CounterWidth = 32U,
+};
+
 static const XAie_UcMod Aie4UcMod =
 {
 	.IsCheckerBoard = 0U,
@@ -206,6 +246,7 @@ static const XAie_UcMod Aie4UcMod =
 	.PCValid = {XAIE4GBL_UC_MODULE_CORE_PC_EVENT0_VALID_LSB, XAIE4GBL_UC_MODULE_CORE_PC_EVENT0_VALID_MASK},
 	.CoreCtrl = &Aie4UcCoreCtrlReg,
 	.CoreSts = &Aie4UcCoreStsReg,
+	.UcMdm = &Aie4UcMdm,
 	.Wakeup = &_XAie_UcCoreWakeup,
 	.Sleep = &_XAie_UcCoreSleep,
 	.GetCoreStatus = &_XAie_UcCoreGetStatus

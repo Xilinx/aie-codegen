@@ -68,4 +68,23 @@ XAIE_AIG_EXPORT AieRC XAie_PerfCounterSnapshotLoadEventSet(XAie_DevInst *DevInst
 		XAie_ModuleType Module, XAie_Events EventVal);
 XAIE_AIG_EXPORT AieRC XAie_PerfCounterSnapshotLoadEventReset(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_ModuleType Module);
+
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterGet(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u32 *CounterVal);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterGetConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u8 *NumEvntCounter, u8 *NumLatCounter, u8 *CounterWidth);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterGetStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u8 *CounterStatus);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterControlSet(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u8 *UcEvents);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterControlReset(XAie_DevInst *DevInst, XAie_LocType Loc);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterSet(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u32 *CounterVal);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterReset(XAie_DevInst *DevInst, XAie_LocType Loc);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterGetControlConfig(XAie_DevInst *DevInst,
+		XAie_LocType Loc, u8 *UcEvents);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterStart(XAie_DevInst *DevInst, XAie_LocType Loc);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterStop(XAie_DevInst *DevInst, XAie_LocType Loc,
+		u8 SampleEnable);
+XAIE_AIG_EXPORT AieRC XAie_MdmPerfCounterSample(XAie_DevInst *DevInst, XAie_LocType Loc);
 #endif		/* end of protection macro */

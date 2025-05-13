@@ -83,7 +83,7 @@ XAIE_AIG_EXPORT AieRC XAie_StrmSwDeterministicMergeEnable(XAie_DevInst *DevInst,
 		XAie_LocType Loc, u8 Arbitor);
 XAIE_AIG_EXPORT AieRC XAie_StrmSwDeterministicMergeDisable(XAie_DevInst *DevInst,
 		XAie_LocType Loc, u8 Arbitor);
-XAIE_AIG_EXPORT	AieRC XAie_StrmSwRegisterClear(XAie_DevInst *DevInst);
+XAIE_AIG_EXPORT	AieRC XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 Col, u8 Row);
 AieRC _XAie_GetPortIdx(XAie_DevInst *DevInst, u8 TileType,
 		const XAie_StrmMod *StrmMod, StrmSwPortType PortType,
 		u8 PortNum, u8 *PortIdx, XAie_StrmPortIntf Port);

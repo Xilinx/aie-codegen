@@ -1727,6 +1727,14 @@ static inline AieRC _XAie_LConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie
 						XAIE_PL_MOD_NOC_TRUSTED_KEYS_A_MASK);
 			_XAie_LPartWrite32(DevInst, RegAddr, FldVal);
 
+			/* Configure AxUSER A register */
+			RegAddr = XAIE_PL_MOD_NOC_AxUSER_A_REGOFF +
+						_XAie_LGetTileAddr(XAIE_SHIM_ROW, col);
+			FldVal = XAie_SetField(ShimOptions->AxUSER,
+						XAIE_PL_MOD_NOC_AxUSER_A_LSB,
+						XAIE_PL_MOD_NOC_AxUSER_A_MASK);
+			_XAie_LPartWrite32(DevInst, RegAddr, FldVal);
+
 			/* Configure SMID B register */
 			RegAddr = XAIE_PL_MOD_NOC_SMID_B_REGOFF +
 						_XAie_LGetTileAddr(XAIE_SHIM_ROW, col);
@@ -1742,6 +1750,15 @@ static inline AieRC _XAie_LConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie
 						XAIE_PL_MOD_NOC_TRUSTED_KEYS_B_LSB,
 						XAIE_PL_MOD_NOC_TRUSTED_KEYS_B_MASK);
 			_XAie_LPartWrite32(DevInst, RegAddr, FldVal);
+
+			/* Configure AxUSER B register */
+			RegAddr = XAIE_PL_MOD_NOC_AxUSER_B_REGOFF +
+						_XAie_LGetTileAddr(XAIE_SHIM_ROW, col);
+			FldVal = XAie_SetField(ShimOptions->AxUSER,
+						XAIE_PL_MOD_NOC_AxUSER_B_LSB,
+						XAIE_PL_MOD_NOC_AxUSER_B_MASK);
+			_XAie_LPartWrite32(DevInst, RegAddr, FldVal);
+
 		} else if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
 			/* Configure SMID A register */
 			RegAddr = XAIE_PL_MOD_NOC_SMID_A_REGOFF +
@@ -1758,6 +1775,15 @@ static inline AieRC _XAie_LConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie
 						XAIE_PL_MOD_NOC_TRUSTED_KEYS_A_LSB,
 						XAIE_PL_MOD_NOC_TRUSTED_KEYS_A_MASK);
 			_XAie_LPartWrite32(DevInst, RegAddr, FldVal);
+
+			/* Configure AxUSER A register */
+			RegAddr = XAIE_PL_MOD_NOC_AxUSER_A_REGOFF +
+						_XAie_LGetTileAddr(XAIE_SHIM_ROW, col);
+			FldVal = XAie_SetField(ShimOptions->AxUSER,
+						XAIE_PL_MOD_NOC_AxUSER_A_LSB,
+						XAIE_PL_MOD_NOC_AxUSER_A_MASK);
+			_XAie_LPartWrite32(DevInst, RegAddr, FldVal);
+
 		} else {
 			/* Configure SMID B register */
 			RegAddr = XAIE_PL_MOD_NOC_SMID_B_REGOFF +
@@ -1773,6 +1799,14 @@ static inline AieRC _XAie_LConfigureShimDmaRegisters(XAie_DevInst *DevInst, XAie
 			FldVal = XAie_SetField(ShimOptions->Trusted_Keys,
 						XAIE_PL_MOD_NOC_TRUSTED_KEYS_B_LSB,
 						XAIE_PL_MOD_NOC_TRUSTED_KEYS_B_MASK);
+			_XAie_LPartWrite32(DevInst, RegAddr, FldVal);
+
+			/* Configure AxUSER B register */
+			RegAddr = XAIE_PL_MOD_NOC_AxUSER_B_REGOFF +
+						_XAie_LGetTileAddr(XAIE_SHIM_ROW, col);
+			FldVal = XAie_SetField(ShimOptions->AxUSER,
+						XAIE_PL_MOD_NOC_AxUSER_B_LSB,
+						XAIE_PL_MOD_NOC_AxUSER_B_MASK);
 			_XAie_LPartWrite32(DevInst, RegAddr, FldVal);
 		}
 	}

@@ -30,12 +30,11 @@
 /****************************** Type Definitions *****************************/
 #ifdef __SWIGINTERFACE__
 // redirect XAIE_ERROR to printf
-#define XAIE_ERROR       printf
+#define XAIE_ERROR	printf
 // no need for debug/warn printf so empty macro
-#define XAIE_DEBUG
+#define XAIE_DBG
 #define XAIE_WARN
 #endif
-
 
 typedef struct {
 	u64 BaseAddr;

@@ -10,7 +10,6 @@
 %apply uint32_t { u32, uint32_t };
 %apply int { u32 };
 %apply uint32_t * { u32 *, uint32_t * };
-%apply (int *IN, int DIM1) { (u32 *data, int size) };
 
 %{
     #include <stdlib.h>  /* For malloc and free */

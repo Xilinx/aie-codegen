@@ -37,6 +37,9 @@
 #include "swig_controlcode_interface.h"
 #endif
 
+/* Forward declaration of the ControlCodeBackend variable */
+extern const XAie_Backend ControlCodeBackend;
+
 #ifdef __AIECONTROLCODE__
 
 #define TEMP_ASM_FILE1    ".temp_data1.txt"
@@ -1108,17 +1111,12 @@ AieRC XAie_WaitTaskCompleteToken(XAie_DevInst *DevInst,
 *******************************************************************************/
 AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
 {
-	/**
-	 * TODO (Kotesh): Need to fix this issue.
-	 * When invoked from swig interface backend is not set
-	 * Hence causing seg fault.
-	 */
-#if 0
+
         if(DevInst->Backend->Type != XAIE_IO_BACKEND_CONTROLCODE) {
                 XAIE_ERROR("This is supported only in Controlcode Backend %d \n", DevInst->Backend->Type);
                 return XAIE_INVALID_BACKEND;
         }
-#endif
+
         XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
 		if(ControlCodeInst->NumShimBDsChained != 0) {
@@ -1318,19 +1316,10 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	}
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
-	/**
-	 * Kotesh TODO: Fix It
-	 * When using swig interface.
-	 * This is causing a segfault.
-	 * As the backend pointer in DevInst stays uninitialized.
-	 * For now disabled the check will look into it later.
-	 */
-#if 0
 	if(DevInst->Backend->Type != XAIE_IO_BACKEND_CONTROLCODE) {
 		XAIE_ERROR("This is supported only in Controlcode Backend %d \n", DevInst->Backend->Type);
 		return XAIE_INVALID_BACKEND;
 	}
-#endif
 
 	memset(ControlCodeInst, 0, sizeof(XAie_ControlCodeIO));
 	ControlCodeInst->ScrachpadName = NULL;
@@ -1563,6 +1552,8 @@ AieRC XAie_ControlCodeSetScrachPad(XAie_DevInst *DevInst, const char *Scrachpad)
 *******************************************************************************/
 int XAie_ControlCodeIO_swig_Init(Swig_DevInst *DevInst) {
 	AieRC RC;
+	// Set Backend in DevInst to control code
+	DevInst->Backend = &ControlCodeBackend;
 	RC = XAie_ControlCodeIO_Init((XAie_DevInst *)DevInst);
 	return RC;
 }

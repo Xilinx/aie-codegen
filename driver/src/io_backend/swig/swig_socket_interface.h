@@ -82,9 +82,19 @@ typedef struct {
 	XAie_PartitionProp PartProp;
 } Swig_Config;
 
-
+/***
+ * SWIG Interface API Prototype definitions
+ */
 int XAie_SocketIO_swig_Write32(Swig_SocketIO IOInst, u64 RegOff, u32 Value);
 int XAie_SocketIO_swig_Read32(Swig_SocketIO IOInst, u64 RegOff, u32 Data);
 int XAie_SocketIO_swig_Init(Swig_DevInst *DevInst);
 int XAie_SocketIO_swig_Finish(Swig_SocketIO IOInst);
+
+/***
+ * Socket Backend API Prototype definitions
+ */
+AieRC XAie_SocketIO_Finish(void *IOInst);
+AieRC XAie_SocketIO_Init(XAie_DevInst *DevInst);
+AieRC XAie_SocketIO_Write32(void *IOInst, u64 RegOff, u32 Value);
+AieRC XAie_SocketIO_Read32(void *IOInst, u64 RegOff, u32 *Data);
 #endif /* XAIESOCKET_H */

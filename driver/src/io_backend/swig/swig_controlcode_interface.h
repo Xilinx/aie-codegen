@@ -4,7 +4,6 @@
 * SPDX-License-Identifier: MIT
 ******************************************************************************/
 
-
 /*****************************************************************************/
 /**
 * @file swig_controlcode_interface.h
@@ -34,36 +33,8 @@
 #define XAIE_WARN
 #endif
 
-#if 0
-/*
- * Typedef for enum to capture backend function code
- */
-typedef enum {
-	XAIE_BACKEND_OP_NPIWR32,
-	XAIE_BACKEND_OP_NPIMASKPOLL32,
-	XAIE_BACKEND_OP_RST_PART,
-	XAIE_BACKEND_OP_ASSERT_SHIMRST,
-	XAIE_BACKEND_OP_SET_PROTREG,
-	XAIE_BACKEND_OP_CONFIG_SHIMDMABD,
-	XAIE_BACKEND_OP_REQUEST_TILES,
-	XAIE_BACKEND_OP_RELEASE_TILES,
-	XAIE_BACKEND_OP_PARTITION_INITIALIZE,
-	XAIE_BACKEND_OP_PARTITION_TEARDOWN,
-	XAIE_BACKEND_OP_PARTITION_CLEAR_CONTEXT,
-	XAIE_BACKEND_OP_UPDATE_NPI_ADDR,
-	XAIE_BACKEND_OP_SET_COLUMN_CLOCK,
-	XAIE_BACKEND_OP_PERFORMANCE_UTILIZATION,
-	XAIE_BACKEND_OP_CONFIG_MEM_INTRLVNG,
-} Swig_BackendOpCode;
-
-typedef enum {
-	XAIE_SHIM_BD_CHAINING_DISABLE,
-	XAIE_SHIM_BD_CHAINING_ENABLE,
-	XAIE_WRITE_DES_ASYNC_DISABLE,
-	XAIE_WRITE_DES_ASYNC_ENABLE,
-	XAIE_INVALID_MODE
-}Swig_ModeSelect;
-#endif
+/* Forward declaration of the ControlCodeBackend variable */
+extern const XAie_Backend ControlCodeBackend;
 
 typedef struct {
 	XAie_DevInst *DevInst;
@@ -72,7 +43,6 @@ typedef struct {
 	FILE *ControlCodefp;
 	FILE *ControlCodedatafp;
 	FILE *ControlCodedata2fp;
-	FILE *ControlCodedata3fp;
 	u32  UcbdLabelNum;
 	u32  UcbdDataNum;
 	u32  UcDmaDataNum;
@@ -81,12 +51,17 @@ typedef struct {
 	u32  UcPageTextSize;
 	u32  PageSizeMax;
 	u32  NumShimBDsChained;
+	u32  DataAligner;
 	u8   CombineCommands;
 	u8   IsJobOpen;
 	u8   IsPageOpen;
 	u8   IsShimBd;
 	u8   Mode;
+	u8   IsAdjacentMemWrite;
+	u32  CombinedMemWriteSize;
+	u64  CalculatedNextRegOff;
 	char *ScrachpadName;
+	u8 PageBreak;
 } Swig_ControlCodeIO;
 
 typedef struct {
@@ -129,12 +104,15 @@ typedef struct {
 	XAie_PartitionProp PartProp;
 } Swig_Config;
 
+/***
+ * SWIG Interface API Prototype definitions
+ */
 int XAie_ControlCodeIO_swig_Finish(Swig_ControlCodeIO IOInst);
 int XAie_ControlCodeIO_swig_Init(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_ConfigMode(Swig_DevInst *DevInst, XAie_ModeSelect Mode);
 XAie_ModeSelect XAie_ControlCodeIO_swig_GetConfigMode(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_Write32(Swig_DevInst *DevInst, u64 RegOff, u32 Value);
-u32 XAie_ControlCodeIO_swig_Read32(Swig_DevInst *DevInst, u64 RegOff, u32 *Data);
+int XAie_ControlCodeIO_swig_Read32(Swig_DevInst *DevInst, u64 RegOff, u32 *Data);
 int XAie_ControlCodeIO_swig_MaskWrite32(Swig_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value);
 int XAie_ControlCodeIO_swig_MaskPoll(Swig_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value, u32 TimeOutUs);
 int XAie_ControlCodeIO_swig_BlockWrite32(Swig_DevInst *DevInst, u64 RegOff, u32 *Data, u32 DataSize);
@@ -143,8 +121,7 @@ int XAie_ControlCodeIO_swig_AddressPatching(Swig_DevInst *DevInst, u32 Arg_Index
 int XAie_ControlCodeIO_swig_WaitUcDMA(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_WaitTaskCompleteToken(Swig_DevInst *DevInst, u16 Column, u16 Row, u32 Channel, u8 NumTokens);
 int XAie_ControlCodeIO_swig_SaveTimestamp(Swig_DevInst *DevInst, u32 Timestamp);
-//int XAie_ControlCodeIO_swig_RunOp(Swig_DevInst *DevInst, Swig_DevInst *DevInst, XAie_BackendOpCode Op, void *Arg);
-
+int XAie_ControlCodeIO_swig_RunOp(Swig_DevInst *DevInst, XAie_BackendOpCode Op, void *Arg);
 int XAie_ControlCodeIO_swig_OpenControlCodeFile(Swig_DevInst *DevInst, const char *FileName, u32 PageSize);
 int XAie_ControlCodeIO_swig_StartNewJob(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_EndJob(Swig_DevInst *DevInst);
@@ -152,4 +129,30 @@ int XAie_ControlCodeIO_swig_EndPage(Swig_DevInst *DevInst);
 void XAie_ControlCodeIO_swig_CloseControlCodeFile(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_ControlCodeAddAnnotation(Swig_DevInst *DevInst, u32 Id, const char *Name, const char *Description);
 int XAie_ControlCodeIO_swig_ControlCodeSetScrachPad(Swig_DevInst *DevInst, const char *Scrachpad);
+
+/***
+ * Control Code Backend API Prototype definitions
+ */
+AieRC XAie_ControlCodeIO_Finish(void *IOInst);
+AieRC XAie_ControlCodeIO_Init(XAie_DevInst *DevInst);
+AieRC XAie_ConfigMode(void *IOInst, XAie_ModeSelect Mode);
+XAie_ModeSelect XAie_GetConfigMode(void *IOInst);
+AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value);
+AieRC XAie_ControlCodeIO_Read32(void *IOInst, u64 RegOff, u32 *Data);
+AieRC XAie_ControlCodeIO_MaskWrite32(void *IOInst, u64 RegOff, u32 Mask, u32 Value);
+AieRC XAie_ControlCodeIO_MaskPoll(void *IOInst, u64 RegOff, u32 Mask, u32 Value, u32 TimeOutUs);
+AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data, u32 Size);
+AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u32 Size);
+AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u32 Arg_Index, u8 Num_BDs);
+AieRC XAie_ControlCodeIO_WaitUcDMA(void *IOInst);
+AieRC XAie_WaitTaskCompleteToken(XAie_DevInst *DevInst, uint16_t Column, uint16_t Row, uint32_t Channel, uint8_t NumTokens);
+AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp);
+AieRC XAie_ControlCodeIO_RunOp(void *IOInst, XAie_DevInst *DevInst, XAie_BackendOpCode Op, void *Arg);
+AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 PageSize);
+AieRC XAie_StartNewJob(XAie_DevInst *DevInst);
+AieRC XAie_EndJob(XAie_DevInst *DevInst);
+AieRC XAie_EndPage(XAie_DevInst *DevInst);
+void XAie_CloseControlCodeFile(XAie_DevInst *DevInst);
+AieRC XAie_ControlCodeAddAnnotation(XAie_DevInst *DevInst, u32 Id, const char *Name, const char *Description);
+AieRC XAie_ControlCodeSetScrachPad(XAie_DevInst *DevInst, const char *Scrachpad);
 #endif

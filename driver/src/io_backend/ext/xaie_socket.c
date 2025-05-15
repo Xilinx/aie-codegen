@@ -78,7 +78,7 @@ typedef struct XAie_SocketIO {
 * the reference count reaches a zero. Internal only.
 *
 *******************************************************************************/
-static AieRC XAie_SocketIO_Finish(void *IOInst)
+AieRC XAie_SocketIO_Finish(void *IOInst)
 {
 	XAie_SocketIO *SocketIOInst = (XAie_SocketIO *)IOInst;
 
@@ -101,7 +101,7 @@ static AieRC XAie_SocketIO_Finish(void *IOInst)
 * to initialize just increments the reference count. Internal only.
 *
 *******************************************************************************/
-static AieRC XAie_SocketIO_Init(XAie_DevInst *DevInst)
+AieRC XAie_SocketIO_Init(XAie_DevInst *DevInst)
 {
 	XAie_SocketIO *IOInst;
 	struct addrinfo hints, *slist, *p;
@@ -214,7 +214,7 @@ static AieRC XAie_SocketIO_Init(XAie_DevInst *DevInst)
 * @note		Internal only.
 *
 *******************************************************************************/
-static AieRC XAie_SocketIO_Write32(void *IOInst, u64 RegOff, u32 Value)
+AieRC XAie_SocketIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 {
 	XAie_SocketIO *SocketIOInst = (XAie_SocketIO *)IOInst;
 	char CmdBuf[XAIE_IO_SOCKET_CMDBUFSIZE];
@@ -247,7 +247,7 @@ static AieRC XAie_SocketIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 * @note		Internal only.
 *
 *******************************************************************************/
-static AieRC XAie_SocketIO_Read32(void *IOInst, u64 RegOff, u32 *Data)
+AieRC XAie_SocketIO_Read32(void *IOInst, u64 RegOff, u32 *Data)
 {
 	XAie_SocketIO *SocketIOInst = (XAie_SocketIO *)IOInst;
 	char CmdBuf[XAIE_IO_SOCKET_CMDBUFSIZE];
@@ -276,90 +276,6 @@ static AieRC XAie_SocketIO_Read32(void *IOInst, u64 RegOff, u32 *Data)
 
 	return XAIE_OK;
 }
-
-#ifdef __SWIGINTERFACE__
-/*****************************************************************************/
-/**
-*
-* This is the public interface memory IO function to initialize the global IO instance
-*
-* @param	None.
-*
-* @return	None.
-*
-* @note		The global IO instance is a singleton and any further attempt
-* to initialize just increments the reference count. Internal only.
-*
-*******************************************************************************/
-int XAie_SocketIO_swig_Init(Swig_DevInst *DevInst) {
-	AieRC RC;
-	RC = XAie_SocketIO_Init(DevInst);
-	return RC;
-}
-
-/*****************************************************************************/
-/**
-*
-* This is the public interface memory IO function to write 32bit data to the specified address.
-*
-* @param	IOInst: IO instance pointer
-* @param	RegOff: Register offset to read from.
-* @param	Value: 32-bit data to be written.
-*
-* @return	None.
-*
-* @note		Internal only.
-*
-*******************************************************************************/
-int XAie_SocketIO_swig_Write32(Swig_SocketIO IOInst, u64 RegOff, u32 Value) {
-	AieRC RC;
-	void *IOInst_swig = &IOInst;
-	RC = XAie_SocketIO_Write32(IOInst_swig,RegOff,Value);
-	return RC;
-}
-
-/*****************************************************************************/
-/**
-*
-* This is the public interface memory IO function to read 32bit data from the specified address.
-*
-* @param	IOInst: IO instance pointer
-* @param	RegOff: Register offset to read from.
-* @param	Data: u32 Data variable
-*
-* @return	Data read from the register
-*
-* @note		Internal only.
-*
-*******************************************************************************/
-int XAie_SocketIO_swig_Read32(Swig_SocketIO IOInst, u64 RegOff, u32 Data) {
-	AieRC RC;
-	void *IOInst_swig = &IOInst;
-	RC = XAie_SocketIO_Read32(IOInst_swig,RegOff,&Data);
-	return Data;
-}
-
-/*****************************************************************************/
-/**
-*
-* This is the public interface memory IO function to free the global IO instance
-*
-* @param	IOInst: IO Instance pointer.
-*
-* @return	XAIE_OK on success, error code on failure.
-*
-* @note		The global IO instance is a singleton and freed when
-* the reference count reaches a zero. Internal only.
-*
-*******************************************************************************/
-int XAie_SocketIO_swig_Finish(Swig_SocketIO IOInst) {
-	AieRC RC;
-	void *IOInst_swig = &IOInst;
-	RC = XAie_SocketIO_Finish(IOInst_swig);
-	return RC;
-}
-
-#endif // __SWIGINTERFACE__
 
 /*****************************************************************************/
 /**
@@ -711,14 +627,14 @@ static AieRC XAie_SocketMemFree(XAie_MemInst *MemInst)
 
 #else
 
-static AieRC XAie_SocketIO_Finish(void *IOInst)
+AieRC XAie_SocketIO_Finish(void *IOInst)
 {
 	/* no-op */
 	(void)IOInst;
 	return XAIE_OK;
 }
 
-static AieRC XAie_SocketIO_Init(XAie_DevInst *DevInst)
+AieRC XAie_SocketIO_Init(XAie_DevInst *DevInst)
 {
 	/* no-op */
 	(void)DevInst;
@@ -727,7 +643,7 @@ static AieRC XAie_SocketIO_Init(XAie_DevInst *DevInst)
 	return XAIE_INVALID_BACKEND;
 }
 
-static AieRC XAie_SocketIO_Write32(void *IOInst, u64 RegOff, u32 Value)
+AieRC XAie_SocketIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 {
 	/* no-op */
 	(void)IOInst;
@@ -737,7 +653,7 @@ static AieRC XAie_SocketIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 	return XAIE_ERR;
 }
 
-static AieRC XAie_SocketIO_Read32(void *IOInst, u64 RegOff, u32 *Data)
+AieRC XAie_SocketIO_Read32(void *IOInst, u64 RegOff, u32 *Data)
 {
 	/* no-op */
 	(void)IOInst;

@@ -54,9 +54,9 @@ typedef enum {
 	AIETILE_DUALAPP_SUBRDNT_CORE	= 0,
 	AIETILE_DUALAPP_SUBRDNT_MM2S	= 1,
 	AIETILE_DUALAPP_SUBRDNT_SOUTH	= 2,
-	AIETILE_DUALAPP_SUBRDNT_NORTH	= 7,
-	AIETILE_DUALAPP_SUBRDNT_SC	= 9,
-	AIETILE_DUALAPP_SUBRDNT_32b	= 10,
+	AIETILE_DUALAPP_SUBRDNT_NORTH	= 6,
+	AIETILE_DUALAPP_SUBRDNT_SC		= 8,
+	AIETILE_DUALAPP_SUBRDNT_32b		= 9,
 	AIETILE_DUALAPP_SUBRDNT_MAX
 }_AieTile_DualAppSlvPortTypeBaseIdx;
 
@@ -135,8 +135,8 @@ typedef enum {
 
 typedef enum {
 	SHIMTILE_DUALAPP_SUBRDNT_MM2S	= 0,
-	SHIMTILE_DUALAPP_SUBRDNT_M2SCTL	= 2,
-	SHIMTILE_DUALAPP_SUBRDNT_NORTH	= 3,
+	SHIMTILE_DUALAPP_SUBRDNT_NORTH	= 2,
+	SHIMTILE_DUALAPP_SUBRDNT_M2SCTL	= 4,
 	SHIMTILE_DUALAPP_SUBRDNT_32b	= 5,
 	SHIMTILE_DUALAPP_SUBRDNT_MAX	= 6
 }_ShimTile_DualAppSlvPortTypeBaseIdx;
@@ -193,7 +193,7 @@ static const u8 _XAie4_AieTile_PortsConectivityMatrix[AIETILE_SUBRDNT_MAX][AIETI
 };
 
 static const u8 _XAie4_AieTile_DualAppPortsConectivityMatrix[AIETILE_DUALAPP_SUBRDNT_MAX][AIETILE_DUALAPP_MNGR_MAX] = {
-		  /*C0  C1  S2M0  S2M1  S0  S1  N0  N1  N2  N3  NC0 TC  32b */
+		      /*C0  C1  S2M0  S2M1  S0  S1  N0  N1  N2  N3  NC0 TC  32b */
 	/*  C0  */ {0,  0,   0,    1,   1,  1,  1,  1,  1,  1,  1,  1,  1  },
 	/* M2S0 */ {1,  1,   1,    0,   1,  1,  1,  1,  1,  1,  1,  1,  1  },
 	/*  S0  */ {1,  1,   1,    1,   1,  0,  1,  1,  1,  1,  0,  0,  1  },
@@ -201,7 +201,7 @@ static const u8 _XAie4_AieTile_DualAppPortsConectivityMatrix[AIETILE_DUALAPP_SUB
 	/*  S2  */ {1,  1,   1,    1,   0,  0,  1,  1,  1,  1,  0,  0,  1  },
 	/*  S3  */ {1,  1,   1,    1,   0,  0,  1,  1,  1,  1,  0,  0,  1  },
 	/*  N0  */ {1,  1,   1,    1,   1,  1,  1,  0,  0,  0,  0,  0,  1  },
-	/*  N1  */ {1,  1,   1,    1,   1,  1,  1,  1,  1,  1,  0,  0,  0  },
+	/*  N1  */ {1,  1,   1,    1,   1,  1,  0,  1,  0,  0,  0,  0,  1  },
 	/*  SC0 */ {1,  0,   1,    0,   0,  0,  0,  0,  0,  0,  1,  1,  1  },
 	/*  32b */ {1,  1,   1,    1,   1,  1,  1,  1,  1,  1,  1,  1,  0  }
 };
@@ -241,7 +241,7 @@ static const u8 _XAie4_MemTile_DualAppPortsConectivityMatrix[MEMTILE_DUALAPP_SUB
 	/* M2S0 */ {1,     0,    0,    0,    1,    0,    1,   1,  1,  1,  0,   0,   1 },
 	/* M2S1 */ {0,     1,    0,    0,    0,    1,    1,   1,  1,  1,  0,   0,   1 },
 	/* M2S2 */ {0,     0,    1,    0,    1,    0,    1,   1,  1,  1,  0,   0,   1 },
-	/* M2S3 */ {0,     0,    0,    1,    0,    1,    1,   1,  1,  1,  0,   0,   1 },
+	/* M2S3 */ {0,     0,    0,    1,    0,    1,    1,   1,  1,  1,  1,   1,   1 },
 	/* M2S4 */ {0,     0,    0,    0,    1,    1,    1,   0,  0,  0,  1,   1,   1 },
 	
 	/*  S0  */ {1,     0,    1,    1,    1,    0,    1,   1,  1,  1,  0,   0,   1 },
@@ -278,9 +278,9 @@ static const u8 _XAie4_ShimTile_DualAppPortsConectivityMatrix[SHIMTILE_DUALAPP_S
 		      /*S2M0  TS2M	N0    N1  NC0  TC0  32b0*/
 	/* M2S0 */ { 1,   0,	1,    1,   1,  1,    1 },
 	/* M2S1 */ { 0,   0,	1,    1,   1,  1,    1 },
-	/* M2SC0*/ { 0,   1,	1,    1,   1,  1,    1 },
 	/*  N0  */ { 1,   1,	1,    0,   0,  0,    1 },
-	/*  N1  */ { 1,   0,	0,    1,   1,  1,    1 },
+	/*  N1  */ { 1,   1,	0,    1,   1,  1,    1 },
+	/* M2SC0*/ { 0,   0,	1,    1,   1,  1,    1 },
 	/* 32b0 */ { 1,   1,	1,    1,   1,  1,    0 }
 };
 

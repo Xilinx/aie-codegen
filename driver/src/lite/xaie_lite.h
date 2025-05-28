@@ -90,6 +90,20 @@
 #define XAIE_ERROR_RETURN(...)
 #endif
 
+/***************************** Macro Definitions *****************************/
+#define XAIE_MEM_WORD_ALIGN_SHIFT       2U
+#define XAIE_MEM_WORD_ALIGN_MASK        ((1U << XAIE_MEM_WORD_ALIGN_SHIFT) - 1U)
+#define XAIE_MEM_WORD_ALIGN_SIZE        (1U << XAIE_MEM_WORD_ALIGN_SHIFT)
+#define XAIE_MEM_WORD_LAST_BYTE 8U
+#define XAIE_MEM_WORD_LAST_BYTE_MASK    ((1U << XAIE_MEM_WORD_LAST_BYTE) - 1U)
+
+#define XAIE_MEM_WORD_ROUND_UP(Addr)    (((Addr) + XAIE_MEM_WORD_ALIGN_MASK) & \
+                                                ~XAIE_MEM_WORD_ALIGN_MASK)
+#define XAIE_MEM_WORD_ROUND_DOWN(Addr)  ((Addr) & (~XAIE_MEM_WORD_ALIGN_MASK))
+
+/************************** Function Prototypes  *****************************/
+
+
 /************************** Variable Definitions *****************************/
 /************************** Function Prototypes  *****************************/
 XAIE_AIG_EXPORT AieRC XAie_IsPartitionIdle(XAie_DevInst *DevInst);
@@ -105,6 +119,11 @@ XAIE_AIG_EXPORT AieRC XAie_TrigColIntr(XAie_DevInst *DevInst, u8 BcChan);
 XAIE_AIG_EXPORT AieRC XAie_PauseMem(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_CfgPrivilegeHwErrIrq(XAie_DevInst *DevInst, XAie_HwErrCfg HwErrCf);
 XAIE_AIG_EXPORT AieRC XAie_WakeupShimUc(XAie_DevInst *DevInst, u8 ColNum);
+
+XAIE_AIG_EXPORT AieRC XAie_LDataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
+                const void *Src, u32 Size);
+XAIE_AIG_EXPORT AieRC XAie_LDataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
+                void *Dst, u32 Size);
 
 /* Custom API for Reading/Writing to registers directly for Self-test from IPU FW*/
 XAIE_AIG_EXPORT u64 XAie_GenRead(u64 RegAddr);

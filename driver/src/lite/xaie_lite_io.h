@@ -203,6 +203,17 @@ static inline int _XAie_LPartPoll32(XAie_DevInst *DevInst, u64 RegAddr,
 			TimeOutUs);
 }
 
+__FORCE_INLINE__
+static inline void _XAie_LPartBlockWrite32(XAie_DevInst *DevInst, u64 RegAddr,
+                const u32 *Data, u32 Size)
+{
+        for(u32 i = 0U; i < Size; i++) {
+                _XAie_LPartWrite32(DevInst, RegAddr + i * 4U, *Data);
+                Data++;
+        }
+}
+
+
 #endif /* XAIE_FEATURE_LITE */
 #endif /* XAIE_LITE_IO_H */
 

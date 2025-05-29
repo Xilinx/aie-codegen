@@ -190,6 +190,7 @@ XAIE_AIG_EXPORT AieRC XAie_GetUngatedLocsInPartition(XAie_DevInst *DevInst, u32 
 XAIE_AIG_EXPORT u32 XAie_GetNumRows(XAie_DevInst *DevInst, u8 TileType);
 XAIE_AIG_EXPORT u32 XAie_GetStartRow(XAie_DevInst *DevInst, u8 TileType);
 XAIE_AIG_EXPORT u64 XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C);
+XAIE_AIG_EXPORT u8 XAie_IsUcModulePresent(XAie_DevInst* DevInst, u8 TileType);
 
 /* AIE4 Specific global APIs*/
 XAIE_AIG_EXPORT u8 XAie_IsTileTypeAndModuleSupportForEvents(XAie_DevInst* DevInst,

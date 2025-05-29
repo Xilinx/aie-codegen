@@ -1371,7 +1371,7 @@ AieRC XAie_MdmPerfCounterGet(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1456,7 +1456,7 @@ AieRC XAie_MdmPerfCounterGetConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1500,7 +1500,7 @@ AieRC XAie_MdmPerfCounterGetStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1638,7 +1638,7 @@ AieRC XAie_MdmPerfCounterControlSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1681,7 +1681,7 @@ AieRC XAie_MdmPerfCounterControlReset(XAie_DevInst *DevInst, XAie_LocType Loc)
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1714,7 +1714,7 @@ AieRC XAie_MdmPerfCounterSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 	const XAie_UcMdm *UcMdm;
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1797,7 +1797,7 @@ AieRC XAie_MdmPerfCounterReset(XAie_DevInst *DevInst, XAie_LocType Loc)
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1844,7 +1844,7 @@ AieRC XAie_MdmPerfCounterGetControlConfig(XAie_DevInst *DevInst, XAie_LocType Lo
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1909,7 +1909,7 @@ AieRC XAie_MdmPerfCounterStart(XAie_DevInst *DevInst, XAie_LocType Loc)
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1958,7 +1958,7 @@ AieRC XAie_MdmPerfCounterStop(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -2015,7 +2015,7 @@ AieRC XAie_MdmPerfCounterSample(XAie_DevInst *DevInst, XAie_LocType Loc)
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(_XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
+	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");
 		return XAIE_INVALID_TILE;
 	}

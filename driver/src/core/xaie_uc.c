@@ -620,7 +620,7 @@ static AieRC _XAie_UcModuleEventPCConfig(XAie_DevInst *DevInst, XAie_LocType Loc
 		return XAIE_INVALID_TILE;
 	}
 
-	if(!_XAie_IsUcModulePresent(DevInst, TileType)) {
+	if(!XAie_IsUcModulePresent(DevInst, TileType)) {
 		XAIE_ERROR("Invalid Device Type/ No UcModule\n");
 		return XAIE_INVALID_DEVICE;
 	}
@@ -706,7 +706,7 @@ AieRC XAie_UcModuleEventPCEnable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 PCE
 		return XAIE_INVALID_TILE;
 	}
 
-	if(!_XAie_IsUcModulePresent(DevInst, TileType)) {
+	if(!XAie_IsUcModulePresent(DevInst, TileType)) {
 		XAIE_ERROR("Invalid Device Type/ No UcModule\n");
 		return XAIE_INVALID_DEVICE;
 	}
@@ -745,7 +745,7 @@ AieRC XAie_UcModuleEventPCDisable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 PC
 		return XAIE_INVALID_TILE;
 	}
 
-	if(!_XAie_IsUcModulePresent(DevInst, TileType)) {
+	if(!XAie_IsUcModulePresent(DevInst, TileType)) {
 		XAIE_ERROR("Invalid Device Type/ No UcModule\n");
 		return XAIE_INVALID_DEVICE;
 	}
@@ -784,7 +784,7 @@ AieRC XAie_UcModuleEventPCReset(XAie_DevInst *DevInst, XAie_LocType Loc, u8 PCEv
 		return XAIE_INVALID_TILE;
 	}
 
-	if(!_XAie_IsUcModulePresent(DevInst, TileType)) {
+	if(!XAie_IsUcModulePresent(DevInst, TileType)) {
 		XAIE_ERROR("Invalid Device Type/ No UcModule\n");
 		return XAIE_INVALID_DEVICE;
 	}

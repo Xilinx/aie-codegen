@@ -4584,7 +4584,7 @@ u64 _XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C)
 * @note		Internal API only.
 *
 *******************************************************************************/
-u8 _XAie_IsUcModulePresent(XAie_DevInst* DevInst, u8 TileType) {
+u8 XAie_IsUcModulePresent(XAie_DevInst* DevInst, u8 TileType) {
 	if ((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
 			TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
 		return 1;

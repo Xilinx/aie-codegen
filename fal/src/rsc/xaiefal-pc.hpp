@@ -182,7 +182,7 @@ namespace xaiefal {
 			} else if (vRscs[0].RscId == 0) {
 				Event = XAIE_EVENT_PC_RANGE_0_1_CORE;
 			} else {
-				Event = (XAie_Events)(XAIE_EVENT_PC_RANGE_0_1_CORE + vRscs[0].RscId);
+				Event = (XAie_Events)(XAIE_EVENT_PC_RANGE_0_1_CORE + (vRscs[0].RscId/2));
 			}
 			return RC;
 		}

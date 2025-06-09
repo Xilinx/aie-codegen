@@ -486,10 +486,12 @@ namespace xaiefal {
 				throw std::invalid_argument("Invalid module and tile");
 			}
 			AieHandle = Dev.getDevHandle();
-			TraceCntr = std::make_shared<XAieTraceCntr>(AieHandle,
-					Loc, Mod);
-			AieHandle->getRscGroup("Generic").addRsc(TraceCntr);
-			AieHandle->getRscGroup("Avail").addRsc(TraceCntr);
+			if (XAie_IsTileTypeAndModuleSupportForEvents(Dev.dev(), Loc, Mod)) {
+				TraceCntr = std::make_shared<XAieTraceCntr>(AieHandle,
+						Loc, Mod);
+				AieHandle->getRscGroup("Generic").addRsc(TraceCntr);
+				AieHandle->getRscGroup("Avail").addRsc(TraceCntr);
+			}
 		}
 		~XAieMod() {}
 
@@ -901,7 +903,9 @@ namespace xaiefal {
 
 				throw std::invalid_argument(str);
 			}
-			if (Mod == XAIE_CORE_MOD) {
+			if ((Mod == XAIE_CORE_MOD) &&
+					(XAie_IsTileTypeAndModuleSupportForEvents(
+							AieHandle->dev(), Loc, XAIE_MEM_MOD))) {
 				return Mods[1];
 			} else {
 				return Mods[0];

@@ -3064,6 +3064,20 @@ XAie_ModeSelect XAie_GetModeConfig(XAie_DevInst *DevInst)
 	}
 }
 
+AieRC XAie_Preempt(XAie_DevInst *DevInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel)
+{
+	const XAie_Backend *Backend = DevInst->Backend;
+	if (Backend->Ops.Preempt != NULL)
+	{
+		return Backend->Ops.Preempt((void *)DevInst->IOInst, PreemptId, SaveLabel, RestoreLabel);
+	}
+	else
+	{
+		XAIE_ERROR("Preempt function pointer points to NULL, hence returned mode is XAIE_INVALID_MODE\n");
+		return XAIE_INVALID_MODE;
+	}
+}
+
 AieRC _XAie_ClearTransaction(XAie_DevInst* DevInst)
 {
 	AieRC RC;

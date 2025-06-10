@@ -578,6 +578,7 @@ const XAie_Backend DebugBackend =
 	.Ops.ConfigMode = NULL,
 	.Ops.WaitUcDMA = NULL,
 	.Ops.GetConfigMode = NULL,
+	.Ops.Preempt = NULL,
 };
 
 /** @} */

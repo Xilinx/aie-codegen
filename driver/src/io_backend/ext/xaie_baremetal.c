@@ -734,6 +734,7 @@ const XAie_Backend BaremetalBackend =
 	.Ops.ConfigMode = NULL,
 	.Ops.WaitUcDMA = NULL,
 	.Ops.GetConfigMode = NULL,
+	.Ops.Preempt = NULL,
 };
 
 /** @} */

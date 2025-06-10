@@ -177,6 +177,7 @@ typedef struct XAie_BackendOps {
 	AieRC (*WaitUcDMA) (void *IOInst);
 	AieRC (*ConfigMode)(void *IOInst, XAie_ModeSelect Mode);
 	XAie_ModeSelect (*GetConfigMode) (void *IOInst);
+	AieRC (*Preempt)(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel);
 } XAie_BackendOps;
 
 /* Typedef to capture all backend information */

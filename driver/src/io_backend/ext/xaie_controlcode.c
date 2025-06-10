@@ -1149,6 +1149,56 @@ AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
 /*****************************************************************************/
 /**
 *
+* This function is used to add preempt opcode to asm file.
+*
+* @param        IOInst: IO instance pointer
+* @param        PreemptId: Preemption level
+* @param        SaveLabel: Name of Save Label
+* @param        RestoreLabel: Name of Restore Label
+*
+* @return       XAIE_OK or XAIE_ERR.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel)
+{
+	if(SaveLabel == NULL || RestoreLabel == NULL) {
+		XAIE_ERROR("SaveLabel and RestoreLabel cannot be NULL\n");
+		return XAIE_ERR;
+	}
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT - ((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_PREEMPT) % DATA_SECTION_ALIGNMENT));
+	if (ControlCodeInst->DataAligner == DATA_SECTION_ALIGNMENT)
+	{
+		ControlCodeInst->DataAligner = 0U;
+	}
+
+	if (ControlCodeInst->ControlCodefp != NULL)
+	{
+		/*
+		(1) As per the CERT spec, PREEMPT opcode should be in an new, independent and self contained Page,
+		    which means it should not be combined with any other opcode. Hence, everytime this API is called, aie-rt logic ends the current page
+		    and starts a new page, adds PREEMPT opcode and again ends that page.
+		
+		(2) But, check if the current page is a newly created one, which has either empty text section or just EOF opcode in the text section.
+		    If so, then there is no need to end the current page and start a new one.
+		*/
+
+		if(ControlCodeInst->UcPageTextSize > ISA_OPSIZE_EOF) { 
+			_XAie_StartNewPage(ControlCodeInst);
+		}
+		_XAie_StartNewJob(ControlCodeInst);
+		fprintf(ControlCodeInst->ControlCodefp, "PREEMPT\t0x%x, @%s, @%s\n",PreemptId, SaveLabel, RestoreLabel);
+		ControlCodeInst->CombineCommands = 0;
+		ControlCodeInst->UcPageSize += ISA_OPSIZE_PREEMPT;
+		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_PREEMPT;
+		_XAie_EndPage(ControlCodeInst);
+	}
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
 * This is the function to write 32 bit value to NPI register address.
 *
 * @param	IOInst: IO instance pointer
@@ -1753,6 +1803,18 @@ XAie_ModeSelect XAie_GetConfigMode(void *IOInst)
 	return XAIE_INVALID_MODE;
 }
 
+AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel)
+{
+	/* no-op */
+	(void)IOInst;
+	(void)PreemptId;
+	(void)SaveLabel;
+	(void)RestoreLabel;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
 #endif /* __AIECONTROLCODE__ */
 
 static AieRC XAie_ControlCodeIO_CmdWrite(void *IOInst, u8 Col, u8 Row, u8 Command,
@@ -1835,6 +1897,7 @@ const XAie_Backend ControlCodeBackend =
 	.Ops.ConfigMode = XAie_ConfigMode,
 	.Ops.WaitUcDMA = XAie_ControlCodeIO_WaitUcDMA,
 	.Ops.GetConfigMode = XAie_GetConfigMode,
+	.Ops.Preempt = XAie_ControlCodeIO_Preempt,
 	.Ops.SubmitTxn = NULL,
 };
 

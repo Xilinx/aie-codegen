@@ -241,6 +241,12 @@ XAIE_AIG_EXPORT AieRC XAie_WaitUCDMA(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_ModeConfig(XAie_DevInst *DevInst, XAie_ModeSelect Mode);
 XAIE_AIG_EXPORT XAie_ModeSelect XAie_GetModeConfig(XAie_DevInst *DevInst);
 
+/* While calling XAie_Preempt API, the caller does not have to call StartNewPage, StartNewJob, EndJob and EndPage APIs explicitly.
+   Since, the requirement of this opcode is that it should be in a new, independent and self contained page, the Preempt API itself
+   will take care of starting/ending the page and job.
+*/
+XAIE_AIG_EXPORT AieRC XAie_Preempt(XAie_DevInst *DevInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel);
+
 XAIE_AIG_EXPORT AieRC XAie_Txn_NoOp(XAie_DevInst *DevInst, uint32_t Count);
 XAIE_AIG_EXPORT AieRC XAie_Txn_Preempt(XAie_DevInst *DevInst, XAie_PreemptHdr* Preempt);
 XAIE_AIG_EXPORT AieRC XAie_Txn_LoadPdi(XAie_DevInst *DevInst, u16 PdiId);

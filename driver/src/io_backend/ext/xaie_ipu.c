@@ -495,6 +495,7 @@ const XAie_Backend IpuBackend =
 	.Ops.ConfigMode = NULL,
 	.Ops.WaitUcDMA = NULL,
 	.Ops.GetConfigMode = NULL,
+	.Ops.Preempt = NULL,
 };
 
 /** @} */

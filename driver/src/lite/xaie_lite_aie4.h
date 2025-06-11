@@ -1871,6 +1871,9 @@ static inline AieRC _XAie_LClearBCPort(XAie_DevInst *DevInst, u8 BcChan) {
 *
 * @param    DevInst: AI engine partition device instance pointer
 * @param    BcChan: Broadcast Channel number to be written
+* @description  This API expects MPNPU to send Baseaddress which are shifted
+* 		to column from which Interrupts are being generated.The interrupts
+* 		are broadcasted for particular channels only in south direction
 *
 * @return   XAIE_OK on success, error code on failure
 *
@@ -1899,13 +1902,7 @@ static inline AieRC _XAie_LTrigColIntr(XAie_DevInst *DevInst, u8 BcChan) {
 		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
 	}
         else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
-                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_B_BLOCK_WEST_SET;
-		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
-
                 RegOff = XAIE_PL_MOD_EVENT_BROADCAST_B_BLOCK_NORTH_SET;
-		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
-
-                RegOff = XAIE_PL_MOD_EVENT_BROADCAST_B_BLOCK_EAST_SET;
 		_XAie_LPartWrite32(DevInst, RegOff, (1 << BcChan));
 	}
         else

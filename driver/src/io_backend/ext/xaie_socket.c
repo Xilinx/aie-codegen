@@ -809,6 +809,8 @@ const XAie_Backend SocketBackend =
 	.Ops.WaitUcDMA = NULL,
 	.Ops.GetConfigMode = NULL,
 	.Ops.Preempt = NULL,
+	.Ops.SetPadInteger = NULL,
+	.Ops.SetPadString = NULL,
 };
 
 /** @} */

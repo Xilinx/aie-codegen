@@ -246,6 +246,8 @@ XAIE_AIG_EXPORT XAie_ModeSelect XAie_GetModeConfig(XAie_DevInst *DevInst);
    will take care of starting/ending the page and job.
 */
 XAIE_AIG_EXPORT AieRC XAie_Preempt(XAie_DevInst *DevInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel);
+XAIE_AIG_EXPORT AieRC XAie_SetPadInteger(XAie_DevInst *DevInst, char* BuffName, u32 BuffSize);
+XAIE_AIG_EXPORT AieRC XAie_SetPadString(XAie_DevInst *DevInst, char* BuffName, char* BuffBlobPath);
 
 XAIE_AIG_EXPORT AieRC XAie_Txn_NoOp(XAie_DevInst *DevInst, uint32_t Count);
 XAIE_AIG_EXPORT AieRC XAie_Txn_Preempt(XAie_DevInst *DevInst, XAie_PreemptHdr* Preempt);

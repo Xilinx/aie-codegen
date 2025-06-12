@@ -1194,6 +1194,76 @@ AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, c
 /*****************************************************************************/
 /**
 *
+* This function is used to add preempt opcode to asm file.
+*
+* @param        IOInst: IO instance pointer
+* @param        BuffName: Name of Save/Restore Buffer
+* @param        BuffSize: Size of Save/Restore Buffer
+* eg - 			.setpad ctrl_pkt, 0x1000
+* @return       XAIE_OK or XAIE_ERR.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_SetPadInteger(void *IOInst, char* BuffName, u32 BuffSize)
+{
+	if(BuffName == NULL) {
+		XAIE_ERROR("Buffer name cannot be NULL\n");
+		return XAIE_ERR;
+	}
+	if(BuffSize == 0) {
+		XAIE_ERROR("Buffer size cannot be zero\n");
+		return XAIE_ERR;
+	}
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	
+	if(ControlCodeInst->ControlCodefp != NULL) {
+		fprintf(ControlCodeInst->ControlCodefp, ".setpad\t %s, 0x%x\n",BuffName, BuffSize);
+		ControlCodeInst->CombineCommands = 0;
+		return XAIE_OK;
+	}
+	else {
+		XAIE_ERROR("Control code file pointer is NULL\n");
+		return XAIE_ERR;
+	}
+}
+
+/*****************************************************************************/
+/**
+*
+* This function is used to add preempt opcode to asm file.
+*
+* @param        IOInst: IO instance pointer
+* @param        BuffName: Name of Save/Restore Buffer
+* @param        BuffBlobPath: Path to the Buffer Blob .bin file
+* eg - 			.setpad ctrl_pkt, ctrlpkt.bin
+* @return       XAIE_OK or XAIE_ERR.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_SetPadString(void *IOInst, char* BuffName, char* BuffBlobPath)
+{
+	if(BuffName == NULL) {
+		XAIE_ERROR("Buffer name cannot be NULL\n");
+		return XAIE_ERR;
+	}
+	if(BuffBlobPath == NULL) {
+		XAIE_ERROR("Buffer Blob Path cannot be NULL\n");
+		return XAIE_ERR;
+	}
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	
+	if(ControlCodeInst->ControlCodefp != NULL) {
+		fprintf(ControlCodeInst->ControlCodefp, ".setpad\t %s, %s\n",BuffName, BuffBlobPath);
+		ControlCodeInst->CombineCommands = 0;
+		return XAIE_OK;
+	}
+	else {
+		XAIE_ERROR("Control code file pointer is NULL\n");
+		return XAIE_ERR;
+	}
+}
+
+/*****************************************************************************/
+/**
+*
 * This is the function to write 32 bit value to NPI register address.
 *
 * @param	IOInst: IO instance pointer
@@ -1811,6 +1881,28 @@ AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, c
 	return XAIE_INVALID_BACKEND;
 }
 
+AieRC XAie_ControlCodeIO_SetPadInteger(void *IOInst, char* BuffName, u32 BuffSize)
+{
+	/* no-op */
+	(void)IOInst;
+	(void)BuffName;
+	(void)BuffSize;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
+AieRC XAie_ControlCodeIO_SetPadString(void *IOInst, char* BuffName, char* BuffBlobPath)
+{
+	/* no-op */
+	(void)IOInst;
+	(void)BuffName;
+	(void)BuffBlobPath;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
 #endif /* __AIECONTROLCODE__ */
 
 static AieRC XAie_ControlCodeIO_CmdWrite(void *IOInst, u8 Col, u8 Row, u8 Command,
@@ -1894,6 +1986,8 @@ const XAie_Backend ControlCodeBackend =
 	.Ops.WaitUcDMA = XAie_ControlCodeIO_WaitUcDMA,
 	.Ops.GetConfigMode = XAie_GetConfigMode,
 	.Ops.Preempt = XAie_ControlCodeIO_Preempt,
+	.Ops.SetPadInteger = XAie_ControlCodeIO_SetPadInteger,
+	.Ops.SetPadString = XAie_ControlCodeIO_SetPadString,
 	.Ops.SubmitTxn = NULL,
 };
 

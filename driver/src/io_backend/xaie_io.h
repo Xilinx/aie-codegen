@@ -178,6 +178,8 @@ typedef struct XAie_BackendOps {
 	AieRC (*ConfigMode)(void *IOInst, XAie_ModeSelect Mode);
 	XAie_ModeSelect (*GetConfigMode) (void *IOInst);
 	AieRC (*Preempt)(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel);
+	AieRC (*SetPadInteger)(void *IOInst, char* BuffName, u32 BuffSize);
+	AieRC (*SetPadString)(void *IOInst, char* BuffName, char* BuffBlobPath);
 } XAie_BackendOps;
 
 /* Typedef to capture all backend information */

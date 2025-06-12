@@ -3028,6 +3028,30 @@ AieRC XAie_AddressPatching(XAie_DevInst *DevInst, u16 Arg_Offset, u8 Num_BDs)
 	}
 }
 
+AieRC XAie_SetPadInteger(XAie_DevInst *DevInst, char* BuffName, u32 BuffSize)
+{
+	const XAie_Backend *Backend = DevInst->Backend;
+	
+	if (Backend->Ops.SetPadInteger != NULL) {
+		return Backend->Ops.SetPadInteger((void *)DevInst->IOInst, BuffName, BuffSize);
+	} else {
+		XAIE_ERROR("SetPadInteger function pointer points to NULL\n");
+		return XAIE_NOT_SUPPORTED;
+	}
+}
+
+AieRC XAie_SetPadString(XAie_DevInst *DevInst, char* BuffName, char* BuffBlobPath)
+{
+	const XAie_Backend *Backend = DevInst->Backend;
+	
+	if (Backend->Ops.SetPadString != NULL) {
+		return Backend->Ops.SetPadString((void *)DevInst->IOInst, BuffName, BuffBlobPath);
+	} else {
+		XAIE_ERROR("SetPadString function pointer points to NULL\n");
+		return XAIE_NOT_SUPPORTED;
+	}
+}
+
 AieRC XAie_WaitUCDMA(XAie_DevInst *DevInst)
 {
 	const XAie_Backend *Backend = DevInst->Backend;

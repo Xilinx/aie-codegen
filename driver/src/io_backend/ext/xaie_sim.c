@@ -663,6 +663,8 @@ const XAie_Backend SimBackend =
 	.Ops.WaitUcDMA = NULL,
 	.Ops.GetConfigMode = NULL,
 	.Ops.Preempt = NULL,
+	.Ops.SetPadInteger = NULL,
+	.Ops.SetPadString = NULL,
 };
 
 /** @} */

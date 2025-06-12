@@ -120,9 +120,9 @@ XAIE_AIG_EXPORT AieRC XAie_PauseMem(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_CfgPrivilegeHwErrIrq(XAie_DevInst *DevInst, XAie_HwErrCfg HwErrCf);
 XAIE_AIG_EXPORT AieRC XAie_WakeupShimUc(XAie_DevInst *DevInst, u8 ColNum);
 
-XAIE_AIG_EXPORT AieRC XAie_LDataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
+XAIE_AIG_EXPORT AieRC XAie_LMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
                 const void *Src, u32 Size);
-XAIE_AIG_EXPORT AieRC XAie_LDataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
+XAIE_AIG_EXPORT AieRC XAie_LMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
                 void *Dst, u32 Size);
 
 /* Custom API for Reading/Writing to registers directly for Self-test from IPU FW*/

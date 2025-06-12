@@ -203,6 +203,21 @@ static inline int _XAie_LPartPoll32(XAie_DevInst *DevInst, u64 RegAddr,
 			TimeOutUs);
 }
 
+
+/*****************************************************************************/
+/**
+*
+* This API used to write Block of data into give address. This will provide
+* functionality to user to call sigle API to write block of data.
+*
+* @param        DevInst: Device Instance
+* @param        RegAddr: Starting address on which Data needs to written.
+* @param        Data: Pointer to Data block
+* @param        Size: Total number of bytes needs to be written
+*
+* @note         None
+*
+******************************************************************************/
 __FORCE_INLINE__
 static inline void _XAie_LPartBlockWrite32(XAie_DevInst *DevInst, u64 RegAddr,
                 const u32 *Data, u32 Size)

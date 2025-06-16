@@ -1147,14 +1147,14 @@ AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
 * This function is used to add preempt opcode to asm file.
 *
 * @param        IOInst: IO instance pointer
-* @param        PreemptId: Preemption level
+* @param        PreemptLevel: Preemption level
 * @param        SaveLabel: Name of Save Label
 * @param        RestoreLabel: Name of Restore Label
 *
 * @return       XAIE_OK or XAIE_ERR.
 *
 *******************************************************************************/
-AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel)
+AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u8 PreemptLevel, char* SaveLabel, char* RestoreLabel)
 {
 	if(SaveLabel == NULL || RestoreLabel == NULL) {
 		XAIE_ERROR("SaveLabel and RestoreLabel cannot be NULL\n");
@@ -1182,7 +1182,7 @@ AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, c
 			_XAie_StartNewPage(ControlCodeInst);
 		}
 		_XAie_StartNewJob(ControlCodeInst);
-		fprintf(ControlCodeInst->ControlCodefp, "PREEMPT\t0x%x, @%s, @%s\n",PreemptId, SaveLabel, RestoreLabel);
+		fprintf(ControlCodeInst->ControlCodefp, "PREEMPT\t0x%x, @%s, @%s\n",PreemptLevel, SaveLabel, RestoreLabel);
 		ControlCodeInst->CombineCommands = 0;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_PREEMPT;
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_PREEMPT;
@@ -1869,11 +1869,11 @@ XAie_ModeSelect XAie_GetConfigMode(void *IOInst)
 	return XAIE_INVALID_MODE;
 }
 
-AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel)
+AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u8 PreemptLevel, char* SaveLabel, char* RestoreLabel)
 {
 	/* no-op */
 	(void)IOInst;
-	(void)PreemptId;
+	(void)PreemptLevel;
 	(void)SaveLabel;
 	(void)RestoreLabel;
 	XAIE_ERROR("Driver is not compiled with ControlCode generation "

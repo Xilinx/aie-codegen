@@ -4279,9 +4279,9 @@ AieRC XAie_StatusDump(XAie_DevInst *DevInst, XAie_ColStatus *Status)
 u8 _XAie_IsDeviceGenAIE4(u8 DevGen)
 {
 	switch(DevGen) {
+	case XAIE_DEV_GEN_AIE4_GENERIC:
 	case XAIE_DEV_GEN_AIE4:
-	case XAIE_DEV_GEN_AIE4_MEDUSA:
-	case XAIE_DEV_GEN_AIE4_SOUNDWAVE:
+	case XAIE_DEV_GEN_AIE4_A:
 		return true;
 	default:
 		return false;
@@ -4306,9 +4306,9 @@ u8 _XAie_IsDeviceGenSupportDualApp(u8 DevGen)
 {
 	if(_XAie_IsDeviceGenAIE4(DevGen)) {
 		switch(DevGen){
+		case XAIE_DEV_GEN_AIE4_GENERIC:
 		case XAIE_DEV_GEN_AIE4:
-		case XAIE_DEV_GEN_AIE4_MEDUSA:
-		case XAIE_DEV_GEN_AIE4_SOUNDWAVE:
+		case XAIE_DEV_GEN_AIE4_A:
 			return true;
 		default:
 			return false;
@@ -4422,9 +4422,9 @@ u16 XAie_GetMaxElementValue(u8 DevGen, u8 TileType, u8 AppMode, u16 elementValue
 static inline u32 XAie_Mask_Value(u8 devGen)
 {
 	switch(devGen) {
+	case XAIE_DEV_GEN_AIE4_GENERIC:
 	case XAIE_DEV_GEN_AIE4:
-	case XAIE_DEV_GEN_AIE4_MEDUSA:
-	case XAIE_DEV_GEN_AIE4_SOUNDWAVE:
+	case XAIE_DEV_GEN_AIE4_A:
 		return XAIE4_MASK_VALUE_APP_B;
 
 	default:

@@ -63,9 +63,9 @@ typedef struct {
 /* Data structure to capture the mem tile status */
 #if (XAIE_DEV_SINGLE_GEN != XAIE_DEV_GEN_AIE)
 typedef struct {
-#if ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
-           (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA) || \
-           (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE))
+#if ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_GENERIC) || \
+           (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
+           (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_A))
 	u32 DmaMm2sStatus[XAIE_MEM_TILE_DMA_MM2S_NUM_CH];
 	u32 DmaS2mmStatus[XAIE_MEM_TILE_DMA_S2MM_NUM_CH];
 #else
@@ -78,9 +78,9 @@ typedef struct {
 
 /* Data structure to capture the shim tile status */
 typedef struct {
-#if ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
-           (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA) || \
-           (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE))
+#if ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_GENERIC) || \
+           (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
+           (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_A))
 	u32 DmaMm2sStatus[XAIE_SHIM_DMA_MM2S_NUM_CH];
 	u32 DmaS2mmStatus[XAIE_SHIM_DMA_S2MM_NUM_CH];
 #else

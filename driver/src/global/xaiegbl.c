@@ -56,16 +56,16 @@ extern XAie_TileMod AieMlMod[XAIEGBL_TILE_TYPE_MAX];
 extern XAie_TileMod Aie2IpuMod[XAIEGBL_TILE_TYPE_MAX];
 extern XAie_TileMod Aie2PMod[XAIEGBL_TILE_TYPE_MAX];
 extern XAie_TileMod Aie2PSMod[XAIEGBL_TILE_TYPE_MAX];
+extern XAie_TileMod Aie4GenericMod[XAIEGBL_TILE_TYPE_MAX];
 extern XAie_TileMod Aie4Mod[XAIEGBL_TILE_TYPE_MAX];
-extern XAie_TileMod Aie4MedusaMod[XAIEGBL_TILE_TYPE_MAX];
 
 extern XAie_DeviceOps AieDevOps;
 extern XAie_DeviceOps AieMlDevOps;
 extern XAie_DeviceOps Aie2IpuDevOps;
 extern XAie_DeviceOps Aie2PDevOps;
 extern XAie_DeviceOps Aie2PSDevOps;
+extern XAie_DeviceOps Aie4GenericDevOps;
 extern XAie_DeviceOps Aie4DevOps;
-extern XAie_DeviceOps Aie4MedusaDevOps;
 
 extern u8 XAieDevType;
 
@@ -83,15 +83,15 @@ extern u8 XAieDevType;
 #elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE
 #define XAIE_DEV_SINGLE_MOD AieMod
 #define XAIE_DEV_SINGLE_DEVOPS AieDevOps
+#elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_GENERIC
+#define XAIE_DEV_SINGLE_MOD Aie4GenericMod
+#define XAIE_DEV_SINGLE_DEVOPS Aie4GenericDevOps
 #elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4
 #define XAIE_DEV_SINGLE_MOD Aie4Mod
 #define XAIE_DEV_SINGLE_DEVOPS Aie4DevOps
-#elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA
-#define XAIE_DEV_SINGLE_MOD Aie4MedusaMod
-#define XAIE_DEV_SINGLE_DEVOPS Aie4MedusaDevOps
-#elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE
-#define XAIE_DEV_SINGLE_MOD Aie4MedusaMod
-#define XAIE_DEV_SINGLE_DEVOPS Aie4MedusaDevOps
+#elif XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_A
+#define XAIE_DEV_SINGLE_MOD Aie4Mod
+#define XAIE_DEV_SINGLE_DEVOPS Aie4DevOps
 #else
 #ifdef XAIE_DEV_SINGLE_GEN
 #error "Unsupported device defined."
@@ -202,18 +202,18 @@ AieRC XAie_CfgInitialize(XAie_DevInst *InstPtr, XAie_Config *ConfigPtr)
 		InstPtr->DevProp.DevMod = Aie2PMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE2P_STRIX_B0;
 		InstPtr->DevOps = &Aie2PDevOps;	
+	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_GENERIC) {
+		InstPtr->DevProp.DevMod = Aie4GenericMod;
+		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_GENERIC;
+		InstPtr->DevOps = &Aie4GenericDevOps;
 	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4) {
 		InstPtr->DevProp.DevMod = Aie4Mod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4;
 		InstPtr->DevOps = &Aie4DevOps;
-	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_MEDUSA) {
-		InstPtr->DevProp.DevMod = Aie4MedusaMod;
-		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_MEDUSA;
-		InstPtr->DevOps = &Aie4MedusaDevOps;
-	}else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_SOUNDWAVE) {
-		InstPtr->DevProp.DevMod = Aie4MedusaMod;
-		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_MEDUSA;
-		InstPtr->DevOps = &Aie4MedusaDevOps;
+	}else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_A) {
+		InstPtr->DevProp.DevMod = Aie4Mod;
+		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_A;
+		InstPtr->DevOps = &Aie4DevOps;
 #endif
 	} else {
 		XAIE_ERROR("Invalid device\n");
@@ -245,9 +245,9 @@ AieRC XAie_CfgInitialize(XAie_DevInst *InstPtr, XAie_Config *ConfigPtr)
 		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE2P) ||
 		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_A0) ||
 		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_B0) ||
+		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE4_GENERIC) ||
 		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE4) ||
-		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE4_SOUNDWAVE) ||
-		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE4_MEDUSA)) {
+		(InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE4_A)) {
 		InstPtr->EccStatus = XAIE_DISABLE;
 
 	} else {
@@ -772,9 +772,9 @@ AieRC XAie_TurnEccOn(XAie_DevInst *DevInst)
 		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2P) ||
 		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_A0) ||
 		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2P_STRIX_B0) ||
+		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_GENERIC) ||
 		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4) ||
-		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_SOUNDWAVE) ||
-		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_MEDUSA)) {
+		(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_A)) {
 		XAIE_ERROR("ECC feature not supported\n");
 		return XAIE_FEATURE_NOT_SUPPORTED;
 	}

@@ -6,7 +6,7 @@
 
 /*****************************************************************************/
 /**
-* @file xai4medusagbl_reginit.c
+* @file xai4gbl_reginit.c
 * @{
 *
 * This file contains the instances of the register bit field definitions for the
@@ -6338,7 +6338,7 @@ static const XAie_CtrlPktHndlrMod Aie4ShimTileCtrlPktHndlrMod =
  * Depending on the tile type, this data strcuture can be used to access all
  * hardware properties of individual modules.
  */
-XAie_TileMod Aie4MedusaMod[] =
+XAie_TileMod Aie4Mod[] =
 {
 	{
 		/*
@@ -6441,7 +6441,7 @@ XAie_TileMod Aie4MedusaMod[] =
 };
 
 /* Device level operations for aieml */
-XAie_DeviceOps Aie4MedusaDevOps =
+XAie_DeviceOps Aie4DevOps =
 {
 	.IsCheckerBoard = 0U,
 	.TilesInUse = Aie4TilesInUse,

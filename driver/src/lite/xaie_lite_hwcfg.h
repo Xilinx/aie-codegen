@@ -247,9 +247,9 @@
 #define XAIE_SHIM_TILE_NUM_EVENT_STATUS_REGS    4
 
 
-#elif ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
-	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_MEDUSA) || \
-	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_SOUNDWAVE))
+#elif ((XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_GENERIC) || \
+	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4) || \
+	   (XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_A))
 
 //To-Do - Update register count ,address and other details with new specification if required
 #ifdef __AIEIPU__

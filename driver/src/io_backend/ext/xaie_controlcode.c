@@ -1451,6 +1451,21 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 		return XAIE_ERR;
 	}
 	printf("Generating: %s\n", FileName);
+
+	if(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_MEDUSA) {
+		fprintf(ControlCodeInst->ControlCodefp, ".target\t aie4\n");
+	}
+	else if(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_SOUNDWAVE) {
+		fprintf(ControlCodeInst->ControlCodefp, ".target\t aie4-a\n");
+	}
+	else if(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2PS) {
+		fprintf(ControlCodeInst->ControlCodefp, ".target\t aie2ps\n");
+	}
+	else { 
+		XAIE_ERROR("Unknown Target Device Generation %d\n", DevInst->DevProp.DevGen);
+		return XAIE_INVALID_DEVICE;
+	}
+
 	fprintf(ControlCodeInst->ControlCodefp, ".partition\t %dcolumn\n",DevInst->NumCols);
 	fprintf(ControlCodeInst->ControlCodefp, ";\n");
 	fprintf(ControlCodeInst->ControlCodefp, ";text\n");

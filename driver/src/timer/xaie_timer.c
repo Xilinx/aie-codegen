@@ -282,11 +282,6 @@ AieRC XAie_SetTimerResetEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	else {
 		TimerMod = &DevInst->DevProp.DevMod[TileType].TimerMod[Module];
-                if((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
-                        (TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
-                                Module = XAIE_CORE_MOD;
-                }
-
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
@@ -544,11 +539,6 @@ static XAie_Events _XAie_GetBroadcastEventfromRscId(XAie_DevInst *DevInst,
 	if(Mod == XAIE_PL_MOD)
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
 	else {
-                if((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
-                        (TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
-                                Mod = XAIE_CORE_MOD;
-                }
-
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Mod];
 	}
 
@@ -611,18 +601,28 @@ static AieRC _XAie_SetupBroadcastConfig(XAie_DevInst *DevInst, u32 NumTiles,
 							XAIE_EVENT_BROADCAST_WEST);
 				}
 			} else {
-				RC |= XAie_EventBroadcastBlockDir(
-						DevInst, Locs[i],
-						XAIE_MEM_MOD,
-						XAIE_EVENT_SWITCH_A,
-						BcastId,
-						XAIE_EVENT_BROADCAST_EAST);
-				RC |= XAie_EventBroadcastBlockDir(
-						DevInst, Locs[i],
-						XAIE_CORE_MOD,
-						XAIE_EVENT_SWITCH_A,
-						BcastId,
-						XAIE_EVENT_BROADCAST_WEST);
+				if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+					RC |= XAie_EventBroadcastBlockDir(
+							DevInst, Locs[i],
+							XAIE_CORE_MOD,
+							XAIE_EVENT_SWITCH_A,
+							BcastId,
+							XAIE_EVENT_BROADCAST_WEST);
+
+				} else {
+					RC |= XAie_EventBroadcastBlockDir(
+							DevInst, Locs[i],
+							XAIE_MEM_MOD,
+							XAIE_EVENT_SWITCH_A,
+							BcastId,
+							XAIE_EVENT_BROADCAST_EAST);
+					RC |= XAie_EventBroadcastBlockDir(
+							DevInst, Locs[i],
+							XAIE_CORE_MOD,
+							XAIE_EVENT_SWITCH_A,
+							BcastId,
+							XAIE_EVENT_BROADCAST_WEST);
+				}
 			}
 		} else if(Locs[i].Row != 0) {
 			RC |= XAie_EventBroadcastBlockDir(
@@ -668,22 +668,35 @@ static AieRC _XAie_SetupTimerConfig(XAie_DevInst *DevInst, u32 NumTiles,
 		TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Locs[i]);
 
 		if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
-			BcastEvent = _XAie_GetBroadcastEventfromRscId(
-					DevInst, Locs[i], XAIE_MEM_MOD,
-					BcastId);
-			RC = XAie_SetTimerResetEvent(DevInst, Locs[i],
-					XAIE_MEM_MOD, BcastEvent,
-					XAIE_RESETDISABLE);
-			if(RC != XAIE_OK) {
-				return RC;
+			if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+				BcastEvent = _XAie_GetBroadcastEventfromRscId(
+						DevInst, Locs[i], XAIE_CORE_MOD,
+						BcastId);
+				RC = XAie_SetTimerResetEvent(DevInst, Locs[i],
+						XAIE_CORE_MOD, BcastEvent,
+						XAIE_RESETDISABLE);
+				if(RC != XAIE_OK) {
+					return RC;
+				}
 			}
+			else {
+				BcastEvent = _XAie_GetBroadcastEventfromRscId(
+						DevInst, Locs[i], XAIE_MEM_MOD,
+						BcastId);
+				RC = XAie_SetTimerResetEvent(DevInst, Locs[i],
+						XAIE_MEM_MOD, BcastEvent,
+						XAIE_RESETDISABLE);
+				if(RC != XAIE_OK) {
+					return RC;
+				}
 
-			BcastEvent = _XAie_GetBroadcastEventfromRscId(
-					DevInst, Locs[i], XAIE_CORE_MOD,
-					BcastId);
-			RC = XAie_SetTimerResetEvent(DevInst, Locs[i],
-					XAIE_CORE_MOD, BcastEvent,
-					XAIE_RESETDISABLE);
+				BcastEvent = _XAie_GetBroadcastEventfromRscId(
+						DevInst, Locs[i], XAIE_CORE_MOD,
+						BcastId);
+				RC = XAie_SetTimerResetEvent(DevInst, Locs[i],
+						XAIE_CORE_MOD, BcastEvent,
+						XAIE_RESETDISABLE);
+			}
 		} else if(TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
 			BcastEvent = _XAie_GetBroadcastEventfromRscId(
 					DevInst, Locs[i], XAIE_MEM_MOD,
@@ -762,19 +775,29 @@ static void _XAie_ClearTimerConfig(XAie_DevInst *DevInst, u32 NumTiles,
 		TType = DevInst->DevOps->GetTTypefromLoc(DevInst, Locs[i]);
 
 		if(TType == XAIEGBL_TILE_TYPE_AIETILE) {
-			EvntMod = &DevInst->DevProp.DevMod[TType].EvntMod[0U];
-			if((EvntMod->EventMin > XAIE_EVENT_USER_EVENT_7_MEM_TILE))
-				return;
 
-			XAie_SetTimerResetEvent(DevInst, Locs[i], XAIE_MEM_MOD,
-					(XAie_Events)EvntMod->EventMin, XAIE_RESETDISABLE);
+			if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+				EvntMod = &DevInst->DevProp.DevMod[TType].EvntMod[0U];
+				if((EvntMod->EventMin > XAIE_EVENT_USER_EVENT_7_MEM_TILE))
+					return;
+				XAie_SetTimerResetEvent(DevInst, Locs[i], XAIE_CORE_MOD,
+						(XAie_Events)EvntMod->EventMin, XAIE_RESETDISABLE);
 
-			EvntMod = &DevInst->DevProp.DevMod[TType].EvntMod[1U];
-			if((EvntMod->EventMin > XAIE_EVENT_USER_EVENT_7_MEM_TILE))
-				return;
+			} else {
+				EvntMod = &DevInst->DevProp.DevMod[TType].EvntMod[0U];
+				if((EvntMod->EventMin > XAIE_EVENT_USER_EVENT_7_MEM_TILE))
+					return;
 
-			XAie_SetTimerResetEvent(DevInst, Locs[i], XAIE_CORE_MOD,
-					(XAie_Events)EvntMod->EventMin, XAIE_RESETDISABLE);
+				XAie_SetTimerResetEvent(DevInst, Locs[i], XAIE_MEM_MOD,
+						(XAie_Events)EvntMod->EventMin, XAIE_RESETDISABLE);
+
+				EvntMod = &DevInst->DevProp.DevMod[TType].EvntMod[1U];
+				if((EvntMod->EventMin > XAIE_EVENT_USER_EVENT_7_MEM_TILE))
+					return;
+
+				XAie_SetTimerResetEvent(DevInst, Locs[i], XAIE_CORE_MOD,
+						(XAie_Events)EvntMod->EventMin, XAIE_RESETDISABLE);
+			}
 		} else if (TType == XAIEGBL_TILE_TYPE_MEMTILE) {
 			EvntMod = &DevInst->DevProp.DevMod[TType].EvntMod[0U];
 
@@ -813,18 +836,27 @@ static void _XAie_ClearBroadcastConfig(XAie_DevInst *DevInst, u32 NumTiles,
 		TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Locs[i]);
 
 		if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
-			XAie_EventBroadcastUnblockDir(DevInst, Locs[i],
-					XAIE_MEM_MOD,
-					XAIE_EVENT_SWITCH_A,
-					BcastId,
-					XAIE_EVENT_BROADCAST_WEST |
-					XAIE_EVENT_BROADCAST_EAST);
-			XAie_EventBroadcastUnblockDir(DevInst, Locs[i],
-					XAIE_CORE_MOD,
-					XAIE_EVENT_SWITCH_A,
-					BcastId,
-					XAIE_EVENT_BROADCAST_WEST |
-					XAIE_EVENT_BROADCAST_EAST);
+			if(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+				XAie_EventBroadcastUnblockDir(DevInst, Locs[i],
+						XAIE_CORE_MOD,
+						XAIE_EVENT_SWITCH_A,
+						BcastId,
+						XAIE_EVENT_BROADCAST_WEST |
+						XAIE_EVENT_BROADCAST_EAST);
+			} else {
+				XAie_EventBroadcastUnblockDir(DevInst, Locs[i],
+						XAIE_MEM_MOD,
+						XAIE_EVENT_SWITCH_A,
+						BcastId,
+						XAIE_EVENT_BROADCAST_WEST |
+						XAIE_EVENT_BROADCAST_EAST);
+				XAie_EventBroadcastUnblockDir(DevInst, Locs[i],
+						XAIE_CORE_MOD,
+						XAIE_EVENT_SWITCH_A,
+						BcastId,
+						XAIE_EVENT_BROADCAST_WEST |
+						XAIE_EVENT_BROADCAST_EAST);
+			}
 		} else if(Locs[i].Row != 0) {
 			XAie_EventBroadcastUnblockDir(DevInst, Locs[i],
 					XAIE_MEM_MOD,

@@ -1336,7 +1336,45 @@ AieRC XAie_PerfCounterSnapshotLoadEventSet(XAie_DevInst *DevInst, XAie_LocType L
 AieRC XAie_PerfCounterSnapshotLoadEventReset(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_ModuleType Module)
 {
-	return XAie_PerfCounterSnapshotLoadEventSet(DevInst, Loc, Module, 0U);
+	AieRC RC;
+	u8 TileType;
+	u32 ResetEvent;
+	const XAie_EvntMod *EvntMod;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if(TileType == XAIEGBL_TILE_TYPE_MAX) {
+		XAIE_ERROR("Invalid Tile Type\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	/* check for module and tiletype combination */
+	RC = XAie_CheckModule(DevInst, Loc, Module);
+	if(RC != XAIE_OK) {
+		return XAIE_INVALID_ARGS;
+	}
+
+	if(Module == XAIE_PL_MOD) {
+		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[0U];
+	} else {
+		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
+	}
+
+	/* CERT-C Check*/
+	if(EvntMod->EventMin > XAIE_EVENT_USER_EVENT_7_MEM_TILE){
+		XAIE_ERROR("Invalid Event type\n");
+		return XAIE_ERR;
+	}
+
+	/* Since first event of all modules is NONE event, using it to reset */
+	ResetEvent = EvntMod->EventMin;
+
+	return XAie_PerfCounterSnapshotLoadEventSet(DevInst, Loc, Module, (XAie_Events)ResetEvent);
 }
 
 

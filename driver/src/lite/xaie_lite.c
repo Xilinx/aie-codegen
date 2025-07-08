@@ -268,7 +268,30 @@ AieRC XAie_LMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 		XAIE_ERROR("Invalid device instance or source pointer\n");
 		return XAIE_INVALID_ARGS;
 	}
+#if DEV_GEN_AIE4
 
+	if(Loc.Col >= DevInst->NumCols) {
+		XAIE_ERROR("Invalid Column %d for AIE4 device\n", Loc.Col);
+		return XAIE_INVALID_ARGS;
+	}
+
+	if(Loc.Row == XAIE_SHIM_ROW) {
+		if(Addr < XAIE_SHIM_ROW_START_OFFSET || (Addr + Size) > XAIE_SHIM_ROW_END_OFFSET) {
+			return XAIE_ERR_OUTOFBOUND;
+		}
+	} else if(Loc.Row >= XAIE_MEM_TILE_ROW_START && Loc.Row < XAIE_AIE_TILE_ROW_START) {
+		if(Addr < XAIE_MEM_ROW_START_OFFSET || (Addr + Size) > XAIE_MEM_ROW_END_OFFSET) {
+			return XAIE_ERR_OUTOFBOUND;
+		}
+	} else if(Loc.Row >= XAIE_AIE_TILE_ROW_START && Loc.Row < DevInst->NumRows) {
+		if(Addr < XAIE_AIE_ROW_START_OFFSET || (Addr + Size) > XAIE_AIE_ROW_END_OFFSET) {
+			return XAIE_ERR_OUTOFBOUND;
+		}
+	} else {
+		XAIE_ERROR("Invalid Row %d for AIE4 device\n", Loc.Row);
+		return XAIE_INVALID_ARGS;
+	}
+#endif
 	RC = _XAie_LMemoryBlockWrite(DevInst, Loc, Addr, CharSrc,
 			Size);
 
@@ -311,6 +334,30 @@ AieRC XAie_LMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 		XAIE_ERROR("Invalid device instance or destination pointer\n");
 		return XAIE_INVALID_ARGS;
 	}
+#if DEV_GEN_AIE4
+
+	if(Loc.Col >= DevInst->NumCols) {
+		XAIE_ERROR("Invalid Column %d for AIE4 device\n", Loc.Col);
+		return XAIE_INVALID_ARGS;
+	}
+
+	if(Loc.Row == XAIE_SHIM_ROW) {
+		if(Addr < XAIE_SHIM_ROW_START_OFFSET || (Addr + Size) > XAIE_SHIM_ROW_END_OFFSET) {
+			return XAIE_ERR_OUTOFBOUND;
+		}
+	} else if(Loc.Row >= XAIE_MEM_TILE_ROW_START && Loc.Row < XAIE_AIE_TILE_ROW_START) {
+		if(Addr < XAIE_MEM_ROW_START_OFFSET || (Addr + Size) > XAIE_MEM_ROW_END_OFFSET) {
+			return XAIE_ERR_OUTOFBOUND;
+		}
+	} else if(Loc.Row >= XAIE_AIE_TILE_ROW_START && Loc.Row < DevInst->NumRows) {
+		if(Addr < XAIE_AIE_ROW_START_OFFSET || (Addr + Size) > XAIE_AIE_ROW_END_OFFSET) {
+			return XAIE_ERR_OUTOFBOUND;
+		}
+	} else {
+		XAIE_ERROR("Invalid Row %d for AIE4 device\n", Loc.Row);
+		return XAIE_INVALID_ARGS;
+	}
+#endif
 
 	/* Absolute 4-byte aligned AXI-MM address to write */
 	DmAddrRoundDown = (u64)(XAIE_MEM_WORD_ROUND_DOWN(Addr)) +

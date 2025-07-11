@@ -758,6 +758,29 @@ static inline u8 _XAie_LPmIsArrayTileRequested(XAie_DevInst *DevInst,
 /*****************************************************************************/
 /**
 *
+* This API set SHIM reset in the AI engine partition
+*
+* @param	DevInst: Device Instance
+* @param	Loc: SHIM tile location
+* @param	Reset: XAIE_ENABLE to enable reset,
+*			XAIE_DISABLE to disable reset
+*
+* @return	XAIE_OK for success, and error value for failure
+*
+* @note		This function is not supported in AIE4. It is replaced by _XAie_LSetPartColAppReset
+*
+******************************************************************************/
+static inline void _XAie_LSetPartColShimReset(XAie_DevInst *DevInst,
+		XAie_LocType Loc, u8 Reset)
+{
+		(void)DevInst;
+		(void)Loc;
+		(void)Reset;
+}
+
+/*****************************************************************************/
+/**
+*
 * This API pauses DMA in the AI engine partition
 *
 * @param	DevInst: Device Instance
@@ -775,6 +798,8 @@ static inline void _XAie_LSetPartDmaPause(XAie_DevInst *DevInst,
 	u32 FldVal = 0;
 	u32 FldVal_uC_A, FldVal_uC_B;
 
+	/* Note: This API may need to be updated if MAS is updated to pause both uC for all Application
+	   reset scenarios */
 	RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_PL_MOD_DMA_PAUSE_REGOFF;
 	RegAddr_uC_A = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_PL_MOD_UC_DMA_A_PAUSE_REGOFF;
 	RegAddr_uC_B = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_PL_MOD_UC_DMA_B_PAUSE_REGOFF;
@@ -887,31 +912,19 @@ static inline AieRC _XAie_LPollAximmTransactions(XAie_DevInst *DevInst, XAie_Loc
 *
 *
 ******************************************************************************/
-static inline void _XAie_LSetPartColShimReset(XAie_DevInst *DevInst,
+static inline void _XAie_LSetPartColAppReset(XAie_DevInst *DevInst,
 		XAie_LocType Loc, u8 Reset)
 {
 	u64 RegAddr;
 	u32 FldVal = 0;
-	AieRC RC;
-
-	/* Pause DMA */
-	_XAie_LSetPartDmaPause(DevInst, Loc, Reset);
-	/* Poll pending AXI-MM transactions before Application reset */
-	/* Todo - Return RC value in case of a faiure to FW once FW handlign of AXIMM Polling
-			 Fail is implemented */
-	RC = _XAie_LPollAximmTransactions(DevInst, Loc);
 
 	RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_PL_MOD_COL_RST_REGOFF;
-	if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
-		/* Application A reset */
+	if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A || DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) {
+		/* Application A/Single App reset */
 		FldVal = XAie_SetField(Reset, XAIE_PL_MOD_COL_RST_APP_A_LSB, XAIE_PL_MOD_COL_RST_APP_A_MASK);
 	} else if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B){
 		/* Application B reset */
 		FldVal = XAie_SetField(Reset, XAIE_PL_MOD_COL_RST_APP_B_LSB, XAIE_PL_MOD_COL_RST_APP_B_MASK);
-	} else if(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE){
-		/* Reset both Application A and B */
-		FldVal = XAie_SetField(Reset, XAIE_PL_MOD_COL_RST_APP_A_LSB, XAIE_PL_MOD_COL_RST_APP_A_MASK);
-		FldVal |= XAie_SetField(Reset, XAIE_PL_MOD_COL_RST_APP_B_LSB, XAIE_PL_MOD_COL_RST_APP_B_MASK);
 	}
 	_XAie_LPartWrite32(DevInst, RegAddr, FldVal);
 }

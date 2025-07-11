@@ -902,6 +902,68 @@ static inline AieRC _XAie_LAiePorConfiguration(XAie_DevInst *DevInst, XAie_PartP
 
 /*****************************************************************************/
 /**
+*
+* This API pauses DMA in the AI engine partition
+*
+* @param	DevInst: Device Instance
+* @param	Loc: SHIM tile location
+*
+*
+* @note		Not Supported in AIE2 devices
+*
+******************************************************************************/
+
+static inline void _XAie_LSetPartDmaPause(XAie_DevInst *DevInst,
+		XAie_LocType Loc, u8 Enable) {
+		(void)DevInst;
+		(void)Loc;
+		(void)Enable;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API set Application reset in the AI engine partition
+*
+* @param	DevInst: Device Instance
+* @param	Loc: SHIM tile location
+* @param	Reset: XAIE_ENABLE to enable reset,
+* 			XAIE_DISABLE to disable reset
+*
+* @return	XAIE_OK for success, and error value for failure
+*
+* @note		Not Supported in AIE2 devices
+*
+******************************************************************************/
+static inline void _XAie_LSetPartColAppReset(XAie_DevInst *DevInst,
+		XAie_LocType Loc, u8 Reset)
+{
+	(void)DevInst;
+	(void)Loc;
+	(void)Reset;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API polls for pending AXI-MM transactions in the AI engine partition
+*
+* @param	DevInst: Device Instance
+* @param	Loc: SHIM tile location
+*
+* @note		Not supported in AIE2 devices
+*
+*
+******************************************************************************/
+static inline AieRC _XAie_LPollAximmTransactions(XAie_DevInst *DevInst, XAie_LocType Loc)
+{
+	(void)DevInst;
+	(void)Loc;
+	return XAIE_NOT_SUPPORTED;
+}
+
+/*****************************************************************************/
+/**
 * This API Enables/Disables clock in Individual AIE Tiles
 *
 * @param	DevInst: AI engine partition device instance pointer

@@ -327,6 +327,58 @@ static void _XAie_PrivilegeSetPartColRst(XAie_DevInst *DevInst, u8 RstEnable)
 /*****************************************************************************/
 /**
 *
+* This API reset all the resources for an App for the partition
+*
+* @param	DevInst: Device Instance
+*
+* @return	XAIE_OK for success, and error value for failure
+*
+* @note		This function asserts application reset, and then deassert it.
+*		This function is internal to this file.
+*
+******************************************************************************/
+static AieRC _XAie_PrivilegeApplicationReset(XAie_DevInst *DevInst)
+{
+	AieRC RC;
+	// Pause all DMAs in the partition before Asserting Application reset
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
+		XAie_LocType Loc = XAie_TileLoc(C, 0);
+		_XAie_LSetPartDmaPause(DevInst,Loc,XAIE_ENABLE);
+	}
+
+	// Poll for Pending AXI-MM transactions
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
+		XAie_LocType Loc = XAie_TileLoc(C, 0);
+		RC = _XAie_LPollAximmTransactions(DevInst,Loc);
+		if(RC !=XAIE_OK) {
+			XAIE_ERROR("Application Pending AXI-MM Transaction polling failed \n");
+			return RC;
+		}
+	}
+
+	// Assert Application reset
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
+		XAie_LocType Loc = XAie_TileLoc(C, 0);
+		_XAie_LSetPartColAppReset(DevInst, Loc, XAIE_ENABLE);
+	}
+
+	// De-Assert Applicatoin reset
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
+		XAie_LocType Loc = XAie_TileLoc(C, 0);
+		_XAie_LSetPartColAppReset(DevInst, Loc, XAIE_DISABLE);
+	}
+
+	// Disable all DMAs pause before De-Asserting Application reset
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
+		XAie_LocType Loc = XAie_TileLoc(C, 0);
+		_XAie_LSetPartDmaPause(DevInst,Loc,XAIE_DISABLE);
+	}
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
 * This API reset all SHIMs in the AI engine partition
 *
 * @param	DevInst: Device Instance
@@ -883,6 +935,7 @@ AieRC XAie_PartitionInitialize(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 *******************************************************************************/
 AieRC XAie_PartitionTeardown(XAie_DevInst *DevInst)
 {
+	AieRC RC;
 
 	XAIE_ERROR_RETURN((DevInst == NULL || DevInst->NumCols > XAIE_NUM_COLS),
 		XAIE_INVALID_ARGS,
@@ -916,7 +969,14 @@ AieRC XAie_PartitionTeardown(XAie_DevInst *DevInst)
 		_XAie_PrivilegeSetPartColClkBuf(DevInst, XAIE_ENABLE);
 	}
 
-	_XAie_PrivilegeRstPartShims(DevInst);
+	if (!(_XAie_LIsDeviceGenAIE4())) {
+		_XAie_PrivilegeRstPartShims(DevInst);
+	} else {
+		RC = _XAie_PrivilegeApplicationReset(DevInst);
+		if(RC != XAIE_OK){
+			return RC;
+		}
+	}
 
 	_XAie_LPartMemZeroInit(DevInst);
 
@@ -1035,7 +1095,10 @@ AieRC XAie_ClearPartitionContext(XAie_DevInst *DevInst)
 	* For Legacy devices Column reset is enough during application
 	* context switch */
 	if (_XAie_LIsDeviceGenAIE4()) {
-		_XAie_PrivilegeRstPartShims(DevInst);
+		RC =_XAie_PrivilegeApplicationReset(DevInst);
+		if(RC != XAIE_OK){
+			return RC;
+		}
 	}
 
 	/* Zeroize Application memory resources */

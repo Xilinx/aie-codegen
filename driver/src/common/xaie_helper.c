@@ -1134,7 +1134,7 @@ static inline void _XAie_AppendCreateScratchpad(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 	Hdr->Op = (u8)Cmd->Opcode;
 	Hdr->UsageType = (u8)Cmd->UsageType;
 	Hdr->Size = (u32)Cmd->Size;
-	Hdr->DdrAddr = (u64)Cmd->DdrAddr;
+	Hdr->ScratchOffset = (u64)Cmd->ScratchOffset;
 }
 
 static inline void _XAie_AppendUpdateState(XAie_TxnCmd *Cmd, u8 *TxnPtr)
@@ -3667,7 +3667,7 @@ AieRC XAie_Txn_PmLoadEnd(XAie_DevInst *DevInst)
 * @param    DevInst - Global AIE device instance pointer. 
 * @param    UsageType - Scratchpad usage type
 * @param    Size - Size of scratchpad in bytes.
-* @param    DdrAddr - Offset into the Scratchpad buffer on host side where the
+* @param    ScratchOffset - Offset into the Scratchpad buffer on host side where the
 *                           state table will be defined.
 *
 * @return   XAIE_OK for success and error code otherwise.
@@ -3676,7 +3676,7 @@ AieRC XAie_Txn_PmLoadEnd(XAie_DevInst *DevInst)
 *
 ******************************************************************************/
 AieRC XAie_Txn_CreateScratchpad(XAie_DevInst *DevInst, u8 UsageType, u32 Size,
-								u64 DdrAddr)
+								u64 ScratchOffset)
 {
 	AieRC RC;
 	u64 Tid;
@@ -3708,7 +3708,7 @@ AieRC XAie_Txn_CreateScratchpad(XAie_DevInst *DevInst, u8 UsageType, u32 Size,
 		TxnInst->CmdBuf[TxnInst->NumCmds].Opcode = XAIE_IO_CREATE_SCRATCHPAD;
 		TxnInst->CmdBuf[TxnInst->NumCmds].UsageType = UsageType;
 		TxnInst->CmdBuf[TxnInst->NumCmds].Size = Size;
-		TxnInst->CmdBuf[TxnInst->NumCmds].DdrAddr = DdrAddr;
+		TxnInst->CmdBuf[TxnInst->NumCmds].ScratchOffset = ScratchOffset;
 
 		if (TX_DUMP_ENABLE) {
 			TxnCmdDump(&TxnInst->CmdBuf[TxnInst->NumCmds]);

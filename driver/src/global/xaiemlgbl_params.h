@@ -1,4 +1,10 @@
- /*This file contains the macro definitions for the AIE4 registers, generated from regdb headers.
+/******************************************************************************
+* Copyright (C) 2021-2022 Xilinx, Inc. All rights reserved.
+* Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+* SPDX-License-Identifier: MIT
+******************************************************************************/
+
+/*This file contains the macro definitions for the AIE2 registers, generated from regdb headers.
  MODIFICATION HISTORY:
  Ver   Who		 Date        Changes
  1.0   prathap   16/04/2025  Initial creation

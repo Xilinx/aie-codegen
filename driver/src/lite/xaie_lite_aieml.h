@@ -914,9 +914,10 @@ static inline AieRC _XAie_LAiePorConfiguration(XAie_DevInst *DevInst, XAie_PartP
 ******************************************************************************/
 
 static inline void _XAie_LSetPartDmaPause(XAie_DevInst *DevInst,
-		XAie_LocType Loc, u8 Enable) {
+		XAie_LocType Loc, u8 AppMode, u8 Enable) {
 		(void)DevInst;
 		(void)Loc;
+		(void)AppMode;
 		(void)Enable;
 }
 
@@ -955,9 +956,10 @@ static inline void _XAie_LSetPartColAppReset(XAie_DevInst *DevInst,
 *
 *
 ******************************************************************************/
-static inline AieRC _XAie_LPollAximmTransactions(XAie_DevInst *DevInst, XAie_LocType Loc)
+static inline AieRC _XAie_LPollAximmTransactions(XAie_DevInst *DevInst, u8 AppMode, XAie_LocType Loc)
 {
 	(void)DevInst;
+	(void)AppMode;
 	(void)Loc;
 	return XAIE_NOT_SUPPORTED;
 }

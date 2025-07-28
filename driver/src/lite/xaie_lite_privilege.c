@@ -340,19 +340,49 @@ static void _XAie_PrivilegeSetPartColRst(XAie_DevInst *DevInst, u8 RstEnable)
 static AieRC _XAie_PrivilegeApplicationReset(XAie_DevInst *DevInst)
 {
 	AieRC RC;
-	// Pause all DMAs in the partition before Asserting Application reset
-	for(u8 C = 0; C < DevInst->NumCols; C++) {
-		XAie_LocType Loc = XAie_TileLoc(C, 0);
-		_XAie_LSetPartDmaPause(DevInst,Loc,XAIE_ENABLE);
+	u8 SecondAppMode;
+
+	if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
+		SecondAppMode = XAIE_DEVICE_DUAL_APP_MODE_B;
+	} else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
+		SecondAppMode = XAIE_DEVICE_DUAL_APP_MODE_A;
+	} else {
+		SecondAppMode = XAIE_DEVICE_SINGLE_APP_MODE;
 	}
 
-	// Poll for Pending AXI-MM transactions
+	// Pause DMAs for application which needs to be reset in the partition
 	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		XAie_LocType Loc = XAie_TileLoc(C, 0);
-		RC = _XAie_LPollAximmTransactions(DevInst,Loc);
+		_XAie_LSetPartDmaPause(DevInst,Loc,DevInst->AppMode,XAIE_ENABLE);
+	}
+
+	// Poll for Pending AXI-MM transactions for application to be reset
+	for(u8 C = 0; C < DevInst->NumCols; C++) {
+		XAie_LocType Loc = XAie_TileLoc(C, 0);
+		RC = _XAie_LPollAximmTransactions(DevInst,DevInst->AppMode,Loc);
 		if(RC !=XAIE_OK) {
 			XAIE_ERROR("Application Pending AXI-MM Transaction polling failed \n");
 			return RC;
+		}
+	}
+
+	// Pause DMas for second application if partition is in Dual App mode before calling Application reset assert
+	if(SecondAppMode != XAIE_DEVICE_SINGLE_APP_MODE){
+		for(u8 C = 0; C < DevInst->NumCols; C++) {
+			XAie_LocType Loc = XAie_TileLoc(C, 0);
+			_XAie_LSetPartDmaPause(DevInst,Loc,SecondAppMode,XAIE_ENABLE);
+		}
+	}
+
+	// Poll for Pending AXI-MM transactions for second application before application reset
+	if(SecondAppMode != XAIE_DEVICE_SINGLE_APP_MODE){
+		for(u8 C = 0; C < DevInst->NumCols; C++) {
+			XAie_LocType Loc = XAie_TileLoc(C, 0);
+			RC = _XAie_LPollAximmTransactions(DevInst,SecondAppMode,Loc);
+			if(RC !=XAIE_OK) {
+				XAIE_ERROR("Application Pending AXI-MM Transaction polling failed \n");
+				return RC;
+			}
 		}
 	}
 
@@ -368,10 +398,10 @@ static AieRC _XAie_PrivilegeApplicationReset(XAie_DevInst *DevInst)
 		_XAie_LSetPartColAppReset(DevInst, Loc, XAIE_DISABLE);
 	}
 
-	// Disable all DMAs pause before De-Asserting Application reset
+	// Disable all DMAs pause after De-Asserting Application reset
 	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		XAie_LocType Loc = XAie_TileLoc(C, 0);
-		_XAie_LSetPartDmaPause(DevInst,Loc,XAIE_DISABLE);
+		_XAie_LSetPartDmaPause(DevInst,Loc,XAIE_DEVICE_SINGLE_APP_MODE,XAIE_DISABLE);
 	}
 	return XAIE_OK;
 }

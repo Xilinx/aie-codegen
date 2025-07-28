@@ -792,7 +792,7 @@ static inline void _XAie_LSetPartColShimReset(XAie_DevInst *DevInst,
 ******************************************************************************/
 
 static inline void _XAie_LSetPartDmaPause(XAie_DevInst *DevInst,
-		XAie_LocType Loc, u8 Enable)
+		XAie_LocType Loc, u8 AppMode, u8 Enable)
 {
 	u64 RegAddr, RegAddr_uC_A, RegAddr_uC_B;
 	u32 FldVal = 0;
@@ -804,7 +804,7 @@ static inline void _XAie_LSetPartDmaPause(XAie_DevInst *DevInst,
 	RegAddr_uC_A = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_PL_MOD_UC_DMA_A_PAUSE_REGOFF;
 	RegAddr_uC_B = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_PL_MOD_UC_DMA_B_PAUSE_REGOFF;
 
-	if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
+	if(AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
 		if(Enable){
 			/* Application A DMA Pause */
 			_XAie_LPartMaskWrite32(DevInst, RegAddr, XAIE_PL_MOD_DMA_PAUSE_APP_A_MASK, XAIE_PL_MOD_DMA_PAUSE_APP_A_MASK);
@@ -816,7 +816,7 @@ static inline void _XAie_LSetPartDmaPause(XAie_DevInst *DevInst,
 			/* UnPause uC A DMA */
 			_XAie_LPartMaskWrite32(DevInst, RegAddr_uC_A, XAIE_PL_MOD_UC_DMA_A_PAUSE_MASK,Enable);
 		}
-	} else if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B){
+	} else if(AppMode== XAIE_DEVICE_DUAL_APP_MODE_B){
 		if(Enable){
 			/* Application B DMA Pause */
 			_XAie_LPartMaskWrite32(DevInst, RegAddr, XAIE_PL_MOD_DMA_PAUSE_APP_B_MASK, XAIE_PL_MOD_DMA_PAUSE_APP_B_MASK);
@@ -828,7 +828,7 @@ static inline void _XAie_LSetPartDmaPause(XAie_DevInst *DevInst,
 			/* UnPause uC B DMA */
 			_XAie_LPartMaskWrite32(DevInst, RegAddr_uC_B, XAIE_PL_MOD_UC_DMA_B_PAUSE_MASK, Enable);
 		}
-	} else if(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE){
+	} else if(AppMode == XAIE_DEVICE_SINGLE_APP_MODE){
 		if(Enable){
 			/* Single Application mode DMA Pause */
 			_XAie_LPartMaskWrite32(DevInst, RegAddr, XAIE_PL_MOD_DMA_PAUSE_MASK, XAIE_PL_MOD_DMA_PAUSE_MASK);
@@ -863,13 +863,13 @@ static inline void _XAie_LSetPartDmaPause(XAie_DevInst *DevInst,
 *
 *
 ******************************************************************************/
-static inline AieRC _XAie_LPollAximmTransactions(XAie_DevInst *DevInst, XAie_LocType Loc)
+static inline AieRC _XAie_LPollAximmTransactions(XAie_DevInst *DevInst, u8 AppMode, XAie_LocType Loc)
 {
 	u64 RegAddr;
 	int Ret;
 
 	RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_NOC_MOD_AXI_MM_OUTSTANDING_TRANSACTIONS_REGOFF;
-	if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
+	if(AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) {
 		/* Application A Pending AXI-MM Transaction polling */
 		Ret = _XAie_LPartPoll32(DevInst, RegAddr,
 				XAIE_PL_MOD_AXIMM_APP_A_PENDING_TRANSACTIONS_MASK, 0, XAIE4_PENDING_AXIMM_TRANSACTION_POLL_TIMEOUT);
@@ -878,7 +878,7 @@ static inline AieRC _XAie_LPollAximmTransactions(XAie_DevInst *DevInst, XAie_Loc
 			return XAIE_AXIMM_PENDING_TRANSACTION_TIMEOUT;
 		}
 
-	} else if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B){
+	} else if(AppMode == XAIE_DEVICE_DUAL_APP_MODE_B){
 		/* Application B Pending AXI-MM Transaction polling */
 		Ret = _XAie_LPartPoll32(DevInst, RegAddr,
 				XAIE_PL_MOD_AXIMM_APP_B_PENDING_TRANSACTIONS_MASK, 0, XAIE4_PENDING_AXIMM_TRANSACTION_POLL_TIMEOUT);
@@ -886,7 +886,7 @@ static inline AieRC _XAie_LPollAximmTransactions(XAie_DevInst *DevInst, XAie_Loc
 			XAIE_ERROR("Application B Pending AXI-MM Transaction polling failed\n");
 			return XAIE_AXIMM_PENDING_TRANSACTION_TIMEOUT;
 		}
-	} else if(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE){
+	} else if(AppMode == XAIE_DEVICE_SINGLE_APP_MODE){
 		/* Single Application Pending AXI-MM Transaction polling */
 		Ret = _XAie_LPartPoll32(DevInst, RegAddr,
 				XAIE_NOC_MOD_AXI_MM_OUTSTANDING_TRANSACTIONS_MASK, 0, XAIE4_PENDING_AXIMM_TRANSACTION_POLL_TIMEOUT);

@@ -54,6 +54,12 @@
 
 #define XAIE4_MASK_VALUE_APP_B  0x40000
 
+// Medium Grained clock control
+#define XAIE_PL_MOD_MEDG_CLKCNTRL_VALUE   0X7
+#define XAIE_MEMTILE_MEDG_CLKCNTRL_VALUE  0XF
+#define XAIE_AIETILE_MEDG_CLKCNTRL_VALUE  0XF
+
+
 /* Set the timeout to maximum zeroization cycles required for Memtile DM zeroization for Sim backend.
    If polling timeout is less driver will return an error before zeroization is complete */
 #ifdef __AIESIM__
@@ -1576,6 +1582,41 @@ static inline AieRC _XAie_LColumnClkControl(XAie_DevInst *DevInst, XAie_LocType 
 /*****************************************************************************/
 /**
  *
+ * This API configures the registers to enable Medium Grained clock gating
+ * control in all the tiles in the parition
+ *
+ * @param	DevInst: Device Instance
+ *
+ * @return	None.
+ *
+ * @note	None.
+ *
+ *****************************************************************************/
+static inline void _XAie_LPartMediumGClkControl(XAie_DevInst *DevInst) {
+	u64 RegAddr;
+
+	for(u32 C = 0; C < DevInst->NumCols; C++) {
+		for(u32 R = 0; R < DevInst->NumRows; R++) {
+			if(R == XAIE_SHIM_ROW) {
+				RegAddr = _XAie_LGetTileAddr(R, C) +
+								XAIE_PL_MOD_MEDIUM_GRAINED_CLOCK_GATING_CONTROL;
+				_XAie_LPartWrite32(DevInst, RegAddr, XAIE_PL_MOD_MEDG_CLKCNTRL_VALUE);
+			} else if (R >= XAIE_MEM_TILE_ROW_START && R < XAIE_AIE_TILE_ROW_START) {
+				RegAddr = _XAie_LGetTileAddr(R, C) +
+								XAIE_MEMTILE_MEDIUM_GRAINED_CLOCK_GATING_CONTROL;
+				_XAie_LPartWrite32(DevInst, RegAddr, XAIE_MEMTILE_MEDG_CLKCNTRL_VALUE);
+			} else if (R >= XAIE_AIE_TILE_ROW_START && R < XAIE_NUM_ROWS) {
+				RegAddr = _XAie_LGetTileAddr(R, C) +
+								XAIE_AIETILE_MEDIUM_GRAINED_CLOCK_GATING_CONTROL;
+				_XAie_LPartWrite32(DevInst, RegAddr, XAIE_AIETILE_MEDG_CLKCNTRL_VALUE);
+			}
+		}
+	}
+}
+
+/*****************************************************************************/
+/**
+ *
  * This API configures the registers following POR sequence. It Unlock ME PCSR,
  * Sets ME_IPOR, Sets top row and Row Offset, Releases ARRAY resets, Configures
  * NPI registers, un-gates column clock and disable isolation in entire array.
@@ -1633,10 +1674,13 @@ static inline AieRC _XAie_LAiePorConfiguration(XAie_DevInst *DevInst, XAie_PartP
 
 	/* Un-gate all Columns post toggeling Array reset */
 	for(u32 C = 0; C < DevInst->NumCols; C++) {
-                Loc.Row = XAIE_SHIM_ROW;
-                Loc.Col = C;
-                _XAie_LColumnClkControl(DevInst,Loc,XAIE_ENABLE);
-        }
+        Loc.Row = XAIE_SHIM_ROW;
+        Loc.Col = C;
+        _XAie_LColumnClkControl(DevInst,Loc,XAIE_ENABLE);
+    }
+
+	/* Enable Medium grained Clock Gating Control in all tiles of the partiiton */
+	_XAie_LPartMediumGClkControl(DevInst);
 
 	/* Zeroize All Tiles and uC modules */
 	_XAie_LPartMemZeroInit(DevInst);

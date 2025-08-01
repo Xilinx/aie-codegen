@@ -888,11 +888,38 @@ static void _XAie_PrivilegeConfigureL2Irq(XAie_DevInst *DevInst,
 	RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + \
 		XAIE_NOC_MOD_INTR_L2_GLOBAL_ENABLE;
 
-	if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
+	/**
+	 * Note:
+	 * As per the agreement with MPNPU FW team, This API will be called :
+	 * 		1) Only once per column irrespective of the no of partitions in column during init (Enable mode)
+	 * 		2) But will be called once per partition per column during teardown (Disable mode).
+	 */
+
+	/**
+	 * Mode == Enable 	and 	App Mode == Dual APP A
+	 */
+	if ((Enable == XAIE_ENABLE) && (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A)) {
+
+		RegVal = XAie_SetField(Enable, XAIE_NOC_MOD_INTR_L2_APP_A_GE_LSB,
+			XAIE_NOC_MOD_INTR_L2_APP_A_GE_MASK);
+		RegVal |= XAie_SetField(Enable, XAIE_NOC_MOD_INTR_L2_APP_B_GE_LSB,
+			XAIE_NOC_MOD_INTR_L2_APP_B_GE_MASK);
+	}
+	/**
+	 * Mode == Enable 	and 	App Mode == Dual APP B
+	 * Mode == Disable 	and 	App Mode == Dual APP B 
+	 */ 
+	else if (DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
 
 		RegVal = XAie_SetField(Enable, XAIE_NOC_MOD_INTR_L2_APP_B_GE_LSB,
 			XAIE_NOC_MOD_INTR_L2_APP_B_GE_MASK);
-	} else {
+	}
+	/**
+	 * Mode == Enable 	and 	App Mode == Single APP
+	 * Mode == Disable 	and 	App Mode == Single APP
+	 * Mode == Disable 	and 	App Mode == Dual App A
+	 */ 
+	else {
 
 		RegVal = XAie_SetField(Enable, XAIE_NOC_MOD_INTR_L2_APP_A_GE_LSB,
 			XAIE_NOC_MOD_INTR_L2_APP_A_GE_MASK);

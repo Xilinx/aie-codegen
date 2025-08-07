@@ -6338,7 +6338,7 @@ static const XAie_CtrlPktHndlrMod Aie4ShimTileCtrlPktHndlrMod =
  * Depending on the tile type, this data strcuture can be used to access all
  * hardware properties of individual modules.
  */
-XAie_TileMod Aie4GenericMod[] =
+const XAie_TileMod Aie4GenericMod[] =
 {
 	{
 		/*

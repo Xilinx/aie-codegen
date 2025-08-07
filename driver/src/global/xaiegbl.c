@@ -59,13 +59,13 @@ extern XAie_TileMod Aie2PSMod[XAIEGBL_TILE_TYPE_MAX];
 extern XAie_TileMod Aie4GenericMod[XAIEGBL_TILE_TYPE_MAX];
 extern XAie_TileMod Aie4Mod[XAIEGBL_TILE_TYPE_MAX];
 
-extern XAie_DeviceOps AieDevOps;
-extern XAie_DeviceOps AieMlDevOps;
-extern XAie_DeviceOps Aie2IpuDevOps;
-extern XAie_DeviceOps Aie2PDevOps;
-extern XAie_DeviceOps Aie2PSDevOps;
-extern XAie_DeviceOps Aie4GenericDevOps;
-extern XAie_DeviceOps Aie4DevOps;
+extern const XAie_DeviceOps AieDevOps;
+extern const XAie_DeviceOps AieMlDevOps;
+extern const XAie_DeviceOps Aie2IpuDevOps;
+extern const XAie_DeviceOps Aie2PDevOps;
+extern const XAie_DeviceOps Aie2PSDevOps;
+extern const XAie_DeviceOps Aie4GenericDevOps;
+extern const XAie_DeviceOps Aie4DevOps;
 
 extern u8 XAieDevType;
 

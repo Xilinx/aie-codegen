@@ -1109,7 +1109,7 @@ struct XAie_TileMod {
 
 
 struct XAie_DeviceOps {
-	u8 IsCheckerBoard;
+	const u8 IsCheckerBoard;
 	u32 *TilesInUse;
 	u32 *MemInUse;
 	u32 *CoreInUse;
@@ -1123,7 +1123,7 @@ struct XAie_DeviceOps {
 	AieRC (*SetUCMemoryPrivileged)(XAie_DevInst *DevInst, u8 Enable);
 	AieRC (*RequestTiles)(XAie_DevInst *DevInst,
 			XAie_BackendTilesArray *Args);
-	AieRC (*SetColumnClk)(XAie_DevInst *DevInst,
+	AieRC (*const SetColumnClk)(XAie_DevInst *DevInst,
 			XAie_BackendColumnReq *Args);
 	AieRC (*SetAppMode)(XAie_DevInst *DevInst, XAie_BackendTilesArray *Args);
 };

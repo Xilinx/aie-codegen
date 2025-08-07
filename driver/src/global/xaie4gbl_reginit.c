@@ -6441,7 +6441,7 @@ XAie_TileMod Aie4GenericMod[] =
 };
 
 /* Device level operations for aieml */
-XAie_DeviceOps Aie4GenericDevOps =
+const XAie_DeviceOps Aie4GenericDevOps =
 {
 	.IsCheckerBoard = 0U,
 	.TilesInUse = Aie4TilesInUse,

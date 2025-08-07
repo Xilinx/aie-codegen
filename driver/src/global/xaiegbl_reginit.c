@@ -3375,7 +3375,7 @@ XAie_TileMod AieMod[] =
 };
 
 /* Device level operations for aie */
-XAie_DeviceOps AieDevOps =
+const XAie_DeviceOps AieDevOps =
 {
 	.IsCheckerBoard = 1,
 	.TilesInUse = AieTilesInUse,

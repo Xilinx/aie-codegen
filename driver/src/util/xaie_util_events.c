@@ -32,7 +32,7 @@
 /**************************** Variable Definitions *******************************/
 /* Event string lookup table indexed by event number */
 
-static const char *XAie_EventStrings[] = {
+static const char * const XAie_EventStrings[] = {
 	XAIE_EVENT_GENERATE_CORE_MOD(ENUM_STRING)
 	XAIE_EVENT_GENERATE_MEM_MOD(ENUM_STRING)
 	XAIE_EVENT_GENERATE_PL_MOD(ENUM_STRING)

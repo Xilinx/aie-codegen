@@ -397,6 +397,11 @@ static AieRC _XAie_PrivilegeApplicationReset(XAie_DevInst *DevInst)
 		XAie_LocType Loc = XAie_TileLoc(C, 0);
 		_XAie_LSetPartColAppReset(DevInst, Loc, XAIE_DISABLE);
 	}
+	
+#ifdef __AIESIM__
+	// Wait for Application reset to finish in Simnow
+	usleep(100000);
+#endif
 
 	// Disable all DMAs pause after De-Asserting Application reset
 	for(u8 C = 0; C < DevInst->NumCols; C++) {

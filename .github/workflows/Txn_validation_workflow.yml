@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   jenkins-check:
-    runs-on: [self-hosted, X64, Windows, jenkins-host-runner]
+    runs-on: [self-hosted, x64, windows, jenkins-host-runner]
     env:
       JENKINS_URL: "http://172.23.155.96:8080/"
       JENKINS_USER: "ips-lab"

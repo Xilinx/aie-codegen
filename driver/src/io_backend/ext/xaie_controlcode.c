@@ -963,7 +963,7 @@ AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u16 Arg_Index, u8 Num_BDs
 	}
 
 	ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
-		((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_APPLY_OFFSET_57) % DATA_SECTION_ALIGNMENT));
+		((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_APPLY_OFFSET_57 + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) % DATA_SECTION_ALIGNMENT));
 
 	if (ControlCodeInst->DataAligner == DATA_SECTION_ALIGNMENT) {
 		ControlCodeInst->DataAligner = 0U;

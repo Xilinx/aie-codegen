@@ -207,7 +207,7 @@ AieRC XAie_CfgInitialize(XAie_DevInst *InstPtr, XAie_Config *ConfigPtr)
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE2P_STRIX_B0;
 		InstPtr->DevOps = &Aie2PDevOps;
 		InstPtr->DevType = (u8)ConfigPtr->AieGen;
-	else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_GENERIC) {
+	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_GENERIC) {
 		InstPtr->DevProp.DevMod = Aie4GenericMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_GENERIC;
 		InstPtr->DevOps = &Aie4GenericDevOps;

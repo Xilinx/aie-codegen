@@ -194,6 +194,9 @@ AieRC XAie_ControlCodeIO_Init(XAie_DevInst *DevInst)
         IOInst->ScrachpadName = NULL;
 
 	DevInst->IOInst = IOInst;
+        if (IOInst->PageSizeMax >1024) {
+		IOInst->PageSizeMax -= 16;
+	}
 
 	return XAIE_OK;
 }

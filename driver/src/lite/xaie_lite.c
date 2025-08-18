@@ -259,7 +259,6 @@ AieRC XAie_LMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 		const void *Src, u32 Size)
 {
 	AieRC RC;
-	u32 MemSize, MemAddr;
 	u8 TileType;
 	const unsigned char *CharSrc = (const unsigned char *)Src;
 
@@ -320,7 +319,6 @@ AieRC XAie_LMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 AieRC XAie_LMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 		void *Dst, u32 Size)
 {
-	AieRC RC;
 	u64 DmAddrRoundDown, DmAddrRoundUp;
 	u32 BytePtr = 0;
 	u32 RemBytes = Size;

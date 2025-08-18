@@ -295,7 +295,7 @@ static inline void _XAie_LMemDMAStatus(XAie_DevInst *DevInst, XAie_Col_Status *S
 			(_XAie_LPartRead32(DevInst, RegAddr) & XAIE_MEM_TILE_DMA_S2MM_CHANNEL_VALID_BITS_MASK);
 	}
 	if(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) {
-		u8 DmaChan = XAIE_MEM_TILE_DMA_S2MM_NUM_CH/2;	
+		u8 DmaChan = XAIE_MEM_TILE_DMA_S2MM_NUM_CH/2;
 		for(u32 Chan = 0; Chan < DmaChan; Chan++) {
 			/* mm2s channel address */
 			RegAddr = _XAie_LGetTileAddr(Row + XAIE_MEM_TILE_ROW_START, Col)
@@ -495,7 +495,7 @@ static inline void _XAie_LShimDMAStatus(XAie_DevInst *DevInst, XAie_Col_Status *
 			Status[Col].ShimTile[XAIE_SHIM_ROW].DmaS2mmStatus[Chan + DmaS2mm_Chan] =
 				(_XAie_LPartRead32(DevInst, RegAddr) & XAIE_SHIM_DMA_S2MM_CHANNEL_VALID_BITS_MASK);
 		}
-	}	
+	}
 	for(u32 Chan = 0; Chan < XAIE_SHIM_DMA_MM2S_NUM_CH/2; Chan++) {
 		/* mm2s channel address */
 		RegAddr = _XAie_LGetTileAddr(XAIE_SHIM_ROW, Col) + Chan * XAIE_SHIM_DMA_MM2S_CHANNEL_STATUS_IDX +
@@ -515,7 +515,7 @@ static inline void _XAie_LShimDMAStatus(XAie_DevInst *DevInst, XAie_Col_Status *
 			Status[Col].ShimTile[XAIE_SHIM_ROW].DmaMm2sStatus[Chan + DmaMm2s_Chan] =
 				(_XAie_LPartRead32(DevInst, RegAddr) & XAIE_SHIM_DMA_MM2S_CHANNEL_VALID_BITS_MASK);
 		}
-	}	
+	}
 }
 
 /*****************************************************************************/
@@ -589,7 +589,6 @@ static inline void _XAie_LShimTileStatus(XAie_DevInst *DevInst, XAie_Col_Status 
 __FORCE_INLINE__
 static inline void XAie_LGetColRangeStatus(XAie_DevInst *DevInst, XAie_Col_Status *Status)
 {
-	u32 StartCol = (u32)(DevInst->StartCol);
 	u32 NumCols  = (u32)(DevInst->NumCols);
 
 	/* iterate specified columns */
@@ -801,8 +800,6 @@ static inline void _XAie_LSetPartDmaPause(XAie_DevInst *DevInst,
 		XAie_LocType Loc, u8 AppMode, u8 Enable)
 {
 	u64 RegAddr, RegAddr_uC_A, RegAddr_uC_B;
-	u32 FldVal = 0;
-	u32 FldVal_uC_A, FldVal_uC_B;
 
 	/* Note: This API may need to be updated if MAS is updated to pause both uC for all Application
 	   reset scenarios */
@@ -1170,8 +1167,8 @@ static inline AieRC _XAie_LPartIsDmaIdle(XAie_DevInst *DevInst)
 					/* S2MM Channel */
 					if(Ch >=(XAIE_MEM_TILE_DMA_S2MM_NUM_CH/2)) {
 						RegAddr = _XAie_LGetTileAddr(R, C) + Ch * 4 +
-							(XAIE_MEM_TILE_DMA_S2MM_CHANNEL_STATUS_REGOFF | 
-							XAIE4_MASK_VALUE_APP_B);		
+							(XAIE_MEM_TILE_DMA_S2MM_CHANNEL_STATUS_REGOFF |
+							XAIE4_MASK_VALUE_APP_B);
 					}
 					else {
 						RegAddr = _XAie_LGetTileAddr(R, C) + Ch * 4 +
@@ -1631,8 +1628,7 @@ static inline void _XAie_LPartMediumGClkControl(XAie_DevInst *DevInst) {
  *****************************************************************************/
 static inline AieRC _XAie_LAiePorConfiguration(XAie_DevInst *DevInst, XAie_PartPorOpts *PorOptions) {
 
-	u64 RegAddr;
-	u32 StartCol,EndCol,RegVal, FldVal;
+	u32 RegVal;
 	XAie_LocType Loc;
 	uint16_t NpiPorValues;
 

@@ -29,13 +29,6 @@
 
 #ifdef XAIE_FEATURE_PRIVILEGED_ENABLE
 
-/*
-* This variable captures the generic device value. If S100/S200 device is not
-* available.
-* NOTE: This global variable is deprecated and is replaced by DevType field in
-* XAie_DevInst structure for thread safety. Use DevInst->DevType instead.
-*/
-u8 XAieDevType = XAIE_DEV_GENERIC_DEVICE;
 /************************** Function Definitions *****************************/
 /*****************************************************************************/
 /**

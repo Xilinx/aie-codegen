@@ -94,7 +94,7 @@ extern const XAie_Backend IpuBackend;
 extern const XAie_Backend SocketBackend;
 extern const XAie_Backend ControlCodeBackend;
 
-static const XAie_Backend *IOBackend[XAIE_IO_BACKEND_MAX] =
+static const XAie_Backend * const IOBackend[XAIE_IO_BACKEND_MAX] =
 {
 	SIMBACKEND,
 	CDOBACKEND,

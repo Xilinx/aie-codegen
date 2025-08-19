@@ -45,32 +45,6 @@
 #define CheckBit(bitmap, pos)   ((bitmap)[(u64)(pos) / (sizeof((bitmap)[0]) * 8U)] & \
 				(u32)(1U << (u64)(pos) % (sizeof((bitmap)[0]) * 8U)))
 
-#define XAIE_ERROR(...)							      \
-	do {								      \
-		XAie_Log((FILE*)(uintptr_t)stderr, "[AIE ERROR]", __func__, __LINE__,	      \
-				__VA_ARGS__);				      \
-	} while(0)
-
-#define XAIE_WARN(...)							      \
-	do {								      \
-		XAie_Log((FILE*)(uintptr_t)stderr, "[AIE WARNING]", __func__, __LINE__,	      \
-				__VA_ARGS__);				      \
-	} while(0)
-
-#ifdef XAIE_DEBUG
-
-#define XAIE_DBG(...)							      \
-	do {								      \
-		XAie_Log(stdout, "[AIE DEBUG]", __func__, __LINE__,	      \
-				__VA_ARGS__);				      \
-	} while(0)
-
-#else
-
-#define XAIE_DBG(DevInst, ...) {}
-
-#endif /* XAIE_DEBUG */
-
 /* Compute offset of field within a structure */
 #define XAIE_OFFSET_OF(structure, member) \
 	((uintptr_t)&(((structure *)0)->member))
@@ -78,12 +52,6 @@
 /* Compute a pointer to a structure given a pointer to one of its fields */
 #define XAIE_CONTAINER_OF(ptr, structure, member) \
 	 ((uintptr_t)(ptr) - XAIE_OFFSET_OF(structure, member))
-
-/* Loop through the set bits in Value */
-#define for_each_set_bit(Index, Value, Len)				      \
-	for((Index) = first_set_bit((Value)) - 1;			      \
-	    (Index) < (Len);						      \
-	    (Value) &= (Value) - 1, (Index) = first_set_bit((Value)) - 1)
 
 /* Generate value with a set bit at given Index */
 #ifndef BIT
@@ -150,34 +118,6 @@ typedef struct {
 } XAie_ColStatus;
 
 /************************** Function Definitions *****************************/
-/*****************************************************************************/
-/**
-*
-* Calculates the index value of first set bit. Indexing starts with a value of
-* 1.
-*
-* @param	Value: Value
-* @return	Index of first set bit.
-*
-* @note		Internal API only.
-*
-******************************************************************************/
-static inline u32 first_set_bit(u64 Value)
-{
-	u32 Index = 1;
-
-	if (Value == 0U) {
-		return 0;
-	}
-
-	while ((Value & 1U) == 0U) {
-		Value >>= 1;
-		Index++;
-	}
-
-	return Index;
-}
-
 /* Private Functions (can be called by AIE Internal Driver Only */
 void BuffHexDump(const char* buff,u32 size);
 
@@ -220,8 +160,6 @@ XAIE_AIG_EXPORT AieRC XAie_MaskPollBusy(XAie_DevInst *DevInst, u64 RegOff, u32 M
 XAIE_AIG_EXPORT AieRC XAie_BlockWrite32(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data,
 			u32 Size);
 XAIE_AIG_EXPORT AieRC XAie_BlockSet32(XAie_DevInst *DevInst, u64 RegOff, u32 Data, u32 Size);
-XAIE_AIG_EXPORT void XAie_Log(FILE *Fd, const char *prefix, const char *func, u32 line,
-		const char *Format, ...);
 XAIE_AIG_EXPORT AieRC XAie_StatusDump(XAie_DevInst *DevInst, XAie_ColStatus *Status);
 XAIE_AIG_EXPORT AieRC XAie_RunOp(XAie_DevInst *DevInst, XAie_BackendOpCode Op, void *Arg);
 XAIE_AIG_EXPORT AieRC XAie_CmdWrite(XAie_DevInst *DevInst, u8 Col, u8 Row, u8 Command,

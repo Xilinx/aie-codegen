@@ -45,6 +45,7 @@
 #include "xaiegbl_defs.h"
 #include "xaiegbl_dynlink.h"
 #include "xaie_feature_config.h"
+#include "xaie_log.h"
 
 /************************** Constant Definitions *****************************/
 #define XAIE_LOCK_WITH_NO_VALUE		(-1)

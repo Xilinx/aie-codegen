@@ -1454,15 +1454,12 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	printf("Generating: %s\n", FileName);
 /*
 	if(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4) {
-		//Medusa case
 		fprintf(ControlCodeInst->ControlCodefp, ".target\t aie4\n");
 	}
 	else if(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4_A) {
-		//Soundwave Case
 		fprintf(ControlCodeInst->ControlCodefp, ".target\t aie4-a\n");
 	}
 	else if(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2PS) {
-		//Telluride case
 		fprintf(ControlCodeInst->ControlCodefp, ".target\t aie2ps\n");
 	}
 	else {
@@ -1470,6 +1467,10 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 		XAIE_ERROR("Unknown Target Device Generation %d\n", DevInst->DevProp.DevGen);
 		return XAIE_INVALID_DEVICE;
 	}
+
+	fprintf(ControlCodeInst->ControlCodefp, ".aie_row_topology\t %d-%d-%d-%d\n", 
+		DevInst->ShimTileNumRowsSouth, DevInst->MemTileNumRows, 
+		DevInst->AieTileNumRows, DevInst->ShimTileNumRowsNorth);
 */
 	fprintf(ControlCodeInst->ControlCodefp, ".partition\t %dcolumn\n",DevInst->NumCols);
 	fprintf(ControlCodeInst->ControlCodefp, ";\n");

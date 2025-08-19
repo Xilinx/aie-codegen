@@ -239,6 +239,8 @@ AieRC XAie_CfgInitialize(XAie_DevInst *InstPtr, XAie_Config *ConfigPtr)
 	InstPtr->MemTileNumRows = ConfigPtr->MemTileNumRows;
 	InstPtr->AieTileRowStart = ConfigPtr->AieTileRowStart;
 	InstPtr->AieTileNumRows = ConfigPtr->AieTileNumRows;
+	InstPtr->ShimTileNumRowsNorth = ConfigPtr->ShimTileNumRowsNorth;
+	InstPtr->ShimTileNumRowsSouth = ConfigPtr->ShimTileNumRowsSouth;
 	InstPtr->TxnList.Next = NULL;
 
 	if ((InstPtr->DevProp.DevGen == XAIE_DEV_GEN_AIE2IPU) ||

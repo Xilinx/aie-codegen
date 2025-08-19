@@ -157,6 +157,8 @@ typedef struct {
 	u8 NumRows;   /* Number of rows allocated to the partition */
 	u8 NumCols;   /* Number of cols allocated to the partition */
 	u8 ShimRow;   /* ShimRow location */
+	u8 ShimTileNumRowsNorth; /* Number of North Shim rows in the partition */
+	u8 ShimTileNumRowsSouth; /* Number of South Shim rows in the partition */
 	u8 MemTileRowStart; /* Mem tile starting row in the partition */
 	u8 MemTileNumRows;  /* Number of memtile rows in the partition */
 	u8 AieTileRowStart; /* Aie tile starting row in the partition */
@@ -200,6 +202,8 @@ typedef struct {
 	u8 NumRows;
 	u8 NumCols;
 	u8 ShimRowNum;
+	u8 ShimTileNumRowsNorth;
+	u8 ShimTileNumRowsSouth;
 	u8 MemTileRowStart;
 	u8 MemTileNumRows;
 	u8 AieTileRowStart;
@@ -792,6 +796,27 @@ static inline void XAie_SetupConfigPartProp(XAie_Config *ConfigPtr, u32 Nid,
 /*****************************************************************************/
 /**
 *
+* This API setups the AI engine Shim North and South tile rows in AI engine
+*
+* @param	Config: XAie_Config structure.
+* @param	NumShimTileRowsNorth: Number of shim tile rows in the north direction.
+* @param	NumShimTileRowsSouth: Number of shim tile rows in the south direction.
+* @return	None.
+*
+* @note		This function is to setup the shim tile rows in the AI engine config.
+*			It needs to be called before intialize AI engine partition.
+*
+*******************************************************************************/
+static inline void XAie_SetupConfigNorthSouthShimTileRows(XAie_Config *ConfigPtr, 
+	u8 NumShimTileRowsNorth, u8 NumShimTileRowsSouth)
+{
+	ConfigPtr->ShimTileNumRowsNorth = NumShimTileRowsNorth;
+	ConfigPtr->ShimTileNumRowsSouth = NumShimTileRowsSouth;
+}
+
+/*****************************************************************************/
+/**
+*
 * Macro to setup the configurate pointer data structure with hardware specific
 * details.
 *
@@ -824,6 +849,8 @@ static inline void XAie_SetupConfigPartProp(XAie_Config *ConfigPtr, u32 Nid,
 			.NumRows = _NumRows,\
 			.NumCols = _NumCols,\
 			.ShimRowNum = _ShimRowNum,\
+			.ShimTileNumRowsNorth = 0,\
+			.ShimTileNumRowsSouth = UINT8_MAX,\
 			.MemTileRowStart = _MemTileRowStart,\
 			.MemTileNumRows = _MemTileNumRows,\
 			.AieTileRowStart = _AieTileRowStart,\

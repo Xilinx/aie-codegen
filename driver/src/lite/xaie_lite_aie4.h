@@ -688,52 +688,78 @@ static inline void _XAie4_SetAppBTiles(XAie_DevInst *DevInst, u8 AtopRow, u8 Col
 static inline AieRC _XAie_LSetDualAppModePrivileged(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 {
 	u64 RegAddr;
-	for(u32 i = 0 ; i < Opts->NumUseTiles; i++) {
-		XAie_LocType Loc = XAie_TileLoc(Opts->Locs[i].Col, Opts->Locs[i].Row);
 
-		if(Loc.Row >= XAIE_NUM_ROWS){
-			XAIE_ERROR("Row number is greater then Total number of Rows\n");
-			return XAIE_INVALID_ARGS;
+	if(DevInst->AppMode !=XAIE_DEVICE_SINGLE_APP_MODE  && Opts->Locs == NULL) {
+		XAIE_ERROR("Tile location in XAie_PartInitOpts cannot be NULL in Dual App Mode\n");
+				return XAIE_INVALID_ARGS;
+	}
+
+	if(DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE) {
+		for(u32 i = 0 ; i < Opts->NumUseTiles; i++) {
+			XAie_LocType Loc = XAie_TileLoc(Opts->Locs[i].Col, Opts->Locs[i].Row);
+
+			if(Loc.Row >= XAIE_NUM_ROWS){
+				XAIE_ERROR("Row number is greater then Total number of Rows\n");
+				return XAIE_INVALID_ARGS;
+			}
+
+			if (Loc.Row == XAIE_SHIM_ROW) {
+				RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_PL_MOD_DUAL_APP_MODE;
+				_XAie_LPartWrite32(DevInst, RegAddr, XAIE_ENABLE);
+
+			} else if (Loc.Row >= XAIE_MEM_TILE_ROW_START && Loc.Row < XAIE_AIE_TILE_ROW_START ) {
+				RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_MEM_TILE_DUAL_APP_MODE;
+				_XAie_LPartWrite32(DevInst, RegAddr, XAIE_ENABLE);
+
+			} else if (Loc.Row >= XAIE_AIE_TILE_ROW_START) {
+				/* APP A requested tiles should not be >= to total no of AIE Tiles*/
+				u32 AieTiles = Opts->NumUseTiles - (XAIE_SHIM_NUM_ROWS + XAIE_MEM_TILE_NUM_ROWS);
+				u8 AtopRow;
+
+				if(AieTiles >= XAIE_AIE_TILE_NUM_ROWS) {
+					XAIE_ERROR("In Dual App Mode at-least 1 compute tile should be alloted to App B\n");
+					return XAIE_INVALID_RANGE;
+				}
+
+				/* Configure App A Top compute Tile */
+				if(Loc.Row == ((AieTiles  + XAIE_AIE_TILE_ROW_START) - 1)) {
+					RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_CORE_MOD_DUAL_APP_MODE;
+					_XAie_LPartWrite32(DevInst, RegAddr, XAIE_CORE_MOD_DUALAPP_A_TOP);
+					AtopRow = Loc.Row;
+					/*Function to set app B tiles. Once We got A_TOP tile, below
+					function will set all remaining tiles for App_B */
+					_XAie4_SetAppBTiles(DevInst, AtopRow, Loc.Col);
+
+				}
+				else if(Loc.Row < ((AieTiles  + XAIE_AIE_TILE_ROW_START) - 1) &&
+						Loc.Row >= XAIE_AIE_TILE_ROW_START) {
+					/* Configure App A compute Tiles */
+					RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_CORE_MOD_DUAL_APP_MODE;
+					_XAie_LPartWrite32(DevInst, RegAddr, XAIE_CORE_MOD_DUALAPP_A);
+				}
+				else {
+					XAIE_ERROR("InValid Tile Location Has been passed \n");
+				}
+			}
 		}
-
-		if (Loc.Row == XAIE_SHIM_ROW) {
-			RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_PL_MOD_DUAL_APP_MODE;
-			_XAie_LPartWrite32(DevInst, RegAddr, XAIE_ENABLE);
-
-		} else if (Loc.Row >= XAIE_MEM_TILE_ROW_START && Loc.Row < XAIE_AIE_TILE_ROW_START ) {
-			RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_MEM_TILE_DUAL_APP_MODE;
-			_XAie_LPartWrite32(DevInst, RegAddr, XAIE_ENABLE);
-
-		} else if (Loc.Row >= XAIE_AIE_TILE_ROW_START) {
-			/* APP A requested tiles should not be >= to total no of AIE Tiles*/
-			u32 AieTiles = Opts->NumUseTiles - (XAIE_SHIM_NUM_ROWS + XAIE_MEM_TILE_NUM_ROWS);
-			u8 AtopRow;
-
-			if(AieTiles >= XAIE_AIE_TILE_NUM_ROWS) {
-				XAIE_ERROR("In Dual App Mode at-least 1 compute tile should be alloted to App B\n");
-				return XAIE_INVALID_RANGE;
-			}
-
-			/* Configure App A Top compute Tile */
-			if(Loc.Row == ((AieTiles  + XAIE_AIE_TILE_ROW_START) - 1)) {
-				RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_CORE_MOD_DUAL_APP_MODE;
-				_XAie_LPartWrite32(DevInst, RegAddr, XAIE_CORE_MOD_DUALAPP_A_TOP);
-				AtopRow = Loc.Row;
-				/*Function to set app B tiles. Once We got A_TOP tile, below
-				  function will set all remaining tiles for App_B */
-				_XAie4_SetAppBTiles(DevInst, AtopRow, Loc.Col);
-
-			}
-			else if(Loc.Row < ((AieTiles  + XAIE_AIE_TILE_ROW_START) - 1) &&
-					Loc.Row >= XAIE_AIE_TILE_ROW_START) {
-				/* Configure App A compute Tiles */
-				RegAddr = _XAie_LGetTileAddr(Loc.Row, Loc.Col) + XAIE_CORE_MOD_DUAL_APP_MODE;
-				_XAie_LPartWrite32(DevInst, RegAddr, XAIE_CORE_MOD_DUALAPP_A);
-			}
-			else {
-				XAIE_ERROR("InValid Tile Location Has been passed \n");
+	} else if (DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) {
+		for(u32 i = 0 ; i < DevInst->NumCols; i++) {
+			for(u32 j=0; j < DevInst->NumRows; j++) {
+				if (j == XAIE_SHIM_ROW) {
+					RegAddr = _XAie_LGetTileAddr(j, i) + XAIE_PL_MOD_DUAL_APP_MODE;
+					_XAie_LPartWrite32(DevInst, RegAddr, XAIE_DISABLE);
+				} else if(j >= XAIE_MEM_TILE_ROW_START && j < XAIE_AIE_TILE_ROW_START  ) {
+					RegAddr = _XAie_LGetTileAddr(j, i) + XAIE_MEM_TILE_DUAL_APP_MODE;
+				_XAie_LPartWrite32(DevInst, RegAddr, XAIE_DISABLE);
+				} else {
+					RegAddr = _XAie_LGetTileAddr(j, i) + XAIE_CORE_MOD_DUAL_APP_MODE;
+					_XAie_LPartWrite32(DevInst, RegAddr, XAIE_DISABLE);
+				}
 			}
 		}
+	} else {
+		XAIE_ERROR("InValid App Mode \n");
+		return XAIE_INVALID_APP_MODE;
 	}
 	return XAIE_OK;
 }
@@ -1664,6 +1690,7 @@ static inline AieRC _XAie_LAiePorConfiguration(XAie_DevInst *DevInst, XAie_PartP
 		XAIE_NPI_PCSR_MASK_ME_ARRAY_RESET_MASK);
 	_XAie_LNpiWriteCheck32(XAIE_NPI_PCSR_MASK_REG, RegVal);
 
+	// To-Do: Add delay before releasing Array reset
 	RegVal = XAie_ClearBitField(XAIE_ENABLE, XAIE_NPI_PCSR_MASK_ME_ARRAY_RESET_LSB,
 			XAIE_NPI_PCSR_MASK_ME_ARRAY_RESET_MASK);
 	_XAie_LNpiWriteCheck32(XAIE_NPI_PCSR_CONTROL_REG, RegVal);

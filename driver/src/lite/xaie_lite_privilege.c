@@ -1088,18 +1088,13 @@ AieRC XAie_PartitionInitialize(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 	/*TODO: Need to configure all dual app registers into single app mode for
 	  single app partition. */
 	if (_XAie_LIsDeviceGenSupportDualApp()) {
-		if(DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE){
-			if(Opts->Locs != NULL) {
-				RC =_XAie_LSetDualAppModePrivileged(DevInst, Opts);
-				if(RC != XAIE_OK) {
-					XAIE_ERROR("Dual APP setting failed\n");
-					return RC;
-				}
-			} else {
-				XAIE_ERROR("Tile location in XAie_PartInitOpts cannot be NULL in Dual App Mode\n");
-				return XAIE_INVALID_ARGS;
-			}
+		RC =_XAie_LSetDualAppModePrivileged(DevInst, Opts);
+		if(RC != XAIE_OK) {
+			XAIE_ERROR("Dual APP setting failed\n");
+			return RC;
 		}
+	} else {
+		XAIE_DBG("Device doesn't support Dual App mode. No need to set App mode\n");
 	}
 
 	/* Column Reset is replaced by Application reset in AIE4 devices */

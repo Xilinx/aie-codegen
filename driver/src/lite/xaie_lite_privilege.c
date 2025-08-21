@@ -616,7 +616,7 @@ static AieRC _XAie_PrivilegeApplicationReset(XAie_DevInst *DevInst)
 	
 #ifdef __AIESIM__
 	// Wait for Application reset to finish in Simnow
-	usleep(100000);
+	usleep(8000);
 #endif
 
 	// Disable all DMAs pause after De-Asserting Application reset

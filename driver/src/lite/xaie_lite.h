@@ -37,6 +37,9 @@
 		.NumCols = (_NumCols), \
 		.NumRows = (XAIE_NUM_ROWS), \
 		.L2PreserveMem = 0, \
+		.HostddrBuffAddr = 0, \
+		.HostddrBuffSize = 0, \
+		.HostddrBuff_SMID = 0, \
 	}
 
 /* Macro for Initialization of AIE4 Device Instance */
@@ -47,7 +50,17 @@
 		.NumCols = (_NumCols), \
 		.NumRows = (XAIE_NUM_ROWS), \
 		.AppMode = (_AppMode), \
+		.HostddrBuffAddr = 0, \
+		.HostddrBuffSize = 0, \
+		.HostddrBuff_SMID = 0, \
+		.HostddrBuff_AxUSER = 0 \
 	}
+
+#define XAie_A2SBuffWorkaroundInfo(DevInst, _HostddrBuffAddr, _HostddrBuffSize, _HostddrBuff_SMID, _HostddrBuff_AxUSER) \
+        DevInst.HostddrBuffAddr = _HostddrBuffAddr, \
+        DevInst.HostddrBuffSize = _HostddrBuffSize, \
+        DevInst.HostddrBuff_SMID = _HostddrBuff_SMID, \
+        DevInst.HostddrBuff_AxUSER = _HostddrBuff_AxUSER
 
 #if XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE
 #include "xaie_lite_aie.h"

@@ -38,11 +38,14 @@
 #include "xaiegbl_defs.h"
 #include "xaiegbl.h"
 #include "xaie_lite_util.h"
+#include "xaie_lite_aie2p_ssw_and_dma.h"
 
 /* AIE core registers step size */
 #define AIE_CORE_REGS_STEP              0x10
 #define MAX_DMA_CHAN			2
 #define MAX_DMA_DIR			2
+
+#define A2S_BUFFER_SIZE (64 * 1024)
 
 /************************** Constant Definitions *****************************/
 /************************** Function Prototypes  *****************************/
@@ -629,6 +632,72 @@ static inline void _XAie_LSetPartIsolationAfterRst(XAie_DevInst *DevInst)
 static inline void  _XAie_LPartMemZeroInit(XAie_DevInst *DevInst)
 {
 	u64 RegAddr;
+    int Ret;
+	
+	u8 clearA2SBuffer = 0;
+	if ((DevInst->HostddrBuffAddr != 0) && (DevInst->HostddrBuffSize > 0)) {
+		clearA2SBuffer = 1;
+	}
+
+	DMA_SHIM_BD_t mm2s_bd_0 = {0};
+	DMA_SHIM_BD_t s2mm_bd_1 = {0};
+
+	if (clearA2SBuffer) {
+		//A2S work-around : (1) Stream switch configuration
+		SSwitch_Slave_Port_Config_t switch_sub_port = {0};
+		SSwitch_Master_Port_Config_t switch_mgr_port = {0};
+		switch_sub_port.bits.Slave_Enable = 1;
+		switch_mgr_port.bits.Master_Enable = 1;
+		switch_mgr_port.bits.Configuration = 0;
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_SOUTH_3), switch_sub_port.value);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_PL_MODULE_STREAM_SWITCH_MASTER_CONFIG_SOUTH2), switch_mgr_port.value);
+
+		//A2S work-around : (2) Connect South port with DMA
+		Mux_Config_t mux_config = {0};
+		Demux_Config_t demux_config = {0};
+		mux_config.bits.South3 = 0x1;   //values: PL (0x0), DMA(0x1) or NoC(0x2)
+		demux_config.bits.South2 = 0x1; //values: PL (0x0), DMA(0x1) or NoC(0x2)
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_MUX_CONFIG), mux_config.value);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DEMUX_CONFIG), demux_config.value);
+
+		//A2S work-around : (2) DMA configuration
+		DMA_Task_Queue_t mm2s_task_queue = {0};
+		DMA_Task_Queue_t s2mm_task_queue = {0};
+
+		//A2S work-around : Configure S2MM BD1
+		s2mm_bd_1.reg2.bits.Base_Address_High = (u32)((u64)(DevInst->HostddrBuffAddr + ((size_t)DevInst->HostddrBuffSize/2)) >> 32);
+		s2mm_bd_1.reg1.bits.Base_Address_Low = (u32)((u64)(DevInst->HostddrBuffAddr + ((size_t)DevInst->HostddrBuffSize/2)) & 0xFFFFFFFF);
+		s2mm_bd_1.reg0.bits.Buffer_Length = ((size_t)DevInst->HostddrBuffSize/2) >> 2;
+		s2mm_bd_1.reg5.bits.SMID = DevInst->HostddrBuff_SMID;
+
+		for (int i = 0; i < sizeof(s2mm_bd_1)/sizeof(s2mm_bd_1.reg0) ; i++)
+		{
+			RegAddr = _XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_BD1_0 + (i * 4);
+			_XAie_LPartWrite32(DevInst, RegAddr, *((u32 *)&s2mm_bd_1.reg0 + i));
+		}
+		s2mm_task_queue.bits.Start_BD_ID = 1;
+		s2mm_task_queue.bits.Repeat_Count = ((A2S_BUFFER_SIZE << 1 ) / ((size_t)DevInst->HostddrBuffSize));
+		if (s2mm_task_queue.bits.Repeat_Count > 0)
+				s2mm_task_queue.bits.Repeat_Count -= 1; // Repeat count is one less than the number of times to repeat
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_S2MM_0_TASK_QUEUE), s2mm_task_queue.value);
+
+		//A2S work-around : Configure MM2S BD0
+		mm2s_bd_0.reg2.bits.Base_Address_High = (u32)((u64)(DevInst->HostddrBuffAddr) >> 32);
+		mm2s_bd_0.reg1.bits.Base_Address_Low = (u32)((u64)(DevInst->HostddrBuffAddr) & 0xFFFFFFFF);
+		mm2s_bd_0.reg0.bits.Buffer_Length = ((size_t)DevInst->HostddrBuffSize/2) >> 2;
+		mm2s_bd_0.reg5.bits.SMID = DevInst->HostddrBuff_SMID;
+
+		for (int i = 0; i < sizeof(mm2s_bd_0)/sizeof(mm2s_bd_0.reg0) ; i++)
+		{
+			RegAddr = _XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_BD0_0 + (i * 4);
+			_XAie_LPartWrite32(DevInst, RegAddr, *((u32 *)&mm2s_bd_0.reg0 + i));
+		}
+		mm2s_task_queue.bits.Start_BD_ID = 0;
+		mm2s_task_queue.bits.Repeat_Count = (A2S_BUFFER_SIZE << 1 ) / ((size_t)DevInst->HostddrBuffSize);
+		if (mm2s_task_queue.bits.Repeat_Count > 0)
+				mm2s_task_queue.bits.Repeat_Count -= 1; // Repeat count is one less than the number of times to repeat
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_MM2S_0_TASK_QUEUE), mm2s_task_queue.value);
+	}
 
 	for(u8 C = 0; C < DevInst->NumCols; C++) {
 		for (u8 R = XAIE_MEM_TILE_ROW_START;
@@ -669,6 +738,33 @@ static inline void  _XAie_LPartMemZeroInit(XAie_DevInst *DevInst)
 	_XAie_LPartPoll32(DevInst, RegAddr,
 			XAIE_MEM_TILE_MEM_CNTR_ZEROISATION_MASK, 0, 800);
 
+	if (clearA2SBuffer) {
+
+		/* A2S work-around : Poll for A2S buffer written with Dummy data*/
+		//Note: After testing remove XAIEML_MEMZERO_POLL_TIMEOUT as A2S DMA should be done in parallel of mem-zeroisation
+		Ret = _XAie_LPartPoll32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_S2MM_STATUS_0),
+			XAIE2PGBL_NOC_MODULE_DMA_S2MM_STATUS_0_STATUS_MASK, 0, XAIEML_MEMZERO_POLL_TIMEOUT);
+		if (Ret < 0)
+		{
+			XAIE_ERROR("A2S buffer DMA poll time out");
+			return;
+		}
+
+		//A2S work-around : Reset used fields
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_SOUTH_3), 0x00);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_PL_MODULE_STREAM_SWITCH_MASTER_CONFIG_SOUTH2), 0x00);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_MUX_CONFIG), 0x00);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DEMUX_CONFIG), 0x00);
+
+		for (int i = 0; i < sizeof(s2mm_bd_1)/sizeof(s2mm_bd_1.reg0) ; i++)
+		{
+			RegAddr = _XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_BD0_0 + (i * 4);
+			_XAie_LPartWrite32(DevInst, RegAddr, 0x0);
+
+			RegAddr = _XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_BD1_0 + (i * 4);
+			_XAie_LPartWrite32(DevInst, RegAddr, 0x0);
+		}
+	}
 }
 
 static inline void _XAie_LCertMemZeroInit(XAie_DevInst *DevInst)
@@ -806,6 +902,71 @@ static inline AieRC _XAie_LPartDataMemZeroInit(XAie_DevInst *DevInst)
 	u64 RegAddr;
 	int Ret;
 
+	u8 clearA2SBuffer = 0;
+	if ((DevInst->HostddrBuffAddr != 0) && (DevInst->HostddrBuffSize > 0)) {
+		clearA2SBuffer = 1;
+	}
+
+	DMA_SHIM_BD_t mm2s_bd_0 = {0};
+	DMA_SHIM_BD_t s2mm_bd_1 = {0};
+
+	if (clearA2SBuffer) {
+		//A2S work-around : (1) Stream switch configuration
+		SSwitch_Slave_Port_Config_t switch_sub_port = {0};
+		SSwitch_Master_Port_Config_t switch_mgr_port = {0};
+		switch_sub_port.bits.Slave_Enable = 1;
+		switch_mgr_port.bits.Master_Enable = 1;
+		switch_mgr_port.bits.Configuration = 0;
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_SOUTH_3), switch_sub_port.value);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_PL_MODULE_STREAM_SWITCH_MASTER_CONFIG_SOUTH2), switch_mgr_port.value);
+
+		//A2S work-around : (2) Connect South port with DMA
+		Mux_Config_t mux_config = {0};
+		Demux_Config_t demux_config = {0};
+		mux_config.bits.South3 = 0x1;	//values: PL (0x0), DMA(0x1) or NoC(0x2)
+		demux_config.bits.South2 = 0x1;	//values: PL (0x0), DMA(0x1) or NoC(0x2)
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_MUX_CONFIG), mux_config.value);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DEMUX_CONFIG), demux_config.value);
+
+		//A2S work-around : (2) DMA configuration
+		DMA_Task_Queue_t mm2s_task_queue = {0};
+		DMA_Task_Queue_t s2mm_task_queue = {0};
+
+		//A2S work-around : Configure S2MM BD1
+		s2mm_bd_1.reg2.bits.Base_Address_High = (u32)((u64)(DevInst->HostddrBuffAddr + ((size_t)DevInst->HostddrBuffSize/2)) >> 32);
+		s2mm_bd_1.reg1.bits.Base_Address_Low = (u32)((u64)(DevInst->HostddrBuffAddr + ((size_t)DevInst->HostddrBuffSize/2)) & 0xFFFFFFFF);
+		s2mm_bd_1.reg0.bits.Buffer_Length = ((size_t)DevInst->HostddrBuffSize/2) >> 2;
+		s2mm_bd_1.reg5.bits.SMID = DevInst->HostddrBuff_SMID;
+
+		for (int i = 0; i < sizeof(s2mm_bd_1)/sizeof(s2mm_bd_1.reg0) ; i++)
+		{
+			RegAddr = _XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_BD1_0 + (i * 4);
+			_XAie_LPartWrite32(DevInst, RegAddr, *((u32 *)&s2mm_bd_1.reg0 + i));
+		}
+		s2mm_task_queue.bits.Start_BD_ID = 1;
+		s2mm_task_queue.bits.Repeat_Count = ((A2S_BUFFER_SIZE << 1 ) / ((size_t)DevInst->HostddrBuffSize));
+		if (s2mm_task_queue.bits.Repeat_Count > 0)
+			s2mm_task_queue.bits.Repeat_Count -= 1; // Repeat count is one less than the number of times to repeat
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_S2MM_0_TASK_QUEUE), s2mm_task_queue.value);
+
+		//A2S work-around : Configure MM2S BD0
+		mm2s_bd_0.reg2.bits.Base_Address_High = (u32)((u64)(DevInst->HostddrBuffAddr) >> 32);
+		mm2s_bd_0.reg1.bits.Base_Address_Low = (u32)((u64)(DevInst->HostddrBuffAddr) & 0xFFFFFFFF);
+		mm2s_bd_0.reg0.bits.Buffer_Length = ((size_t)DevInst->HostddrBuffSize/2) >> 2;
+		mm2s_bd_0.reg5.bits.SMID = DevInst->HostddrBuff_SMID;
+
+		for (int i = 0; i < sizeof(mm2s_bd_0)/sizeof(mm2s_bd_0.reg0) ; i++)
+		{
+			RegAddr = _XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_BD0_0 + (i * 4);
+			_XAie_LPartWrite32(DevInst, RegAddr, *((u32 *)&mm2s_bd_0.reg0 + i));
+		}
+		mm2s_task_queue.bits.Start_BD_ID = 0;
+		mm2s_task_queue.bits.Repeat_Count = (A2S_BUFFER_SIZE << 1 ) / ((size_t)DevInst->HostddrBuffSize);
+		if (mm2s_task_queue.bits.Repeat_Count > 0)
+			mm2s_task_queue.bits.Repeat_Count -= 1; // Repeat count is one less than the number of times to repeat
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_MM2S_0_TASK_QUEUE), mm2s_task_queue.value);
+	}
+
 	if(DevInst->L2PreserveMem == 0) {
 		for(u8 C = 0; C < DevInst->NumCols; C++) {
 			for (u8 R = XAIE_MEM_TILE_ROW_START;
@@ -848,6 +1009,32 @@ static inline AieRC _XAie_LPartDataMemZeroInit(XAie_DevInst *DevInst)
 				XAIE_MEM_TILE_MEM_CNTR_ZEROISATION_MASK, 0, XAIEML_MEMZERO_POLL_TIMEOUT);
 		if (Ret < 0)
 			return XAIE_ERR;
+		}
+	}
+
+	if (clearA2SBuffer) {
+		/* A2S work-around : Poll for A2S buffer written with Dummy data*/
+		//Note: After testing remove XAIEML_MEMZERO_POLL_TIMEOUT as A2S DMA should be done in parallel of mem-zeroisation
+		Ret = _XAie_LPartPoll32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_S2MM_STATUS_0),
+			XAIE2PGBL_NOC_MODULE_DMA_S2MM_STATUS_0_STATUS_MASK, 0, XAIEML_MEMZERO_POLL_TIMEOUT);
+		if (Ret < 0) {
+			XAIE_ERROR("A2S buffer DMA poll time out");
+			return XAIE_ERR;
+		}
+
+		//A2S work-around : Reset used fields
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_SOUTH_3), 0x00);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_PL_MODULE_STREAM_SWITCH_MASTER_CONFIG_SOUTH2), 0x00);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_MUX_CONFIG), 0x00);
+		_XAie_LPartWrite32(DevInst, (_XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DEMUX_CONFIG), 0x00);
+
+		for (int i = 0; i < sizeof(s2mm_bd_1)/sizeof(s2mm_bd_1.reg0) ; i++)
+		{
+			RegAddr = _XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_BD0_0 + (i * 4);
+			_XAie_LPartWrite32(DevInst, RegAddr, 0x0);
+
+			RegAddr = _XAie_LGetTileAddr(0, 0) + XAIE2PGBL_NOC_MODULE_DMA_BD1_0 + (i * 4);
+			_XAie_LPartWrite32(DevInst, RegAddr, 0x0);
 		}
 	}
 	return XAIE_OK;

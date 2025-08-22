@@ -177,6 +177,12 @@ typedef struct {
 	XAie_PartitionProp PartProp; /* Partition property */
 	XAie_List TxnList; /* Head of the list of txn buffers */
 	u32 InitialTxnCmdArraySize; /* TXN command array max size to begin with */
+	
+	/*use to clear A2S buffer (work-around for data leak)*/
+	u64 HostddrBuffAddr;
+	size_t HostddrBuffSize;
+	u32 HostddrBuff_SMID;
+	u32 HostddrBuff_AxUSER;
 } XAie_DevInst;
 
 /* enum to capture cache property of allocate memory */

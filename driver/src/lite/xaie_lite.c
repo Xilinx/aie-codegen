@@ -53,9 +53,24 @@ AieRC XAie_MapIrqIdToCols(u8 IrqId, XAie_Range *Range)
 	XAIE_ERROR_RETURN(IrqId >= XAIE_MAX_NUM_NOC_INTR, XAIE_INVALID_ARGS,
 			XAIE_ERROR_MSG("Invalid AIE IRQ ID\n"));
 
+#if DEV_GEN_AIE4
+    /**
+	 * As per the latest agreement with MPNPU Firmware team, Since spatial
+	 * sharing and dual app mode is not supported for AIE4 at this point of
+	 * time, hence they want to use only NPI IRQ 1 for reporting Async Errors
+	 * to MPNPU firmware from each column.
+	 */
+	XAIE_ERROR_RETURN(IrqId != XAIE_AIE4_ASYNC_ERROR_NPI_IRQ, XAIE_INVALID_ARGS,
+			XAIE_ERROR_MSG("Invalid AIE4 NPI IRQ ID\n"));
+
+	// Return the complete AIE Engine column range.
+	Range->Start = 0;
+	Range->Num = XAIE_NUM_COLS;
+#else
 	XAie_Range Temp = _XAie_MapIrqIdToCols(IrqId);
 	Range->Start = Temp.Start;
 	Range->Num = Temp.Num;
+#endif
 
 	return XAIE_OK;
 }

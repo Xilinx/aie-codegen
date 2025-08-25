@@ -30,9 +30,11 @@
 #include "xaiegbl.h"
 
 /************************** Constant Definitions *****************************/
-#define XAIE_MAX_NUM_NOC_INTR				3U
-#define IS_TILE_NOC_TILE(Loc)				1
-#define UPDT_NEXT_NOC_TILE_LOC(Loc)			(Loc).Col++
+#define XAIE_AIE4_ASYNC_ERROR_NPI_IRQ       1U
+#define XAIE_MAX_NUM_NOC_INTR               3U
+// Fixed the macro to return true only if Loc is SHIM tile.
+#define IS_TILE_NOC_TILE(Loc)               (((Loc).Row == 0) ? 1 : 0)
+#define UPDT_NEXT_NOC_TILE_LOC(Loc)         (Loc).Col++
 
 /************************** Function Prototypes  *****************************/
 /*****************************************************************************/
@@ -61,38 +63,6 @@ static inline u8 _XAie_LGetShimTTypefromLoc(XAie_DevInst *DevInst,
 /*****************************************************************************/
 /**
 *
-* This is API returns the range of columns programmed to generate interrupt on
-* the given IRQ channel.
-*
-* @param	IrqId: L2 IRQ ID.
-*
-* @return	Range of columns.
-*
-* @note		Internal only.
-*
-******************************************************************************/
-static inline XAie_Range _XAie_MapIrqIdToCols(u8 IrqId)
-{
-	XAie_Range _MapIrqIdToCols[] = {
-#if XAIE_DEV_SINGLEGEN == XAIE_DEV_GEN_AIE2P_STRIX_B0
-		{.Start = 0, .Num = 2},
-		{.Start = 2, .Num = 2},
-		{.Start = 4, .Num = 2},
-		{.Start = 6, .Num = 2},
-#else
-		{.Start = 0, .Num = 1},
-		{.Start = 1, .Num = 1},
-		{.Start = 2, .Num = 1},
-		{.Start = 3, .Num = 1},
-#endif
-	};
-
-	return _MapIrqIdToCols[IrqId];
-}
-
-/*****************************************************************************/
-/**
-*
 * This is API returns the L2 IRQ ID for a given column.
 *
 * @param	DevInst: Device Instance
@@ -105,13 +75,18 @@ static inline XAie_Range _XAie_MapIrqIdToCols(u8 IrqId)
 ******************************************************************************/
 static inline u8 _XAie_MapColToIrqId(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
-	if((UINT8_MAX-Loc.Col) > DevInst->StartCol){
+	if(Loc.Col > (DevInst->StartCol + DevInst->NumCols)){
 		XAIE_ERROR("Colum is out of range\n");
 		return XAIE_INVALID_RANGE;
 	}
-	u8 AbsCol = DevInst->StartCol + Loc.Col;
 
-	return AbsCol / (XAIE_NUM_COLS / XAIE_MAX_NUM_NOC_INTR);
+	/**
+	 * As per the latest agreement with MPNPU Firmware team, Since spatial
+	 * sharing and dual app mode is not supported for AIE4 at this point of
+	 * time, hence they want to use only NPI IRQ 1 for reporting Async Errors
+	 * to MPNPU firmware from each column.
+	 */
+	return XAIE_AIE4_ASYNC_ERROR_NPI_IRQ;
 }
 
 /*****************************************************************************/
@@ -138,7 +113,7 @@ static inline u8 _XAie_MapColToHWErrIrqId(XAie_DevInst *DevInst,
 	 * If AIE4 derived devices have any specific requiremnet then that needs
 	 * to be handled here.
 	 */
-	return 1;
+	return XAIE_AIE4_ASYNC_ERROR_NPI_IRQ;
 }
 
 /*****************************************************************************/

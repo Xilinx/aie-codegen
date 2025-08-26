@@ -24,7 +24,7 @@
 
 /***************************** Include Files *********************************/
 #ifdef __AIESOCKET__
-
+#undef _POSIX_C_SOURCE
 #define  _POSIX_C_SOURCE 200112L
 
 #include <errno.h>

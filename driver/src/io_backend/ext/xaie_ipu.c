@@ -123,7 +123,7 @@ static AieRC XAie_IpuIO_Write32(void *IOInst, u64 RegOff, u32 Value)
     	return XAIE_ERR;
     }
 #endif
-	reg_write32((void *)(uintptr_t)RegAddr, Value);
+	reg_write32((uintptr_t)RegAddr, Value);
 
 	return XAIE_OK;
 }
@@ -152,7 +152,7 @@ static AieRC XAie_IpuIO_Read32(void *IOInst, u64 RegOff, u32 *Data)
     }
 #endif
 
-	*Data = reg_read32((void *)(uintptr_t)RegAddr);
+	*Data = reg_read32((uintptr_t)RegAddr);
 
 	return XAIE_OK;
 }
@@ -183,7 +183,7 @@ static AieRC XAie_IpuIO_MaskWrite32(void *IOInst, u64 RegOff, u32 Mask,
     	return XAIE_ERR;
     }
 #endif
-	reg_maskwrite32((void *)(uintptr_t)RegAddr, Mask, Value);
+	reg_maskwrite32((uintptr_t)RegAddr, Mask, Value);
 
 	return XAIE_OK;
 }

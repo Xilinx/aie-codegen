@@ -4278,7 +4278,7 @@ static const XAie_MemCtrlMod AieMlMemTileMemCtrlMod =
  * Depending on the tile type, this data strcuture can be used to access all
  * hardware properties of individual modules.
  */
-XAie_TileMod Aie2IpuMod[] =
+const XAie_TileMod Aie2IpuMod[] =
 {
 	{
 		/*
@@ -4367,7 +4367,7 @@ XAie_TileMod Aie2IpuMod[] =
 };
 
 /* Device level operations for aieml */
-XAie_DeviceOps Aie2IpuDevOps =
+const XAie_DeviceOps Aie2IpuDevOps =
 {
 	.IsCheckerBoard = 0U,
 	.TilesInUse = Aie2IpuTilesInUse,

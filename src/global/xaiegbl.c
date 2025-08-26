@@ -52,23 +52,21 @@
 #define XAIE_ECC_BROADCAST_ID		6U
 
 /************************** Variable Definitions *****************************/
-extern XAie_TileMod AieMod[XAIEGBL_TILE_TYPE_MAX];
-extern XAie_TileMod AieMlMod[XAIEGBL_TILE_TYPE_MAX];
-extern XAie_TileMod Aie2IpuMod[XAIEGBL_TILE_TYPE_MAX];
-extern XAie_TileMod Aie2PMod[XAIEGBL_TILE_TYPE_MAX];
-extern XAie_TileMod Aie2PSMod[XAIEGBL_TILE_TYPE_MAX];
-extern XAie_TileMod Aie4GenericMod[XAIEGBL_TILE_TYPE_MAX];
-extern XAie_TileMod Aie4Mod[XAIEGBL_TILE_TYPE_MAX];
+extern const XAie_TileMod AieMod[XAIEGBL_TILE_TYPE_MAX];
+extern const XAie_TileMod AieMlMod[XAIEGBL_TILE_TYPE_MAX];
+extern const XAie_TileMod Aie2IpuMod[XAIEGBL_TILE_TYPE_MAX];
+extern const XAie_TileMod Aie2PMod[XAIEGBL_TILE_TYPE_MAX];
+extern const XAie_TileMod Aie2PSMod[XAIEGBL_TILE_TYPE_MAX];
+extern const XAie_TileMod Aie4GenericMod[XAIEGBL_TILE_TYPE_MAX];
+extern const XAie_TileMod Aie4Mod[XAIEGBL_TILE_TYPE_MAX];
 
-extern XAie_DeviceOps AieDevOps;
-extern XAie_DeviceOps AieMlDevOps;
-extern XAie_DeviceOps Aie2IpuDevOps;
-extern XAie_DeviceOps Aie2PDevOps;
-extern XAie_DeviceOps Aie2PSDevOps;
-extern XAie_DeviceOps Aie4GenericDevOps;
-extern XAie_DeviceOps Aie4DevOps;
-
-extern u8 XAieDevType;
+extern const XAie_DeviceOps AieDevOps;
+extern const XAie_DeviceOps AieMlDevOps;
+extern const XAie_DeviceOps Aie2IpuDevOps;
+extern const XAie_DeviceOps Aie2PDevOps;
+extern const XAie_DeviceOps Aie2PSDevOps;
+extern const XAie_DeviceOps Aie4GenericDevOps;
+extern const XAie_DeviceOps Aie4DevOps;
 
 #if XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE2IPU
 #define XAIE_DEV_SINGLE_MOD Aie2IpuMod
@@ -179,54 +177,69 @@ AieRC XAie_CfgInitialize(XAie_DevInst *InstPtr, XAie_Config *ConfigPtr)
 		InstPtr->DevProp.DevMod = XAIE_DEV_SINGLE_MOD;
 		InstPtr->DevProp.DevGen = XAIE_DEV_SINGLE_GEN;
 		InstPtr->DevOps = &XAIE_DEV_SINGLE_DEVOPS;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 #else
 	if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIEML) {
 		InstPtr->DevProp.DevMod = AieMlMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIEML;
 		InstPtr->DevOps = &AieMlDevOps;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 	} else if((ConfigPtr->AieGen == XAIE_DEV_GEN_AIE) ||
 			(ConfigPtr->AieGen == XAIE_DEV_GEN_S100) ||
 			(ConfigPtr->AieGen == XAIE_DEV_GEN_S200)) {
 		InstPtr->DevProp.DevMod = AieMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE;
 		InstPtr->DevOps = &AieDevOps;
-		XAieDevType = (u8)ConfigPtr->AieGen;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE2IPU) {
 		InstPtr->DevProp.DevMod = Aie2IpuMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE2IPU;
 		InstPtr->DevOps = &Aie2IpuDevOps;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE2P) {
 		InstPtr->DevProp.DevMod = Aie2PMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE2P;
 		InstPtr->DevOps = &Aie2PDevOps;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE2P_STRIX_A0){
 		InstPtr->DevProp.DevMod = Aie2PMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE2P_STRIX_A0;
 		InstPtr->DevOps = &Aie2PDevOps;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE2P_STRIX_B0){
 		InstPtr->DevProp.DevMod = Aie2PMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE2P_STRIX_B0;
 		InstPtr->DevOps = &Aie2PDevOps;
+                InstPtr->DevType = (u8)ConfigPtr->AieGen;
         } else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE2PS) {
-                InstPtr->DevProp.DevMod = Aie2PSMod;
+		InstPtr->DevProp.DevMod = Aie2PSMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE2PS;
 		InstPtr->DevOps = &Aie2PSDevOps;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_GENERIC) {
 		InstPtr->DevProp.DevMod = Aie4GenericMod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_GENERIC;
 		InstPtr->DevOps = &Aie4GenericDevOps;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 	} else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4) {
 		InstPtr->DevProp.DevMod = Aie4Mod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4;
 		InstPtr->DevOps = &Aie4DevOps;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 	}else if(ConfigPtr->AieGen == XAIE_DEV_GEN_AIE4_A) {
 		InstPtr->DevProp.DevMod = Aie4Mod;
 		InstPtr->DevProp.DevGen = XAIE_DEV_GEN_AIE4_A;
 		InstPtr->DevOps = &Aie4DevOps;
+		InstPtr->DevType = (u8)ConfigPtr->AieGen;
 #endif
 	} else {
 		XAIE_ERROR("Invalid device\n");
 		return XAIE_INVALID_DEVICE;
+	}
+
+	/* Initialize DevType to default value for all device generations */
+	if (InstPtr->DevType == 0U) {
+		InstPtr->DevType = XAIE_DEV_GENERIC_DEVICE;
 	}
 
 	if(InstPtr->NumCols == 0U) {

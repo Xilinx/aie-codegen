@@ -29,11 +29,6 @@
 
 #ifdef XAIE_FEATURE_PRIVILEGED_ENABLE
 
-/*
-* This variable captures the generic device value. If S100/S200 device is not
-* available
-*/
-u8 XAieDevType = XAIE_DEV_GENERIC_DEVICE;
 /************************** Function Definitions *****************************/
 /*****************************************************************************/
 /**
@@ -140,8 +135,8 @@ u8 _XAie_GetTTypefromLoc(XAie_DevInst *DevInst, XAie_LocType Loc)
 		}
 
 		//For S100/S200 column 58 is shim-PL
-		if(XAieDevType == XAIE_DEV_GEN_S200 ||
-				XAieDevType == XAIE_DEV_GEN_S100) {
+		if(DevInst->DevType == XAIE_DEV_GEN_S200 ||
+				DevInst->DevType == XAIE_DEV_GEN_S100) {
 			if((DevInst->StartCol + Loc.Col) == 58U) {
 				return XAIEGBL_TILE_TYPE_SHIMPL;
 			}

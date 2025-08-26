@@ -29,11 +29,6 @@
 #include "xaie_txn.h"
 
 /************************** Variable Definitions *****************************/
-const u8 TransactionHeaderVersion_Major = 0;
-const u8 TransactionHeaderVersion_Minor = 1;
-const u8 TransactionHeaderVersion_Major_opt = 1;
-const u8 TransactionHeaderVersion_Minor_opt = 0;
-
 /***************************** Macro Definitions *****************************/
 #define XAIE_DEFAULT_NUM_CMDS 1024U
 #define XAIE_DEFAULT_TXN_BUFFER_SIZE (1024 * 4)
@@ -42,6 +37,14 @@ const u8 TransactionHeaderVersion_Minor_opt = 0;
 #define XAIE_TXN_AUTO_FLUSH_MASK XAIE_TRANSACTION_ENABLE_AUTO_FLUSH
 #define XAIE_TXN_STATE_TABLE_SIZE 32U
 #define TX_DUMP_ENABLE 0
+
+// Major & Minor version details for TXN version 0.1 called Initial version
+#define XAIE_TXN_VER_01_MAJOR 0
+#define XAIE_TXN_VER_01_MINOR 1
+
+// Major & Minor version details for TXN version 1.0 called optimized version
+#define XAIE_TXN_VER_10_MAJOR 1
+#define XAIE_TXN_VER_10_MINOR 0
 
 /************************** Function Definitions *****************************/
 /*****************************************************************************/
@@ -59,8 +62,8 @@ const u8 TransactionHeaderVersion_Minor_opt = 0;
 static inline void _XAie_CreateTxnHeader(XAie_DevInst *DevInst,
 	XAie_TxnHeader *Header)
 {
-	Header->Major = TransactionHeaderVersion_Major;
-	Header->Minor = TransactionHeaderVersion_Minor;
+	Header->Major = XAIE_TXN_VER_01_MAJOR;
+	Header->Minor = XAIE_TXN_VER_01_MINOR;
 	Header->DevGen = DevInst->DevProp.DevGen;
 	Header->NumRows = DevInst->NumRows;
 	Header->NumCols = DevInst->NumCols;
@@ -316,6 +319,12 @@ XAie_TxnInst* _XAie_TxnExport(XAie_DevInst *DevInst)
 			if((void *)(uintptr_t)Cmd->DataPtr == NULL) {
 				XAIE_ERROR("Failed to allocate memory to copy "
 						"command %d\n", i);
+				/* Free previously allocated DataPtr memory to prevent leak */
+				for(u32 j = 0U; j < i; j++) {
+					if(Inst->CmdBuf[j].Opcode == XAIE_IO_BLOCKWRITE) {
+						free((void *)(uintptr_t)Inst->CmdBuf[j].DataPtr);
+					}
+				}
 				free(Inst->CmdBuf);
 				free(Inst);
 				return NULL;
@@ -382,14 +391,17 @@ static AieRC _XAie_ReallocCmdBuf(XAie_TxnInst *TxnInst)
 		return XAIE_ERR;
 	}
 
-	TxnInst->CmdBuf = (XAie_TxnCmd *)realloc((void *)TxnInst->CmdBuf,
+	XAie_TxnCmd *TmpBuf = (XAie_TxnCmd *)realloc((void *)TxnInst->CmdBuf,
 			sizeof(XAie_TxnCmd) * (u32)NewMaxCmds);
-	if(TxnInst->CmdBuf == NULL) {
+	if(TmpBuf == NULL) {
 		XAIE_ERROR("Failed reallocate memory for transaction buffer "
 				"with id: %llu\n", TxnInst->Tid);
+		free(TxnInst->CmdBuf);  /* Free original memory to prevent leak */
+		TxnInst->CmdBuf = NULL;
 		return XAIE_ERR;
 	}
 
+	TxnInst->CmdBuf = TmpBuf;
 	TxnInst->MaxCmds += TxnInst->InitCmds;
 	XAIE_DBG(" Reallocated TXN CMD ARRAY to %llu with id: %llu\n", NewMaxCmds, TxnInst->Tid);
 
@@ -844,8 +856,8 @@ static inline void _XAie_AppendUpdateScratch(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 static inline void _XAie_CreateTxnHeader_opt(XAie_DevInst *DevInst,
 		XAie_TxnHeader *Header)
 {
-	Header->Major = TransactionHeaderVersion_Major_opt;
-	Header->Minor = TransactionHeaderVersion_Minor_opt;
+	Header->Major = XAIE_TXN_VER_10_MAJOR;
+	Header->Minor = XAIE_TXN_VER_10_MINOR;
 	Header->DevGen = DevInst->DevProp.DevGen;
 	Header->NumRows = DevInst->NumRows;
 	Header->NumCols = DevInst->NumCols;
@@ -985,6 +997,7 @@ static u8* _XAie_ReallocTxnBuf_MemInit(u8 *TxnPtr, u32 NewSize, u32 Buffsize)
 	Tmp =  (u8*)realloc((void*)TxnPtr, NewSize);
 	if(Tmp == NULL) {
 		XAIE_ERROR("Reallocation failed for txn buffer\n");
+		free(TxnPtr);  /* Free original memory to prevent leak */
 		return NULL;
 	}
         memset(Tmp + Buffsize,0,(NewSize  - Buffsize));
@@ -997,6 +1010,7 @@ static u8* _XAie_ReallocTxnBuf(u8 *TxnPtr, u32 NewSize)
 	Tmp =  (u8*)realloc((void*)TxnPtr, NewSize);
 	if(Tmp == NULL) {
 		XAIE_ERROR("Reallocation failed for txn buffer\n");
+		free(TxnPtr);  /* Free original memory to prevent leak */
 		return NULL;
 	}
 
@@ -1296,7 +1310,8 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 									( BWBuffAllocatedSize + BWBuffAllocatedSize), BWBuffSize) );
 				if(BlockwriteBuffer == NULL) {
 					XAIE_ERROR("BlockWrite Buffer Realloc Failed\n");
-					free(TxnPtr);
+					// To free Txn Buffer successfully we need to use the start pointer not current pointer
+					free(TxnPtr - BuffSize);
 					return NULL;
 				}
 				 BWBuffAllocatedSize *= 2U;
@@ -1430,7 +1445,8 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 			{
 				XAIE_ERROR("LoadSeqCountPtr is equal to NULL\n");
 				free(BlockwriteBuffer);
-				free(TxnPtr);
+				// To free Txn Buffer successfully we need to use the start pointer not current pointer
+				free(TxnPtr - BuffSize);
 				return NULL;
 			}
 			LoadSeqCount = 0;
@@ -1564,6 +1580,7 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 		TxnPtr += _XAie_AppendBWToTxnBuff(BlockwriteBuffer,TxnPtr,PatchCmdCount);
 	}
 
+	// Free the BlockwriteBuffer
 	free(BlockwriteBuffer);
 
 	u32 four_byte_aligned_BuffSize = ((BuffSize % 4U) != 0U) ? ((BuffSize / 4U + 1U)*4) : BuffSize;
@@ -1859,7 +1876,8 @@ u8* _XAie_TxnExportSerialized_opt(XAie_DevInst *DevInst, u8 NumConsumers,
 									( BWBuffAllocatedSize + BWBuffAllocatedSize), BWBuffSize) );
 				if(BlockwriteBuffer == NULL) {
 					XAIE_ERROR("BlockWrite Buffer Realloc Failed\n");
-					free(TxnPtr);
+					// To free Txn Buffer successfully we need to use the start pointer not current pointer
+					free(TxnPtr - BuffSize);
 					return NULL;
 				}
 				 BWBuffAllocatedSize *= 2U;
@@ -2064,7 +2082,8 @@ u8* _XAie_TxnExportSerialized_opt(XAie_DevInst *DevInst, u8 NumConsumers,
 			{
 				XAIE_ERROR("LoadSeqCountPtr is equal to NULL\n");
 				free(BlockwriteBuffer);
-				free(TxnPtr);
+				// To free Txn Buffer successfully we need to use the start pointer not current pointer
+				free(TxnPtr - BuffSize);
 				return NULL;
 			}
 			LoadSeqCount = 0;
@@ -2127,6 +2146,9 @@ u8* _XAie_TxnExportSerialized_opt(XAie_DevInst *DevInst, u8 NumConsumers,
 		TxnPtr += _XAie_AppendBWToTxnBuff_opt(BlockwriteBuffer,TxnPtr,PatchCmdCount);
 	}
     
+	// Free the BlockwriteBuffer
+	free(BlockwriteBuffer);
+
 	u32 four_byte_aligned_BuffSize = ((BuffSize % 4U) != 0U) ? ((BuffSize / 4U + 1U)*4) : BuffSize;
 	XAIE_DBG("Size of the Txn Hdr being exported: %u bytes\n",
 			sizeof(XAie_TxnHeader));

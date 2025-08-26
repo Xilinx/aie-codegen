@@ -6319,7 +6319,7 @@ static const XAie_CtrlPktHndlrMod Aie4ShimTileCtrlPktHndlrMod =
  * Depending on the tile type, this data strcuture can be used to access all
  * hardware properties of individual modules.
  */
-XAie_TileMod Aie4Mod[] =
+const XAie_TileMod Aie4Mod[] =
 {
 	{
 		/*
@@ -6422,7 +6422,7 @@ XAie_TileMod Aie4Mod[] =
 };
 
 /* Device level operations for aieml */
-XAie_DeviceOps Aie4DevOps =
+const XAie_DeviceOps Aie4DevOps =
 {
 	.IsCheckerBoard = 0U,
 	.TilesInUse = Aie4TilesInUse,

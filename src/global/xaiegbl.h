@@ -106,7 +106,7 @@ typedef struct XAie_DevProp {
 	u8 DevGen;
 	u8 RowShift;
 	u8 ColShift;
-	XAie_TileMod *DevMod;
+	const XAie_TileMod *DevMod;
 } XAie_DevProp;
 
 /*
@@ -176,11 +176,12 @@ typedef struct {
 	u8 L2Split;     /* Set L2 Split in Dual App Mode */
 	u8 L2PreserveMem;    /*Set or Clear to preserve L2 Memory Data */
 	u8 PmLoadingActive; /*To keep track of of PM Loading is active or not*/
+	u8 DevType;         /* Device type for thread-safe device-specific logic (replaces global XAieDevType) */
 	const XAie_Backend *Backend; /* Backend IO properties */
 	void *IOInst;	       /* IO Instance for the backend */
 	XAie_DevProp DevProp; /* Pointer to the device property. To be
 				     setup to AIE prop during intialization*/
-	XAie_DeviceOps *DevOps; /* Device level operations */
+	const XAie_DeviceOps *DevOps; /* Device level operations */
 	XAie_PartitionProp PartProp; /* Partition property */
 	XAie_List TxnList; /* Head of the list of txn buffers */
 	u32 InitialTxnCmdArraySize; /* TXN command array max size to begin with */

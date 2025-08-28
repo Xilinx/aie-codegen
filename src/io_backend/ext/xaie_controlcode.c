@@ -1280,6 +1280,97 @@ AieRC XAie_ControlCodeIO_SetPadString(void *IOInst, char* BuffName, char* BuffBl
 /*****************************************************************************/
 /**
 *
+* This function is used to add ".attach_to_group" cert directive to asm file.
+*
+* @param        IOInst: IO instance pointer
+* @param        UcIndex: uC Index
+*               ---------------------------------------------------------
+*               | aie4                    |   | aie2ps                  |
+*               | column index | uC index |   | column index | uC index |
+*               |-------------------------------------------------------|
+*               | column 0_A   | 0        |   | column 0     | 0        |
+*               | column 0_B   | 1        |   | column 1     | 1        |
+*               | column 1_A   | 2        |   | column 2     | 2        |
+*               | column 1_B   | 3        |   | column 3     | 3        |
+*               | column 2_A   | 4        |   | column 4     | 4        |
+*               | column 2_B   | 5        |   | ...          | ...      |
+*               ---------------------------------------------------------  
+*
+* @return       XAIE_OK or XAIE_ERR.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_AttachToGroup(void *IOInst, uint8_t UcIndex)
+{
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	
+	if(ControlCodeInst->ControlCodefp != NULL) {
+		fprintf(ControlCodeInst->ControlCodefp, ".attach_to_group\t %d\n",UcIndex);
+		ControlCodeInst->CombineCommands = 0;
+		return XAIE_OK;
+	}
+	else {
+		XAIE_ERROR("Control code file pointer is NULL\n");
+		return XAIE_ERR;
+	}
+}
+
+/*****************************************************************************/
+/**
+*
+* This function is used to add "REMOTE BARRIER" cert opcode to asm file.
+*
+* @param        IOInst: IO instance pointer
+* @param        RbId: Remote Barrier ID
+*				There are 64 remote barriers namely:
+*               ---------------------------------------------------------
+*    			| rb0 - rb63											|
+*               ---------------------------------------------------------
+* @param        Mask: Mask to be applied, bitmap of uCs which are going to
+*					  use the barrier.
+*               ---------------------------------------------------------
+*               | aie4                    |   | aie2ps                  |
+*               | column index | uC index |   | column index | uC index |
+*               |-------------------------------------------------------|
+*               | column 0_A   | 0        |   | column 0     | 0        |
+*               | column 0_B   | 1        |   | column 1     | 1        |
+*               | column 1_A   | 2        |   | column 2     | 2        |
+*               | column 1_B   | 3        |   | column 3     | 3        |
+*               | column 2_A   | 4        |   | column 4     | 4        |
+*               | column 2_B   | 5        |   | ...          | ...      |
+*               ---------------------------------------------------------
+*
+* @return       XAIE_OK or XAIE_ERR.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_RemoteBarrier(void *IOInst, uint8_t RbId, uint32_t UcMask)
+{
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	
+	if(ControlCodeInst->ControlCodefp != NULL) {
+        if (!ControlCodeInst->IsJobOpen) {
+            _XAie_StartNewJob(ControlCodeInst);
+        }
+
+        if((ControlCodeInst->UcPageSize + ISA_OPSIZE_REMOTE_BARRIER +
+            ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
+            _XAie_StartNewPage(ControlCodeInst);
+            _XAie_StartNewJob(ControlCodeInst);
+        }
+
+		fprintf(ControlCodeInst->ControlCodefp, "REMOTE_BARRIER\t %d, 0x%x\n", RbId, UcMask);
+		ControlCodeInst->CombineCommands = 0;
+		ControlCodeInst->UcPageSize += ISA_OPSIZE_REMOTE_BARRIER;
+		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_REMOTE_BARRIER;
+		return XAIE_OK;
+	}
+	else {
+		XAIE_ERROR("Control code file pointer is NULL\n");
+		return XAIE_ERR;
+	}
+}
+/*****************************************************************************/
+/**
+*
 * This is the function to write 32 bit value to NPI register address.
 *
 * @param	IOInst: IO instance pointer
@@ -1941,6 +2032,27 @@ AieRC XAie_ControlCodeIO_SetPadString(void *IOInst, char* BuffName, char* BuffBl
 	return XAIE_INVALID_BACKEND;
 }
 
+AieRC XAie_ControlCodeIO_AttachToGroup(void *IOInst, uint8_t UcIndex)
+{
+	/* no-op */
+	(void)IOInst;
+	(void)UcIndex;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
+AieRC XAie_ControlCodeIO_RemoteBarrier(void *IOInst, uint8_t RbId, uint32_t UcMask)
+{
+	/* no-op */
+	(void)IOInst;
+	(void)RbId;
+	(void)UcMask;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
 #endif /* __AIECONTROLCODE__ */
 
 static AieRC XAie_ControlCodeIO_CmdWrite(void *IOInst, u8 Col, u8 Row, u8 Command,
@@ -2026,6 +2138,8 @@ const XAie_Backend ControlCodeBackend =
 	.Ops.Preempt = XAie_ControlCodeIO_Preempt,
 	.Ops.SetPadInteger = XAie_ControlCodeIO_SetPadInteger,
 	.Ops.SetPadString = XAie_ControlCodeIO_SetPadString,
+	.Ops.AttachToGroup = XAie_ControlCodeIO_AttachToGroup,
+	.Ops.RemoteBarrier = XAie_ControlCodeIO_RemoteBarrier,
 	.Ops.SubmitTxn = NULL,
 };
 

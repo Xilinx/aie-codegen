@@ -820,6 +820,8 @@ const XAie_Backend SocketBackend =
 	.Ops.Preempt = NULL,
 	.Ops.SetPadInteger = NULL,
 	.Ops.SetPadString = NULL,
+	.Ops.AttachToGroup = NULL,
+	.Ops.RemoteBarrier = NULL,
 };
 
 /** @} */

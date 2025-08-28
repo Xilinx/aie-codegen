@@ -181,6 +181,8 @@ typedef struct XAie_BackendOps {
 	AieRC (*Preempt)(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel);
 	AieRC (*SetPadInteger)(void *IOInst, char* BuffName, u32 BuffSize);
 	AieRC (*SetPadString)(void *IOInst, char* BuffName, char* BuffBlobPath);
+	AieRC (*AttachToGroup)(void *IOInst, uint8_t GroupId);
+	AieRC (*RemoteBarrier)(void *IOInst, uint8_t RbId, uint32_t UcMask);
 } XAie_BackendOps;
 
 /* Typedef to capture all backend information */

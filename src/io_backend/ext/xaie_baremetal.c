@@ -744,6 +744,8 @@ const XAie_Backend BaremetalBackend =
 	.Ops.Preempt = NULL,
 	.Ops.SetPadInteger = NULL,
 	.Ops.SetPadString = NULL,
+	.Ops.AttachToGroup = NULL,
+	.Ops.RemoteBarrier = NULL,
 };
 
 /** @} */

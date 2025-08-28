@@ -710,6 +710,34 @@ AieRC XAie_Preempt(XAie_DevInst *DevInst, u16 PreemptId, char* SaveLabel, char* 
 	}
 }
 
+AieRC XAie_AttachToGroup(XAie_DevInst *DevInst, uint8_t UcIndex)
+{
+	const XAie_Backend *Backend = DevInst->Backend;
+	if (Backend->Ops.AttachToGroup != NULL)
+	{
+		return Backend->Ops.AttachToGroup((void *)DevInst->IOInst, UcIndex);
+	}
+	else
+	{
+		XAIE_ERROR("AttachToGroup function pointer points to NULL, hence returned mode is XAIE_INVALID_MODE\n");
+		return XAIE_NOT_SUPPORTED;
+	}
+}
+
+AieRC XAie_RemoteBarrier(XAie_DevInst *DevInst,  uint8_t RbId, uint32_t UcMask)
+{
+	const XAie_Backend *Backend = DevInst->Backend;
+	if (Backend->Ops.RemoteBarrier != NULL)
+	{
+		return Backend->Ops.RemoteBarrier((void *)DevInst->IOInst, RbId, UcMask);
+	}
+	else
+	{
+		XAIE_ERROR("RemoteBarrier function pointer points to NULL, hence returned mode is XAIE_INVALID_MODE\n");
+		return XAIE_NOT_SUPPORTED;
+	}
+}
+
 /*****************************************************************************/
 /**
 *

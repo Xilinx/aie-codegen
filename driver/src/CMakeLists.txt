@@ -72,9 +72,10 @@ endif (SOCKET_BACKEND)
 if (DEBUG_BACKEND)
 	list(APPEND IO_BACKEND -D__AIEDEBUG__)
 endif (DEBUG_BACKEND)
-if (CERT_BACKEND)
-	list(APPEND IO_BACKEND -D__AIECONTROLCODE__)
-endif (CERT_BACKEND)
+
+#By default, CERT control code backend will be 
+#enabled while compiling aie-rt using this cmake
+list(APPEND IO_BACKEND -D__AIECONTROLCODE__)
 
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE

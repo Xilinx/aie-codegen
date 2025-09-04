@@ -232,7 +232,7 @@ static AieRC _XAie_GetPortIdxAie4Plus(XAie_DevInst *DevInst, u8 TileType,
 	u32 TempPortIdx;
 	
 	if (DevInst->AppMode != XAIE_DEVICE_SINGLE_APP_MODE) {
-		if((UINT8_MAX - PortPtr->PortLogicalId) > PortNum){
+		if((PortNum + PortPtr->PortLogicalId) > UINT8_MAX){
 			*PortIdx = PortPtr->PortLogicalId + PortNum;
 		}else {
 			XAIE_ERROR("PortNum Exceeds U8 MAX value \n");

@@ -30,7 +30,6 @@
 #include "xaie_lite_io.h"
 #include "xaie_lite_npi.h"
 #include "xaie_lite_regdef_aie.h"
-#include "xaiegbl_defs.h"
 #include "xaiegbl.h"
 #include "xaie_lite_util.h"
 

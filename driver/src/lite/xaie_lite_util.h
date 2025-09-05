@@ -27,9 +27,6 @@
 #ifndef XAIE_LITE_UTIL_H
 #define XAIE_LITE_UTIL_H
 
-#include "xaiegbl_defs.h"
-#include "xaie_lite_hwcfg.h"
-
 #if defined(XAIE_FEATURE_LITE_UTIL)
 /************************** Macro Definitions *****************************/
 // To update these version numbers based on the changes made.

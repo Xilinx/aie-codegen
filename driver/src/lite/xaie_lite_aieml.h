@@ -35,7 +35,6 @@
 #else
 #include "xaie_lite_regdef_aieml.h"
 #endif
-#include "xaiegbl_defs.h"
 #include "xaiegbl.h"
 #include "xaie_lite_util.h"
 #include "xaie_lite_aie2p_ssw_and_dma.h"

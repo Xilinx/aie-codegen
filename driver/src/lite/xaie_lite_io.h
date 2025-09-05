@@ -26,7 +26,6 @@
 
 /***************************** Include Files *********************************/
 #include "xaie_lite_hwcfg.h"
-#include "xaiegbl_defs.h"
 #include "xaiegbl.h"
 
 #ifdef __AIE_REGDUMP__

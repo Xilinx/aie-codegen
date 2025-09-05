@@ -30,7 +30,6 @@
 #include "xaie_lite_io.h"
 #include "xaie_lite_npi.h"
 #include "xaie_lite_regdef_aie4.h"
-#include "xaiegbl_defs.h"
 #include "xaiegbl.h"
 #include "xaie_lite_util.h"
 #include "xaie_lite_aie4_ssw_and_dma.h"
@@ -2228,20 +2227,18 @@ static inline AieRC _XAie_LTrigColIntr(XAie_DevInst *DevInst, u8 BcChan)
 static inline AieRC _XAie_WakeupShimUc(XAie_DevInst *DevInst, u8 ColNum)
 {
 	AieRC RC = XAIE_OK;
-	XAie_LocType Loc;
+	u32 RegOff;
+	u64 RegAddr;	
 
 	if((DevInst == XAIE_NULL) || (DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid device instance\n");
 		return XAIE_INVALID_ARGS;
 	}
 
-	Loc.Col = ColNum;
-	Loc.Row = XAIE_SHIM_ROW;
-	RC = XAie_EventGenerate(DevInst, Loc, XAIE_PL_MOD, XAIE_EVENT_USER_EVENT_0_PL);
-	if (RC != XAIE_OK) {
-		XAIE_ERROR("%d) XAie_EventGenerate: Failure.\n",XAIE_EVENT_USER_EVENT_0_PL);
-		return XAIE_ERR;
-	}
+	RegOff = XAIE_SHIM_TILE_EVENT_GENERATE;
+	RegAddr = _XAie_LGetTileAddr(XAIE_SHIM_ROW, ColNum) + RegOff;
+
+	_XAie_LPartWrite32(DevInst, RegAddr, XAIE_SHIM_TILE_EVENT_USER_EVENT_0_PL);
 
 	return RC;
 }

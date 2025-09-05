@@ -27,7 +27,6 @@
 #ifdef XAIE_FEATURE_LITE
 
 #include "xaiegbl.h"
-#include "xaiegbl_defs.h"
 #include "xaie_helper.h"
 
 

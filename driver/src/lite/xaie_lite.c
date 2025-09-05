@@ -23,14 +23,12 @@
 ******************************************************************************/
 /***************************** Include Files *********************************/
 
-#include "xaie_feature_config.h"
+#include "xaiegbl.h"
 
 #if defined(XAIE_FEATURE_PRIVILEGED_ENABLE) && defined(XAIE_FEATURE_LITE)
 
 #include "xaie_lite.h"
 #include "xaie_lite_internal.h"
-#include "xaiegbl_defs.h"
-#include "xaiegbl.h"
 
 /***************************** Macro Definitions *****************************/
 /************************** Function Definitions *****************************/

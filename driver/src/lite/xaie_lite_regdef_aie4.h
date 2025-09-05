@@ -70,6 +70,14 @@
                                                         XAIE4GBL_PL_MODULE_INTERRUPT_CONTROLLER_HW_ERROR_MASK_A_HW_CORRECTABLE_ERRORS_MASK_PRIVILEGED   || \
                                                         XAIE4GBL_PL_MODULE_INTERRUPT_CONTROLLER_HW_ERROR_MASK_A_AXI_ERRORS_MASK_PRIVILEGED)
 
+
+/**
+ * SHIM Tile Event generate Macros for wakeup uC
+ */
+ #define XAIE_SHIM_TILE_EVENT_USER_EVENT_0_PL        194     // Event numer of shim tile user event 0                                                      
+ #define XAIE_SHIM_TILE_EVENT_GENERATE               XAIE4GBL_PL_MODULE_EVENT_GENERATE_A
+
+
 /**
  * SHIM Tile Event Broadcast Macros
  */

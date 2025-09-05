@@ -45,6 +45,8 @@
 #define CheckBit(bitmap, pos)   ((bitmap)[(u64)(pos) / (sizeof((bitmap)[0]) * 8U)] & \
 				(u32)(1U << (u64)(pos) % (sizeof((bitmap)[0]) * 8U)))
 
+#ifndef __SWIGINTERFACE__
+
 #define XAIE_ERROR(...)							      \
 	do {								      \
 		XAie_Log((FILE*)(uintptr_t)stderr, "[AIE ERROR]", __func__, __LINE__,	      \
@@ -75,6 +77,17 @@
 #define XAIE_DBG(DevInst, ...) {}
 
 #endif /* XAIE_DEBUG */
+
+#else
+
+// redirect XAIE_ERROR to printf
+#define XAIE_ERROR     printf
+
+// no need for debug/warn printf so empty macro
+#define XAIE_DBG(...)   {}
+#define XAIE_WARN(...)  {}
+
+#endif /* __SWIGINTERFACE__ */
 
 /* Compute offset of field within a structure */
 #define XAIE_OFFSET_OF(structure, member) \

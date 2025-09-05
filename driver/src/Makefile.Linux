@@ -23,8 +23,8 @@ INTERNALDIR = ../internal
 EXTERNAL_INCLUDEFILES = ./*/xaie_clock.h ./*/xaie_reset.h ./*/xaie_core.h ./*/xaie_dma.h ./*/xaie_elfloader.h ./*/xaie_events.h ./*/xaie_events_aie.h ./*/xaie_events_aieml.h ./*/xaie_interrupt.h ./*/xaie_lite.h ./*/xaie_lite_util.h ./*/xaie_locks.h ./*/xaie_mem.h ./*/xaie_perfcnt.h ./*/xaie_plif.h ./*/xaie_ss.h ./*/xaie_timer.h ./*/xaie_trace.h ./*/xaie_util_events.h ./*/xaiegbl.h ./*/xaiegbl_dynlink.h ./*/xaiegbl_defs.h ./*/xaiegbl_regdef.h ./*/xaie_io.h ./*/xaie_feature_config.h ./*/xaie_helper.h ./*/xaie_lite_hwcfg.h ./*/xaie_txn.h ./*/xaie_noc.h
 EXTERNAL_INCLUDEDIR = ../externalInclude
 
-SWIG_SOCKET_INCLUDEFILES = ./io_backend/swig/swig_socket_interface.h ./*/xaiegbl.h ./io_backend/ext/isa_stubs.h ./io_backend/ext/xaie_socket.c ./io_backend/swig/swig_socket.c ./io_backend/ext/main_rts.h ./*/xaie_clock.h ./*/xaie_dma.h ./*/xaie_events.h ./*/xaie_feature_config.h ./*/xaie_helper.h ./*/xaie_io.h  ./io_backend/xaie_io_internal.h  ./io_backend/privilege/xaie_io_privilege.h ./io_backend/swig/swig_socket_backend_interface.i ./global/xaiegbl.c ./*/xaiegbl_defs.h ./*/xaiegbl_dynlink.h ./*/xaiegbl_regdef.h ./*/xaie_locks.h ./io_backend/ext/xaie_io_common.h ./*/xaie_helper_internal.h ./npi/xaie_npi.h
-SWIG_CONTROLCODE_INCLUDEFILES = ./io_backend/swig/swig_controlcode_interface.h ./*/xaiegbl.h ./io_backend/ext/isa_stubs.h ./io_backend/ext/xaie_controlcode.c ./io_backend/swig/swig_controlcode.c ./io_backend/ext/main_rts.h ./*/xaie_clock.h ./*/xaie_dma.h ./*/xaie_events.h ./*/xaie_feature_config.h ./*/xaie_helper.h ./*/xaie_io.h  ./io_backend/xaie_io_internal.h  ./io_backend/privilege/xaie_io_privilege.h ./io_backend/swig/swig_controlcode_backend_interface.i ./global/xaiegbl.c ./*/xaiegbl_defs.h ./*/xaiegbl_dynlink.h ./*/xaiegbl_regdef.h ./*/xaie_locks.h ./io_backend/ext/xaie_io_common.h ./*/xaie_helper_internal.h ./npi/xaie_npi.h
+SWIG_SOCKET_INCLUDEFILES = ./io_backend/swig/swig_socket_interface.h ./*/xaiegbl.h ./io_backend/ext/isa_stubs.h ./io_backend/ext/xaie_socket.c ./io_backend/swig/swig_socket.c ./io_backend/ext/main_rts.h ./*/xaie_clock.h ./*/xaie_dma.h ./*/xaie_events.h ./*/xaie_feature_config.h ./*/xaie_helper.h ./*/xaie_io.h  ./io_backend/xaie_io_internal.h  ./io_backend/privilege/xaie_io_privilege.h ./io_backend/swig/swig_socket_backend_interface.i ./global/xaiegbl.c ./*/xaiegbl_defs.h ./*/xaiegbl_dynlink.h ./*/xaiegbl_regdef.h ./*/xaie_locks.h ./io_backend/ext/xaie_io_common.h ./*/xaie_helper_internal.h ./npi/xaie_npi.h ./*/xaie_txn.h
+SWIG_CONTROLCODE_INCLUDEFILES = ./io_backend/swig/swig_controlcode_interface.h ./*/xaiegbl.h ./io_backend/ext/isa_stubs.h ./io_backend/ext/xaie_controlcode.c ./io_backend/swig/swig_controlcode.c ./io_backend/ext/main_rts.h ./*/xaie_clock.h ./*/xaie_dma.h ./*/xaie_events.h ./*/xaie_feature_config.h ./*/xaie_helper.h ./*/xaie_io.h  ./io_backend/xaie_io_internal.h  ./io_backend/privilege/xaie_io_privilege.h ./io_backend/swig/swig_controlcode_backend_interface.i ./global/xaiegbl.c ./*/xaiegbl_defs.h ./*/xaiegbl_dynlink.h ./*/xaiegbl_regdef.h ./*/xaie_locks.h ./io_backend/ext/xaie_io_common.h ./*/xaie_helper_internal.h ./npi/xaie_npi.h ./*/xaie_txn.h
 SWIG_INCLUDEDIR = ../swigInclude
 
 NAME := xaiengine
@@ -76,14 +76,14 @@ lib$(NAME).so: lib$(NAME).so.$(VERSION)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -I$(INTERNALDIR) -I$(INTERNALDIR)/xaiengine -c -fPIC $< -o $@
 
 swig_socket: include lib$(NAME).so
-CFLAGS_swig_socket += -Wall -Wextra --std=c11 -D__SWIGINTERFACE__ -D__SOCKET__
+CFLAGS_swig_socket += -Wall -Wextra -Werror --std=c11 -D__SWIGINTERFACE__ -D__SOCKET__
 ifeq ($(MAKECMDGOALS) ,swig_socket)
 %.o: %.c include
 	$(CC) $(CFLAGS_swig_socket) -I$(SWIG_INCLUDEDIR) -I$(INTERNALDIR) -I$(INTERNALDIR)/xaiengine -c -fPIC $< -o $@
 endif
 
 swig_controlcode: include lib$(NAME).so
-CFLAGS_swig_controlcode += -Wall -Wextra --std=c11 -D__SWIGINTERFACE__ -D__CONTROLCODE__
+CFLAGS_swig_controlcode += -Wall -Wextra -Werror --std=c11 -D__SWIGINTERFACE__ -D__CONTROLCODE__
 ifeq ($(MAKECMDGOALS) ,swig_controlcode)
 %.o: %.c include
 	$(CC) $(CFLAGS_swig_controlcode) -I$(SWIG_INCLUDEDIR) -I$(INTERNALDIR) -I$(INTERNALDIR)/xaiengine -c -fPIC $< -o $@

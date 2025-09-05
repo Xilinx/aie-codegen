@@ -28,13 +28,6 @@
 #define XAIE_IO_SOCKET_RDBUFSIZE	11U /* "0xDEADBEEF\n" */
 
 /****************************** Type Definitions *****************************/
-#ifdef __SWIGINTERFACE__
-// redirect XAIE_ERROR to printf
-#define XAIE_ERROR	printf
-// no need for debug/warn printf so empty macro
-#define XAIE_DBG
-#define XAIE_WARN
-#endif
 
 typedef struct {
 	u64 BaseAddr;
@@ -48,6 +41,8 @@ typedef struct {
 	u8 NumRows;   /* Number of rows allocated to the partition */
 	u8 NumCols;   /* Number of cols allocated to the partition */
 	u8 ShimRow;   /* ShimRow location */
+	u8 ShimTileNumRowsNorth; /* Number of North Shim rows in the partition */
+	u8 ShimTileNumRowsSouth; /* Number of South Shim rows in the partition */
 	u8 MemTileRowStart; /* Mem tile starting row in the partition */
 	u8 MemTileNumRows;  /* Number of memtile rows in the partition */
 	u8 AieTileRowStart; /* Aie tile starting row in the partition */
@@ -58,6 +53,7 @@ typedef struct {
 	u8 L2Split;     /* Set L2 Split in Dual App Mode */
 	u8 L2PreserveMem;    /*Set or Clear to preserve L2 Memory Data */
 	u8 PmLoadingActive; /*To keep track of of PM Loading is active or not*/
+	u8 DevType;         /* Device type for thread-safe device-specific logic (replaces global XAieDevType) */
 	const XAie_Backend *Backend; /* Backend IO properties */
 	void *IOInst;	       /* IO Instance for the backend */
 	XAie_DevProp DevProp; /* Pointer to the device property. To be
@@ -65,6 +61,13 @@ typedef struct {
 	const XAie_DeviceOps *DevOps; /* Device level operations */
 	XAie_PartitionProp PartProp; /* Partition property */
 	XAie_List TxnList; /* Head of the list of txn buffers */
+	u32 InitialTxnCmdArraySize; /* TXN command array max size to begin with */
+
+	/*use to clear A2S buffer (work-around for data leak)*/
+	u64 HostddrBuffAddr;
+	size_t HostddrBuffSize;
+	u32 HostddrBuff_SMID;
+	u32 HostddrBuff_AxUSER;
 } Swig_DevInst;
 
 typedef struct {
@@ -75,6 +78,8 @@ typedef struct {
 	u8 NumRows;
 	u8 NumCols;
 	u8 ShimRowNum;
+	u8 ShimTileNumRowsNorth;
+	u8 ShimTileNumRowsSouth;
 	u8 MemTileRowStart;
 	u8 MemTileNumRows;
 	u8 AieTileRowStart;

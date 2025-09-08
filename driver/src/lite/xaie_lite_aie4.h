@@ -1057,8 +1057,8 @@ static inline void  _XAie_LPartMemZeroInit(XAie_DevInst *DevInst)
 		clearA2SBuffer = 1;
 	}
 
-	DMA_SHIM_BD_t mm2s_bd_0 = {0};
-	DMA_SHIM_BD_t s2mm_bd_1 = {0};
+	DMA_SHIM_BD_t mm2s_bd_0;
+	DMA_SHIM_BD_t s2mm_bd_1;
 
 	if (clearA2SBuffer) {
 		//A2S work-around : Set loop-back stream switch

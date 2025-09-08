@@ -40,7 +40,7 @@
 #define PAGE_SIZE_MAX	  8192
 #define SHIM_BD_NUM_REGS  9
 
-#define EXTRACT_LOWER_FOUR_BYTES(RegOff) (RegOff & UINT32_MAX)
+#define EXTRACT_LOWER_FOUR_BYTES(RegOff) (u32)(RegOff & UINT32_MAX)
 
 //#define UC_DMA_DATASZ					4
 //#define DATA_SECTION_ALIGNMENT        16
@@ -503,7 +503,7 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 
 			fprintf(ControlCodeInst->ControlCodedatafp,
                		"\t UC_DMA_BD\t 0, 0x%x, @WRITE_data_%d, 1, 0, 0\n",
-                	(u32)(EXTRACT_LOWER_FOUR_BYTES(RegOff)),  ControlCodeInst->UcbdDataNum);
+                	EXTRACT_LOWER_FOUR_BYTES(RegOff),  ControlCodeInst->UcbdDataNum);
 
 			ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
 			fprintf(ControlCodeInst->ControlCodedata2fp, "WRITE_data_%d:\n",
@@ -591,7 +591,7 @@ AieRC XAie_ControlCodeIO_MaskWrite32(void *IOInst, u64 RegOff, u32 Mask,
 		}
 
 		fprintf(ControlCodeInst->ControlCodefp, "MASK_WRITE_32\t 0x%x, 0x%x, 0x%x\n",
-				(u32)(EXTRACT_LOWER_FOUR_BYTES(RegOff)), Mask, Value );
+				EXTRACT_LOWER_FOUR_BYTES(RegOff), Mask, Value );
 		ControlCodeInst->CombineCommands = 0;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_MASK_WRITE_32;
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_MASK_WRITE_32;
@@ -640,7 +640,7 @@ AieRC XAie_ControlCodeIO_MaskPoll(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
 		}
 
 		fprintf(ControlCodeInst->ControlCodefp, "MASK_POLL_32\t 0x%x, 0x%x, 0x%x\n",
-				(u32)(EXTRACT_LOWER_FOUR_BYTES(RegOff)), Mask, Value );
+				EXTRACT_LOWER_FOUR_BYTES(RegOff), Mask, Value );
 		ControlCodeInst->CombineCommands = 0;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_MASK_POLL_32;
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_MASK_POLL_32;
@@ -676,6 +676,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 	u32 NewPagePayloadSize;
 	u64 AdjustedOff = 0;
 	u64 NewPageRegOff = 0;
+	u64 CumilativeRegOff = 0;
 
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 
@@ -826,9 +827,10 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 						(ControlCodeInst->CombinedMemWriteSize + IterationSize));
 			}
 			else {
+				CumilativeRegOff = RegOff + AdjustedOff;
             	fprintf(ControlCodeInst->ControlCodedatafp,
                     	"\t UC_DMA_BD\t 0, 0x%x, @DMAWRITE_data_%d, 0x%x, 0, 0\n",
-                    	(u32)(EXTRACT_LOWER_FOUR_BYTES(RegOff + AdjustedOff)),  ControlCodeInst->UcDmaDataNum,
+                    	EXTRACT_LOWER_FOUR_BYTES(CumilativeRegOff),  ControlCodeInst->UcDmaDataNum,
 						(IterationSize - TempItrSize));
 				ControlCodeInst->UcDmaDataNum++;
 			}
@@ -879,6 +881,7 @@ AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u32 Size
 	u32 CompletedSize = 0;
 	u32 IterationSize;
 	u64 AdjustedOff = 0;
+	u64 CumilativeRegOff = 0;
 
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 
@@ -934,9 +937,10 @@ AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u32 Size
 				ControlCodeInst->UcPageSize += UC_DMA_WORD_LEN;
 			}
 
+			CumilativeRegOff = RegOff + AdjustedOff;
             fprintf(ControlCodeInst->ControlCodedatafp,
                     "\t UC_DMA_BD\t 0, 0x%x, @DMAWRITE_data_%d, %d, 0, 0\n\n",
-                    (u32)(EXTRACT_LOWER_FOUR_BYTES(RegOff + AdjustedOff)),
+                    EXTRACT_LOWER_FOUR_BYTES(CumilativeRegOff),
                     ControlCodeInst->UcDmaDataNum, IterationSize);
 
 			AdjustedOff += (IterationSize * UC_DMA_WORD_LEN);

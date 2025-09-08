@@ -34,9 +34,11 @@
 #endif
 
 #ifdef __AIESIM__ /* AIE simulator */
-
 #include "main_rts.h"
+#endif
 
+#ifdef __AIGSIMCI__
+#include "sleep.h"
 #endif
 
 #include "xaie_helper.h"

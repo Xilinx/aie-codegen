@@ -24,16 +24,13 @@
 ******************************************************************************/
 /***************************** Include Files *********************************/
 
-#include "xaie_feature_config.h"
+#include "xaiegbl.h"
 
 #if defined(XAIE_FEATURE_PRIVILEGED_ENABLE) && defined(XAIE_FEATURE_LITE)
 
 #include "xaie_lite.h"
 #include "xaie_lite_io.h"
 #include "xaie_lite_internal.h"
-#include "xaiegbl_defs.h"
-#include "xaiegbl.h"
-#include "xaie_helper.h"
 
 /***************************** Macro Definitions *****************************/
 #define XAIE_ISOLATE_EAST_MASK	(1U << 3)

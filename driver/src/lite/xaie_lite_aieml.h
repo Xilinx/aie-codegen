@@ -35,7 +35,6 @@
 #else
 #include "xaie_lite_regdef_aieml.h"
 #endif
-#include "xaiegbl_defs.h"
 #include "xaiegbl.h"
 #include "xaie_lite_util.h"
 #include "xaie_lite_aie2p_ssw_and_dma.h"
@@ -640,8 +639,8 @@ static inline void  _XAie_LPartMemZeroInit(XAie_DevInst *DevInst)
 		clearA2SBuffer = 1;
 	}
 
-	DMA_SHIM_BD_t mm2s_bd_0 = {0};
-	DMA_SHIM_BD_t s2mm_bd_1 = {0};
+	DMA_SHIM_BD_t mm2s_bd_0;
+	DMA_SHIM_BD_t s2mm_bd_1;
 
 	if (clearA2SBuffer) {
 		//A2S work-around : (1) Stream switch configuration
@@ -908,8 +907,8 @@ static inline AieRC _XAie_LPartDataMemZeroInit(XAie_DevInst *DevInst)
 		clearA2SBuffer = 1;
 	}
 
-	DMA_SHIM_BD_t mm2s_bd_0 = {0};
-	DMA_SHIM_BD_t s2mm_bd_1 = {0};
+	DMA_SHIM_BD_t mm2s_bd_0;
+	DMA_SHIM_BD_t s2mm_bd_1;
 
 	if (clearA2SBuffer) {
 		//A2S work-around : (1) Stream switch configuration

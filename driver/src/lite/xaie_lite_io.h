@@ -26,7 +26,6 @@
 
 /***************************** Include Files *********************************/
 #include "xaie_lite_hwcfg.h"
-#include "xaiegbl_defs.h"
 #include "xaiegbl.h"
 
 #ifdef __AIE_REGDUMP__
@@ -45,7 +44,7 @@ static inline u64 _XAie_LGetTileAddr(u32 Row, u32 Col)
 			|| XAIE_DEV_SINGLE_GEN == XAIE_DEV_GEN_AIE4_A) {
 		if(Row >= XAIE_AIE_TILE_ROW_START) {
 			Row += (XAIE_MEM_TILE_NUM_ROWS * XAIE_LITE_AIE4_AIE_TILE_SHIFT_OFFSET);
-		} else if(Row >= XAIE_MEM_TILE_ROW_START && Row < XAIE_AIE_TILE_ROW_START) {
+		} else if(Row > 0 && Row < XAIE_AIE_TILE_ROW_START) {
 			Row = (Row * XAIE_LITE_AIE4_MEM_TILE_SHIFT_OFFSET) - XAIE_LITE_AIE4_AIE_TILE_SHIFT_OFFSET;
 		}
 	}

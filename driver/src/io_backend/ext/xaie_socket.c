@@ -48,6 +48,11 @@
 #include "swig_socket_interface.h"
 #endif
 
+#ifdef __AIGSOCKETCI__
+#include "sleep.h"
+#endif
+
+
 /***************************** Macro Definitions *****************************/
 #ifndef __SWIGINTERFACE__
 #define XAIE_IO_SOCKET_CMDBUFSIZE	48U

@@ -33,7 +33,7 @@
 #include "xaiegbl.h"
 #include "xaie_lite_util.h"
 #include "xaie_lite_aie4_ssw_and_dma.h"
-
+#include <string.h>
 /************************** Constant Definitions *****************************/
 #define XAIE_PL_MOD_UC_MEMORY_IDX		4U
 #define XAIE_PL_MOD_UC_MEMORY_COUNT 	2U
@@ -1060,6 +1060,10 @@ static inline void  _XAie_LPartMemZeroInit(XAie_DevInst *DevInst)
 	DMA_SHIM_BD_t s2mm_bd_1;
 
 	if (clearA2SBuffer) {
+
+		memset((void *)&mm2s_bd_0, 0, sizeof(DMA_SHIM_BD_t));
+		memset((void *)&s2mm_bd_1, 0, sizeof(DMA_SHIM_BD_t));
+
 		//A2S work-around : Set loop-back stream switch
 		if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B)
 		{
@@ -1476,6 +1480,10 @@ static inline AieRC _XAie_LPartDataMemZeroInit(XAie_DevInst *DevInst)
 	DMA_SHIM_BD_t s2mm_bd_1;
 
 	if (clearA2SBuffer) {
+
+		memset((void *)&mm2s_bd_0, 0, sizeof(DMA_SHIM_BD_t));
+		memset((void *)&s2mm_bd_1, 0, sizeof(DMA_SHIM_BD_t));
+
 		//A2S work-around : Set loop-back stream switch
 		if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B)
 		{

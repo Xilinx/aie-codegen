@@ -75,7 +75,7 @@ static inline u8 _XAie_LGetShimTTypefromLoc(XAie_DevInst *DevInst,
 static inline u8 _XAie_MapColToIrqId(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	if(Loc.Col > (DevInst->StartCol + DevInst->NumCols)){
-		XAIE_ERROR("Colum is out of range\n");
+		XAIE_ERROR("Column is out of range\n");
 		return XAIE_INVALID_RANGE;
 	}
 

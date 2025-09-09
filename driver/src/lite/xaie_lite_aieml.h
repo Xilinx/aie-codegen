@@ -38,6 +38,7 @@
 #include "xaiegbl.h"
 #include "xaie_lite_util.h"
 #include "xaie_lite_aie2p_ssw_and_dma.h"
+#include <string.h>
 
 /* AIE core registers step size */
 #define AIE_CORE_REGS_STEP              0x10
@@ -643,6 +644,10 @@ static inline void  _XAie_LPartMemZeroInit(XAie_DevInst *DevInst)
 	DMA_SHIM_BD_t s2mm_bd_1;
 
 	if (clearA2SBuffer) {
+
+		memset((void *)&mm2s_bd_0, 0, sizeof(DMA_SHIM_BD_t));
+		memset((void *)&s2mm_bd_1, 0, sizeof(DMA_SHIM_BD_t));
+
 		//A2S work-around : (1) Stream switch configuration
 		SSwitch_Slave_Port_Config_t switch_sub_port = {0};
 		SSwitch_Master_Port_Config_t switch_mgr_port = {0};
@@ -911,6 +916,10 @@ static inline AieRC _XAie_LPartDataMemZeroInit(XAie_DevInst *DevInst)
 	DMA_SHIM_BD_t s2mm_bd_1;
 
 	if (clearA2SBuffer) {
+
+		memset((void *)&mm2s_bd_0, 0, sizeof(DMA_SHIM_BD_t));
+		memset((void *)&s2mm_bd_1, 0, sizeof(DMA_SHIM_BD_t));
+
 		//A2S work-around : (1) Stream switch configuration
 		SSwitch_Slave_Port_Config_t switch_sub_port = {0};
 		SSwitch_Master_Port_Config_t switch_mgr_port = {0};

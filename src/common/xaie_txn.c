@@ -395,7 +395,7 @@ static AieRC _XAie_ReallocCmdBuf(XAie_TxnInst *TxnInst)
 			sizeof(XAie_TxnCmd) * (u32)NewMaxCmds);
 	if(TmpBuf == NULL) {
 		XAIE_ERROR("Failed reallocate memory for transaction buffer "
-				"with id: %llu\n", TxnInst->Tid);
+				"with id: %lu\n", TxnInst->Tid);
 		free(TxnInst->CmdBuf);  /* Free original memory to prevent leak */
 		TxnInst->CmdBuf = NULL;
 		return XAIE_ERR;
@@ -451,7 +451,7 @@ static AieRC _XAie_ExecuteCmd(XAie_DevInst *DevInst, XAie_TxnCmd *Cmd,
 							Cmd->Value);
 			}
 			if(RC != XAIE_OK) {
-				XAIE_ERROR("Wr failed. Addr: 0x%llx, Mask: 0x%x,"
+				XAIE_ERROR("Wr failed. Addr: 0x%lx, Mask: 0x%x,"
 						"Value: 0x%x\n", Cmd->RegOff,
 						Cmd->Mask, Cmd->Value);
 				return RC;
@@ -463,7 +463,7 @@ static AieRC _XAie_ExecuteCmd(XAie_DevInst *DevInst, XAie_TxnCmd *Cmd,
 					(const u32 *)(uintptr_t)Cmd->DataPtr,
 					Cmd->Size);
 			if(RC != XAIE_OK) {
-				XAIE_ERROR("Block Wr failed. Addr: 0x%llx\n",
+				XAIE_ERROR("Block Wr failed. Addr: 0x%lx\n",
 						Cmd->RegOff);
 				return RC;
 			}
@@ -477,7 +477,7 @@ static AieRC _XAie_ExecuteCmd(XAie_DevInst *DevInst, XAie_TxnCmd *Cmd,
 					Cmd->RegOff, Cmd->Value,
 					Cmd->Size);
 			if(RC != XAIE_OK) {
-				XAIE_ERROR("Block Wr failed. Addr: 0x%llx\n",
+				XAIE_ERROR("Block Wr failed. Addr: 0x%lx\n",
 						Cmd->RegOff);
 				return RC;
 			}
@@ -489,7 +489,7 @@ static AieRC _XAie_ExecuteCmd(XAie_DevInst *DevInst, XAie_TxnCmd *Cmd,
 							Cmd->RegOff, Cmd->Mask,
 							Cmd->Value, 0U);
 			if(RC != XAIE_OK) {
-				XAIE_ERROR("MP failed. Addr: 0x%llx, Mask: 0x%x, Value: 0x%x\n",
+				XAIE_ERROR("MP failed. Addr: 0x%lx, Mask: 0x%x, Value: 0x%x\n",
 						Cmd->RegOff, Cmd->Mask,
 						Cmd->Value);
 				return RC;

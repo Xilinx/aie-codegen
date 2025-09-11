@@ -375,12 +375,10 @@ AieRC _XAie_GetPortIdx(XAie_DevInst *DevInst, u8 TileType,
 	}
 
 	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)))
-		_XAie_GetPortIdxLegacy(StrmMod, PortType, PortNum, PortIdx, Port);
+		return _XAie_GetPortIdxLegacy(StrmMod, PortType, PortNum, PortIdx, Port);
 	else
-		_XAie_GetPortIdxAie4Plus(DevInst, TileType, PortType, PortPtr,
+		return _XAie_GetPortIdxAie4Plus(DevInst, TileType, PortType, PortPtr,
 			PortNum, PortIdx, Port);
-
-	return XAIE_OK;
 }
 /*****************************************************************************/
 /**

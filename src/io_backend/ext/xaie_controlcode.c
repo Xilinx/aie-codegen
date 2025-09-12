@@ -191,15 +191,12 @@ AieRC XAie_ControlCodeIO_Init(XAie_DevInst *DevInst)
 	IOInst->NpiBaseAddr = XAIE_NPI_BASEADDR;
 	IOInst->ScrachpadName = NULL;
 	IOInst->DevInst = DevInst;
-        IOInst->ControlCodefp = NULL;
-        IOInst->ControlCodedatafp = NULL;
-        IOInst->ControlCodedata2fp = NULL;
-        IOInst->ScrachpadName = NULL;
+	IOInst->ControlCodefp = NULL;
+	IOInst->ControlCodedatafp = NULL;
+	IOInst->ControlCodedata2fp = NULL;
+	IOInst->ScrachpadName = NULL;
 
 	DevInst->IOInst = IOInst;
-        if (IOInst->PageSizeMax >1024) {
-		IOInst->PageSizeMax -= 16;
-	}
 
 	return XAIE_OK;
 }

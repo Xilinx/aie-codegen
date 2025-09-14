@@ -2229,5 +2229,16 @@ AieRC XAie_EventRegStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	return XAIE_OK;
 }
+
+static const char *XAie_EventStrings[] = {
+        XAIE_EVENT_GENERATE_CORE_MOD(ENUM_STRING)
+        XAIE_EVENT_GENERATE_MEM_MOD(ENUM_STRING)
+        XAIE_EVENT_GENERATE_PL_MOD(ENUM_STRING)
+        XAIE_EVENT_GENERATE_MEM_TILE(ENUM_STRING)
+};
+const char* XAie_EventGetString(XAie_Events Event) {
+	return XAie_EventStrings[Event];
+}
+
 #endif /* XAIE_FEATURE_EVENTS_ENABLE */
 /** @} */

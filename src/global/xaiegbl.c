@@ -352,6 +352,26 @@ AieRC XAie_SoftPartitionInitialize(XAie_DevInst *DevInst, XAie_PartInitOpts *Opt
 			XAIE_ERROR("Partition Initialization Failed \n");
 			return RC;
 		}
+
+		/*
+		 * Enable the col clock to set partition isolation. Col clock
+		 * has been disabled in XAie_PartitionInitialize() which causes
+		 * board reboot if we set partition isolation.
+		 */
+		if (DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE) {
+			RC = _XAie_PmSetPartitionClock(DevInst, XAIE_ENABLE);
+
+			for(u32 C = 0; C < DevInst->NumCols; C++) {
+				XAie_LocType Loc;
+				u32 ColClockStatus;
+
+				Loc = XAie_TileLoc(C, 1);
+				ColClockStatus = _XAie_GetTileBitPosFromLoc(DevInst, Loc);
+				_XAie_SetBitInBitmap(DevInst->DevOps->TilesInUse,
+					       ColClockStatus, DevInst->NumRows - 1);
+			}
+		}
+
 		if(DevPartInfo->BaseAddr == DevInst->BaseAddr) {
 			IsolationFlags |= XAIE_INIT_WEST_ISOLATION;
 		}
@@ -364,6 +384,20 @@ AieRC XAie_SoftPartitionInitialize(XAie_DevInst *DevInst, XAie_PartInitOpts *Opt
 		if(RC!= XAIE_OK) {
 			XAIE_ERROR("Failed to set the AxiMM Isolation\n");
 			return RC;
+		}
+
+		if (DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE) {
+			RC = _XAie_PmSetPartitionClock(DevInst, XAIE_DISABLE);
+
+			for(u32 C = 0; C < DevInst->NumCols; C++) {
+				XAie_LocType Loc;
+				u32 ColClockStatus;
+
+				Loc = XAie_TileLoc(C, 1);
+				ColClockStatus = _XAie_GetTileBitPosFromLoc(DevInst, Loc);
+				_XAie_ClrBitInBitmap(DevInst->DevOps->TilesInUse,
+					       ColClockStatus, DevInst->NumRows - 1);
+			}
 		}
 	}
 	else {

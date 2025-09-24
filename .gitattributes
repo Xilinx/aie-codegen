@@ -1,1 +1,2 @@
+driver/docs/xlogo_bg.gif filter=lfs diff=lfs merge=lfs -text
 driver/src/global/xaie4gbl_params.h filter=lfs diff=lfs merge=lfs -text

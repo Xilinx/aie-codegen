@@ -1,0 +1,37 @@
+name: Pre-Commit Workflow
+on:
+  # Not specifying the `type:` key is equivalent to specifying ['opened', 'reopened', 'synchronize']
+  pull_request:
+
+jobs:
+  pre-commit:
+    runs-on: [self-hosted, Linux]
+    env:
+      HOME: ${{ github.workspace }}
+      PRE_COMMIT_HOME: ${{ github.workspace }}/../.cache/pre-commit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          lfs: true
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: temurin
+      - id: setup-pre-commit
+        run: |
+          python3 -m venv ${{ github.workspace }}/.venv
+          source ${{ github.workspace }}/.venv/bin/activate
+          python -m pip install "pre-commit~=4.2"
+          echo "PY=$(python -VV | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v3
+        id: pre-commit-cache
+        with:
+          path: ${{ env.PRE_COMMIT_HOME }}
+          key: >
+            pre-commit|${{ steps.setup-pre-commit.outputs.PY }}|
+            ${{ hashFiles('.pre-commit-config.yaml')}}
+      - name: Run pre-commit
+        run: |
+          source ${{ github.workspace }}/.venv/bin/activate
+          pre-commit run --show-diff-on-failure --color=always --all-files

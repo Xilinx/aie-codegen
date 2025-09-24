@@ -1,0 +1,9 @@
+repos:
+  # custom hooks
+  - repo: https://gitenterprise.xilinx.com/ACAS-DevOps/pre-commit-hooks
+    rev: v0.1.2
+    hooks:
+      - id: check-size-type
+        args: [
+          "--all-files",
+        ]

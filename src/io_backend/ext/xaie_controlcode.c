@@ -41,7 +41,9 @@
 #define TEMP_ASM_FILE4    ".temp_data4.txt"
 #define PAGE_SIZE_MAX	  8192
 #define SHIM_BD_NUM_REGS  9
-#define FNAME_SIZE 40
+#define MAX_LABELS_PER_ASM_FILE 1000
+#define FNAME_SIZE 100
+#define HASH_INVALID -1
 
 #define EXTRACT_LOWER_FOUR_BYTES(RegOff) (u32)(RegOff & UINT32_MAX)
 
@@ -63,6 +65,13 @@
 char FName[FNAME_SIZE];
 
 /****************************** Type Definitions *****************************/
+
+typedef struct {
+	u32 *BWDataSizes;
+	int *HashBW;
+	int *HashW;
+} XAie_LabelMap;
+
 typedef struct {
 	XAie_DevInst *DevInst;
 	u64 BaseAddr;
@@ -92,10 +101,118 @@ typedef struct {
 	u64  CalculatedNextRegOff;
 	char *ScrachpadName;
 	u8 PageBreak;
+	XAie_LabelMap* LabelMap;
+	int CompareLabelUpto;
+	int CompareLabelUptoWrite;
+	u64 TotalLabelsAllocated;
+	u64 TotalLabelsAllocatedWrite;
 	u32 PageId;
+	u32 CurrentDataLabel;
+	u32 CurrentDataBWLabel;
+	u8 LabelMatchFound;
 } XAie_ControlCodeIO;
 
 /************************** Function Definitions *****************************/
+
+/*****************************************************************************/
+/**
+*
+* This function computes hash for given array of Data
+*
+* @param        Data: Pointer to Data Payload struct
+*
+* @param        Count: Number of elements in the Data array
+*
+* @return       u32 Hash Value.
+*
+* @note         Internal only.
+*
+*******************************************************************************/
+
+u32 _XAie_ComputeHash(const u32* Data, u32 Count) {
+    const uint32_t c1 = 0xcc9e2d51;
+    const uint32_t c2 = 0x1b873593;
+    const uint32_t r1 = 15;
+    const uint32_t r2 = 13;
+    const uint32_t m = 5;
+    const uint32_t n = 0xe6546b64;
+
+    uint32_t hash = 5;
+    u32 i;
+
+    // Process blocks of four bytes (uint32_t)
+    for (i = 0; i < Count; i++) {
+        uint32_t k = Data[i];
+        k *= c1;
+        k = (k << r1) | (k >> (32 - r1)); // ROTL32(k, r1)
+        k *= c2;
+
+        hash ^= k;
+        hash = ( (hash << r2) | (hash >> (32 - r2)) ) * m + n; // ROTL32(hash, r2)
+    }
+
+    // Finalize the hash with the length of the data
+    hash ^= Count * sizeof(uint32_t);
+    hash ^= hash >> 16;
+    hash *= 0x85ebca6b;
+    hash ^= hash >> 13;
+    hash *= 0xc2b2ae35;
+    hash ^= hash >> 16;
+
+    return hash;
+}
+
+/*****************************************************************************/
+/**
+*
+* This function allocates memory for LabelMap Struct
+*
+* @param        Map: XAie_LabelMap structure pointer
+*
+* @return       XAIE_OK on success.
+*
+* @note         Internal only.
+*
+*******************************************************************************/
+static AieRC _XAie_LabelMapSetup(XAie_LabelMap *Map, XAie_ControlCodeIO *ControlCodeInst)
+{
+	if(Map) {
+		Map->HashW = (int*)calloc(ControlCodeInst->TotalLabelsAllocatedWrite, sizeof(int));
+		Map->BWDataSizes = (u32*)calloc(ControlCodeInst->TotalLabelsAllocated, sizeof(u32));
+		Map->HashBW = (int*)calloc(ControlCodeInst->TotalLabelsAllocated, sizeof(int));
+	}
+	if(Map->BWDataSizes && Map->HashBW && Map->HashW) {
+		return XAIE_OK;
+	}
+	return XAIE_ERR;
+}
+
+/*****************************************************************************/
+/**
+*
+* This function frees memory for LabelMap Struct
+*
+* @param        Map: XAie_LabelMap structure pointer
+*
+* @return       XAIE_OK on success.
+*
+* @note         Internal only.
+*
+*******************************************************************************/
+static AieRC _XAie_LabelMapTeardown(XAie_LabelMap *Map)
+{
+	if(Map->BWDataSizes && Map->HashBW && Map->HashW) {
+		free(Map->BWDataSizes);
+		Map->BWDataSizes = NULL;
+		free(Map->HashW);
+		Map->HashW = NULL;
+		free(Map->HashBW);
+		Map->HashBW = NULL;
+		return XAIE_OK;
+	}
+
+	return XAIE_ERR;
+}
 
 /*****************************************************************************/
 /**
@@ -226,8 +343,6 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
         }
 
         fseek(ControlCodeInst->DebugAsmFileData0, 0, SEEK_END);
-
-		
 
         return XAIE_OK;
 }
@@ -366,6 +481,10 @@ static void _XAie_EndPage(XAie_ControlCodeIO  *ControlCodeInst) {
 		ControlCodeInst->UcPageSize 	= 0;
 		ControlCodeInst->UcPageTextSize = 0;
 		ControlCodeInst->IsPageOpen 	= 0;
+		ControlCodeInst->UcDmaDataNum = ControlCodeInst->CurrentDataBWLabel;
+		ControlCodeInst->UcbdDataNum = ControlCodeInst->CurrentDataLabel;
+		ControlCodeInst->CompareLabelUpto = ControlCodeInst->UcDmaDataNum;
+		ControlCodeInst->CompareLabelUptoWrite = ControlCodeInst->UcbdDataNum;
 		ControlCodeInst->PageId++;
 	}
 }
@@ -392,6 +511,7 @@ static void _XAie_StartNewPage(XAie_ControlCodeIO  *ControlCodeInst) {
 	ControlCodeInst->UcPageSize 	 = PAGE_HEADER_SIZE + ISA_OPSIZE_EOF;
 	ControlCodeInst->CombineCommands = 0;
 	ControlCodeInst->IsPageOpen 	 = 1;
+	ControlCodeInst->LabelMatchFound = 0;
 }
 
 /*****************************************************************************/
@@ -535,6 +655,9 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	u32 OpSize;
 
+	XAie_LabelMap* Map = ControlCodeInst->LabelMap;
+
+
 	if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE) {
 		OpSize = ISA_OPSIZE_UC_DMA_WRITE_DES;
 	}
@@ -561,7 +684,7 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 			_XAie_StartNewJob(ControlCodeInst);
 		}
 
-		if (ControlCodeInst->IsAdjacentMemWrite == 1) {
+		if(ControlCodeInst->IsAdjacentMemWrite == 1 && ControlCodeInst->LabelMatchFound == 0) {
 			if((ControlCodeInst->UcPageSize + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 				_XAie_StartNewPage(ControlCodeInst);
 				_XAie_StartNewJob(ControlCodeInst);
@@ -569,6 +692,9 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 			}
 			else {
 				_XAie_UpdateDataLengthDmaBd(ControlCodeInst, (ControlCodeInst->CombinedMemWriteSize + 1));
+				if(Map) {
+					Map->HashW[ControlCodeInst->CurrentDataLabel-1] = HASH_INVALID;
+				}
 			}
 		}
 
@@ -578,6 +704,31 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 				UC_DMA_BD_SIZE + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 				_XAie_StartNewPage(ControlCodeInst);
 				_XAie_StartNewJob(ControlCodeInst);
+			}
+
+			if(Map) {
+				if(ControlCodeInst->CurrentDataLabel == ControlCodeInst->TotalLabelsAllocatedWrite) {
+					Map->HashW = (int*)realloc(Map->HashW, (ControlCodeInst->TotalLabelsAllocatedWrite*2)*sizeof(int));
+					if(Map->HashW) {
+						ControlCodeInst->TotalLabelsAllocatedWrite *= 2;
+					}
+					else {
+						XAIE_ERROR("Memory allocation failed\n");
+						return XAIE_ERR;
+					}
+				}
+
+				for(int Label = ControlCodeInst->CurrentDataLabel-1; Label >= ControlCodeInst->CompareLabelUptoWrite; Label--) {
+					if(Map->HashW[Label] == ((int)Value)) {
+						ControlCodeInst->UcbdDataNum = Label;
+						ControlCodeInst->LabelMatchFound = 1;
+						break;
+					}
+				}	
+
+				if(ControlCodeInst->LabelMatchFound == 0) {
+					Map->HashW[ControlCodeInst->CurrentDataLabel] = Value;
+				}
 			}
 
 			if(ControlCodeInst->CombineCommands) {
@@ -635,28 +786,41 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 				EXTRACT_LOWER_FOUR_BYTES(RegOff),  ControlCodeInst->UcbdDataNum);
 
 			ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
-			fprintf(ControlCodeInst->ControlCodedata2fp, "WRITE_data_%d:\n",
+
+			ControlCodeInst->UcbdDataNum = ControlCodeInst->CurrentDataLabel;
+				
+			if(ControlCodeInst->LabelMatchFound == 0) {
+				fprintf(ControlCodeInst->ControlCodedata2fp, "WRITE_data_%d:\n",
 					ControlCodeInst->UcbdDataNum);
 			fprintf(ControlCodeInst->DebugAsmFileData1, "WRITE_data_%d:\n",
 					ControlCodeInst->UcbdDataNum);
-			ControlCodeInst->UcbdDataNum++;
-
-
+				ControlCodeInst->UcbdDataNum++;
+				ControlCodeInst->CurrentDataLabel = ControlCodeInst->UcbdDataNum;
+			}
 		}
-
-		fprintf(ControlCodeInst->ControlCodedata2fp, "\t.long 0x%08x\n", Value);
-		fprintf(ControlCodeInst->DebugAsmFileData1, "\t.long 0x%08x\n", Value);
-		ControlCodeInst->UcPageSize += UC_DMA_WORD_LEN;
-		_XAie_ControlCodePageInfo(ControlCodeInst->DebugAsmFile, ControlCodeInst->PageId, ControlCodeInst->UcPageSize);
+		if(ControlCodeInst->LabelMatchFound == 0) {
+			fprintf(ControlCodeInst->ControlCodedata2fp, "\t.long 0x%08x\n", Value);
+			fprintf(ControlCodeInst->DebugAsmFileData1, "\t.long 0x%08x\n", Value);
+			ControlCodeInst->UcPageSize += UC_DMA_WORD_LEN;
+		}
 	}
 
-	if(ControlCodeInst->IsAdjacentMemWrite == 1) {
+	if(ControlCodeInst->LabelMatchFound)
+	{
+		ControlCodeInst->CombinedMemWriteSize = 0;
+		ControlCodeInst->CalculatedNextRegOff = 0;
+	}
+	else if(ControlCodeInst->IsAdjacentMemWrite == 1) {
 		ControlCodeInst->CombinedMemWriteSize += 1;
+		ControlCodeInst->CalculatedNextRegOff = RegOff + sizeof(Value);
 	}
 	else {
 		ControlCodeInst->CombinedMemWriteSize = 1;
+		ControlCodeInst->CalculatedNextRegOff = RegOff + sizeof(Value);
 	}
-	ControlCodeInst->CalculatedNextRegOff = RegOff + sizeof(Value);
+	ControlCodeInst->LabelMatchFound = 0;
+
+	_XAie_ControlCodePageInfo(ControlCodeInst->DebugAsmFile, ControlCodeInst->PageId, ControlCodeInst->UcPageSize);
 
 	return XAIE_OK;
 }
@@ -810,6 +974,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 		u32 Size)
 {
 	u8 PageBreakOccured = 0;
+	u32 Hash = 0;
 	u32 CompletedSize = 0;
 	u32 IterationSize;
 	u32 TempItrSize = 0;
@@ -820,6 +985,8 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 	u64 CumilativeRegOff = 0;
 
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	XAie_LabelMap* Map = ControlCodeInst->LabelMap;
+	Hash = _XAie_ComputeHash(Data, Size);
 
 	if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE) {
 		OpSize = ISA_OPSIZE_UC_DMA_WRITE_DES;
@@ -880,9 +1047,35 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 					}
 				}
 
+				if(Map) {
+					if(ControlCodeInst->CurrentDataBWLabel == ControlCodeInst->TotalLabelsAllocated) {
+						Map->BWDataSizes = (u32*)realloc(Map->BWDataSizes, (ControlCodeInst->TotalLabelsAllocated*2)*(sizeof(u32)));
+						Map->HashBW = (int*)realloc(Map->HashBW, (ControlCodeInst->TotalLabelsAllocated*2)*sizeof(int));
+						if(Map->BWDataSizes && Map->HashBW) {
+						ControlCodeInst->TotalLabelsAllocated *= 2;
+						}
+						else {
+							XAIE_ERROR("Memory allocation failed\n");
+							return XAIE_ERR;
+						}
+					}
+
+					for(int Label = ControlCodeInst->CurrentDataBWLabel-1; Label >= ControlCodeInst->CompareLabelUpto; Label--) {
+						if(Map->BWDataSizes[Label] == Size) {
+							if(Map->HashBW[Label] == ((int)Hash)) {
+								ControlCodeInst->UcDmaDataNum = Label;
+								ControlCodeInst->LabelMatchFound = 1;
+								break;
+							}
+						}
+					}	
+				}
+
 				if( (ControlCodeInst->IsShimBd) &&
 					(ControlCodeInst->NumShimBDsChained == 0) ) {
 					ControlCodeInst->CombineCommands = 0;
+					ControlCodeInst->LabelMatchFound = 0;
+					ControlCodeInst->UcDmaDataNum = ControlCodeInst->CurrentDataBWLabel;
 				}
 
 				if(ControlCodeInst->CombineCommands) {
@@ -943,13 +1136,31 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 						ControlCodeInst->CombineCommands = 0;
 					}
 				}
-
-				fprintf(ControlCodeInst->ControlCodedata2fp, "DMAWRITE_data_%d:\n",
-						ControlCodeInst->UcDmaDataNum);
-				fprintf(ControlCodeInst->DebugAsmFileData1, "DMAWRITE_data_%d:\n",
-						ControlCodeInst->UcDmaDataNum);
-
 				ControlCodeInst->PageBreak = 0;
+				
+				if(ControlCodeInst->LabelMatchFound == 0) {
+					fprintf(ControlCodeInst->ControlCodedata2fp, "DMAWRITE_data_%d:\n",
+							ControlCodeInst->UcDmaDataNum);
+					fprintf(ControlCodeInst->DebugAsmFileData1, "DMAWRITE_data_%d:\n",
+						ControlCodeInst->UcDmaDataNum);
+				}
+				else {
+					fprintf(ControlCodeInst->ControlCodedatafp,
+                    	"\t UC_DMA_BD\t 0, 0x%x, @DMAWRITE_data_%d, 0x%x, 0, 0\n",
+                    	EXTRACT_LOWER_FOUR_BYTES(RegOff),  ControlCodeInst->UcDmaDataNum,
+						Size);
+					fprintf(ControlCodeInst->DebugAsmFileData0,
+                    	"\t UC_DMA_BD\t 0, 0x%x, @DMAWRITE_data_%d, 0x%x, 0, 0\n",
+                    	EXTRACT_LOWER_FOUR_BYTES(RegOff),  ControlCodeInst->UcDmaDataNum,
+						Size);
+					ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
+					ControlCodeInst->UcDmaDataNum = ControlCodeInst->CurrentDataBWLabel;
+					ControlCodeInst->CombinedMemWriteSize = 0;
+					ControlCodeInst->CalculatedNextRegOff = 0;
+					_XAie_ControlCodePageInfo(ControlCodeInst->DebugAsmFile, ControlCodeInst->PageId, ControlCodeInst->UcPageSize);
+					break;
+				}
+
 			}
 
 			ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
@@ -973,13 +1184,20 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 				fprintf(ControlCodeInst->DebugAsmFileData1, "\t.long 0x%08x\n", *(Data+IterationSize));
 				ControlCodeInst->UcPageSize += UC_DMA_WORD_LEN;
 			}
-			_XAie_ControlCodePageInfo(ControlCodeInst->DebugAsmFile, ControlCodeInst->PageId, ControlCodeInst->UcPageSize);
 
 			if(ControlCodeInst->IsAdjacentMemWrite == 1) {
 				_XAie_UpdateDataLengthDmaBd(ControlCodeInst,
 						(ControlCodeInst->CombinedMemWriteSize + IterationSize));
+				if (Map) {
+					Map->BWDataSizes[ControlCodeInst->CurrentDataBWLabel-1] = ControlCodeInst->CombinedMemWriteSize + IterationSize;
+					Map->HashBW[ControlCodeInst->CurrentDataBWLabel-1] = HASH_INVALID;
+				}
 			}
 			else {
+				if((ControlCodeInst->LabelMatchFound == 0) && Map) {
+						Map->HashBW[ControlCodeInst->CurrentDataBWLabel] = _XAie_ComputeHash(Data, IterationSize - TempItrSize);
+						Map->BWDataSizes[ControlCodeInst->CurrentDataBWLabel] = (IterationSize - TempItrSize);
+				}
 				CumilativeRegOff = RegOff + AdjustedOff;
             	fprintf(ControlCodeInst->ControlCodedatafp,
                     	"\t UC_DMA_BD\t 0, 0x%x, @DMAWRITE_data_%d, 0x%x, 0, 0\n",
@@ -990,6 +1208,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
                     	EXTRACT_LOWER_FOUR_BYTES(CumilativeRegOff),  ControlCodeInst->UcDmaDataNum,
 						(IterationSize - TempItrSize));
 				ControlCodeInst->UcDmaDataNum++;
+				ControlCodeInst->CurrentDataBWLabel = ControlCodeInst->UcDmaDataNum;
 			}
 			
 			NewPageRegOff = RegOff + AdjustedOff;
@@ -998,6 +1217,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 			TempItrSize = IterationSize;
 			
 		}
+		_XAie_ControlCodePageInfo(ControlCodeInst->DebugAsmFile, ControlCodeInst->PageId, ControlCodeInst->UcPageSize);
 	}
 
 	ControlCodeInst->CalculatedNextRegOff = (u64)(RegOff + (Size * (sizeof(*Data))));
@@ -1012,6 +1232,8 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 	else {
 		ControlCodeInst->CombinedMemWriteSize = Size;
 	}
+
+	ControlCodeInst->LabelMatchFound = 0;
 
 	return XAIE_OK;
 }
@@ -1780,7 +2002,17 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	ControlCodeInst->DebugAsmFileData1 = fopen(TEMP_ASM_FILE4, "w+");
 	ControlCodeInst->DebugAsmFile = fopen(FName, "w+");
 	ControlCodeInst->PageSizeMax = PageSize;
-	ControlCodeInst->PageId = 0;
+	ControlCodeInst->TotalLabelsAllocated = MAX_LABELS_PER_ASM_FILE;
+	ControlCodeInst->TotalLabelsAllocatedWrite = MAX_LABELS_PER_ASM_FILE;
+	ControlCodeInst->CurrentDataLabel = ControlCodeInst->UcbdDataNum;
+	ControlCodeInst->CurrentDataBWLabel = ControlCodeInst->UcDmaDataNum;
+	ControlCodeInst->LabelMap = (XAie_LabelMap*)calloc(1,sizeof(XAie_LabelMap));
+	
+	if(ControlCodeInst->LabelMap) {
+		if(_XAie_LabelMapSetup(ControlCodeInst->LabelMap, ControlCodeInst) == XAIE_OK) {
+			XAIE_DBG("Label optimization setup success\n");
+		}
+	}
 
 	if (ControlCodeInst->ControlCodefp == NULL ||
 		ControlCodeInst->ControlCodedatafp == NULL ||
@@ -1984,6 +2216,14 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 		ControlCodeInst->ControlCodefp		= NULL;
 		ControlCodeInst->ControlCodedatafp	= NULL;
 		ControlCodeInst->ControlCodedata2fp	= NULL;
+
+		if(ControlCodeInst->LabelMap) {
+			if(_XAie_LabelMapTeardown(ControlCodeInst->LabelMap) == XAIE_OK) {
+				XAIE_DBG("Label optimization teardown success\n");
+			}
+			free(ControlCodeInst->LabelMap);
+			ControlCodeInst->LabelMap = NULL;
+		}
 		ControlCodeInst->DebugAsmFile = NULL;
 		ControlCodeInst->DebugAsmFileData0 = NULL;
 		ControlCodeInst->DebugAsmFileData1 = NULL;

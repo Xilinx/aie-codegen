@@ -264,27 +264,6 @@ typedef struct XAie_DevicePartInfo {
 } XAie_DevicePartInfo;
 
 /*
- * This typedef contains the attributes for an AIE POR initialization
- * options. The structure is used by the AI engine POR initialization
- * API.
- */
-typedef struct XAie_PartPorOpts {
-	u8 RowOffset; /* Row offset to disable Compute tiles in a column and set them in pass through mode */
-	u8 MeTopRow; /* Top most Compute tile in a Column */
-	u8 PmRetain; /* Parameter to zeroize/retain uC Pm during POR */
-} XAie_PartPorOpts;
-
-/*
- * This typedef contains the attributes for an AIE SHIM DMA Register
- * configuration
- */
-typedef struct XAie_ShimOpts {
-	u32 SMID; /* SMID/PASID value for SHIM DMA channels */
-	u32 AxUSER; /* AxUSER Drive bits values. Bits [36:27] are reserved for future extension */
-	u32 Trusted_Keys; /* uC DMA Trusted_Keys value */
-} XAie_ShimOpts;
-
-/*
  * This enum contains all the Stream Switch Port types. These enums are used to
  * access the base address of stream switch configuration registers.
  */
@@ -511,20 +490,6 @@ typedef enum {
         APPLICATION_A,
         APPLICATION_B,
 } XAie_AppIndex;
-
-/*
- * Data structure to capture HW Error Config.
- */
-typedef struct {
-	uint8_t axi_errors:1;
-	uint8_t hw_ce_errors:1;
-	uint8_t hw_uc_errors:1;
-} XAie_HwErrCfgBits;
-
-typedef union {
-	XAie_HwErrCfgBits cfg_bits;
-	uint8_t cfg_val;
-} XAie_HwErrCfg;
 
 /*
  * This enum captures all the error codes from the driver
@@ -901,69 +866,6 @@ static inline void XAie_SetupConfigNorthSouthShimTileRows(XAie_Config *ConfigPtr
 *
 *******************************************************************************/
 #define XAie_InstDeclare(Inst, ConfigPtr) XAie_DevInst Inst = { 0 }
-
-/*****************************************************************************/
-/**
-*
-* Macro to initialize error metadata.
-*
-* @param	MDataInst: Name of the XAie_ErrorMetaData structure.
-* @param	_Buffer: Pointer to a buffer for returning backtracked error
-*			information.
-* @param	_Size: Size of buffer in bytes.
-*
-* @return	None.
-*
-* @note		None.
-*
-*******************************************************************************/
-#define XAie_ErrorMetadataInit(Mdata, _Buffer, _Size)			\
-	((XAie_ErrorInfo *)(_Buffer))->Payload = (void *)((uintptr_t)_Buffer + sizeof(XAie_ErrorInfo)); \
-	XAie_ErrorMetaData Mdata = {					\
-		.ErrInfo = (XAie_ErrorInfo *) (_Buffer),		\
-		.ArraySize = _Size,					\
-		.Cols = {0, 0},						\
-	}
-
-/*****************************************************************************/
-/**
-*
-* Macro to setup error backtrack column range.
-*
-* @param	MDataInst: Name of the XAie_ErrorMetaData structure.
-* @param	_Cols: XAie_Range column instance.
-*
-* @return	None.
-*
-* @note		None.
-*
-*******************************************************************************/
-#define XAie_ErrorSetBacktrackRange(MData, _Cols)	(MData)->Cols = _Cols
-
-/*****************************************************************************/
-/**
-*
-* Error backtracking can be accomplished using more than one buffer. This macro
-* overrides the error payload buffer while preserving the error metadata.
-*
-* @param	MData: XAie_ErrorMetaData structure instance.
-* @param	Buffer: Pointer to a buffer for returning backtracked error
-*			information.
-* @param	Size: Size of buffer in bytes.
-*
-* @return	None.
-*
-* @note		For the same array partition, for error backtracking algorithm
-*		to continue from the tile module where it previously left off,
-*		error metadata must be preserved. Using this macro,
-*		backtracking could be done using buffers in a ping-pong fashion.
-*
-*******************************************************************************/
-#define XAie_ErrorMetadataOverrideBuffer(Mdata, Buffer, Size)		\
-	({								\
-		(Mdata).Payload = (XAie_ErrorPayload *) (Buffer);	\
-		(Mdata).ArraySize = (Size) / sizeof(XAie_ErrorPayload);	\
-	})
 
 /*****************************************************************************/
 /**

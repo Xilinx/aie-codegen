@@ -42,11 +42,13 @@
 #define XAIE_APP_MODE_SHIFT     8U
 #define XAIE_L2_SPLIT_SHIFT     10U
 
+#if DEV_GEN_AIE4
 #define XAIE_CORE_TILE_GROUP_ERRORS0_EVENT_NUM          0x56     // Group_Error0 = 86 ; Page 210 in spec version v1.3
 #define XAIE_CORE_TILE_GROUP_ERRORS1_EVENT_NUM          0x57     // Group_Error0 = 87 ; Page 210 in spec version v1.3
 #define XAIE_CORE_TILE_GROUP_ERRORS2_EVENT_NUM          0x58     // Group_Error0 = 88 ; Page 210 in spec version v1.3
 #define XAIE_MEM_TILE_GROUP_ERRORS_EVENT_NUM            0xA2     // Group_Errors = 162 ; Page 298 in spec version v1.3
 #define XAIE_SHIM_TILE_GROUP_ERRORS_EVENT_NUM           0x98     // Group_Errors = 152 ; Page 338 in spec version v1.3
+#endif
 
 #define BC_DIR_UNBLOCK		0
 #define BC_DIR_BLOCK		1
@@ -59,6 +61,8 @@
  * BIT-0   Enable_BC0           Enable the Broadcast channel 15 by setting its mask bit 
  ***/
 #define XAIE_L2_INTR_ENABLE_ALL_SOURCES                 0x1FFFF
+#define XAIE_L2_INTR_ENABLE_UC_AND_BC0_SOURCES          0x10001
+
 /***
  * Event_Group_Errors_Enable_A
  * SHIM Tile Group Error Event Number = 152 (153 to 169)
@@ -81,6 +85,9 @@
  * BIT-13 	166		uC_Module_B_ECC_Error_1bit          Set
  * BIT-14 	167		uC_Module_A_ECC_Error_2bit          Set
  * BIT-15 	168		uC_Module_B_ECC_Error_2bit          Set
+ *
+ * XAIE4GBL_PL_MODULE_EVENT_GROUP_ERRORS_ENABLE_A_MASK
+ *
  ****/
 #define XAIE_SHIM_TILE_GROUP_ERROR_VALUE                0xFFFF
 
@@ -101,6 +108,9 @@
  * BIT-08 	171		AXI_MM_Subordinate_Error            Set
  * BIT-09 	172		Lock_Error                          Set
  * BIT-10 	173		DMA_Task_Token_Stall                Set
+ *
+ * XAIE4GBL_MEM_TILE_MODULE_EVENT_GROUP_ERROR_ENABLE_A_MASK
+ *
  ****/
 #define XAIE_MEM_TILE_GROUP_ERROR_VALUE                 0x7FF
 
@@ -142,21 +152,29 @@
  * BIT-27 	116		DMA_Error                           Set
  * BIT-28 	117		Lock_Error                          Set
  * BIT-29 	118		DMA_task_token_stall                Set
+ *
+ * XAIE4GBL_CORE_MODULE_EVENT_GROUP_ERRORS0_ENABLE_MASK
+ *
  ****/
 #define XAIE_CORE_TILE_GROUP_ERROR_VALUE                0x3FFFFFFF
 
 /************************** Function Definitions *****************************/
 /*****************************************************************************/
 /**
-* This API sets up the error network for the given device partition to be used
-* by MPNPU self test.
+* This API sets up the error network for the given device partition.
 *
 * @param        DevInst: Device Instance
 *
 * @return       AieRC
 *               - XAIE_OK on success
 *
-* @note         It is implemented to support MPNPU self test framework.
+* @note         It is implemented to support MPNPU firmware to setup error
+*               network as part of partition initialization.
+*
+*				To Do:
+*               Need to add support for following features:
+*					- Configure error network based on Core Tile usage per column.
+*               	- Halt AIE Core tiles upon hw error.
 *
 ******************************************************************************/
 AieRC XAie_SetupErrorNetwork(XAie_DevInst *DevInst)
@@ -164,17 +182,26 @@ AieRC XAie_SetupErrorNetwork(XAie_DevInst *DevInst)
 	u64 RegAddr;
 
 #if DEV_GEN_AIE4
+	// Enable Column Clock for all the columns in the partition
 	XAie_SetColumnClk(DevInst, XAIE_ENABLE);
 
-	// Event Broadcast Network Configuration for each column
+	/**
+	 * For each column and row of the given partition.
+	 * 		- Configure the L2 Interrupt handler.
+	 * 		- Configure each tile to block events in (North East and West) directions but allow in South
+	 */
 	for (int col = 0; col < DevInst->NumCols; col++) {
-		// Row-0 : Shim Tile
-		// Configure Shim-Tile to enable all interrupt line 16 BC and 1 uC
+		/**
+		 * Row-0 : Shim Tile
+		 * Configure Shim-Tile to enable all interrupt line 16 BC and 1 uC
+		 */
 		RegAddr = _XAie_LGetTileAddr(0, 0) + ((DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) ?
 			XAIE_NOC_MOD_INTR_L2_APP_B_ENABLE : XAIE_NOC_MOD_INTR_L2_ENABLE);
-		_XAie_LPartWrite32(DevInst, RegAddr, XAIE_L2_INTR_ENABLE_ALL_SOURCES);
+		_XAie_LPartWrite32(DevInst, RegAddr, XAIE_L2_INTR_ENABLE_UC_AND_BC0_SOURCES);
 
-		// Configure Shim-Tile to Block Events in all directions (North East South and West)
+		/**
+		 * Configure Shim-Tile to Block Events in (North East and West) directions but allow in South
+		 */
 		RegAddr = _XAie_LGetTileAddr(0, col) + ((DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) ?
 			XAIE_PL_MOD_EVENT_BROADCAST_B_BLOCK_SOUTH_SET : XAIE_PL_MOD_EVENT_BROADCAST_A_BLOCK_SOUTH_SET);
 		_XAie_LPartWrite32(DevInst, RegAddr, BC_DIR_UNBLOCK); // UnBlock South
@@ -191,8 +218,10 @@ AieRC XAie_SetupErrorNetwork(XAie_DevInst *DevInst)
 			_XAie_LPartWrite32(DevInst, RegAddr, BC_DIR_BLOCK); // Block East
 		}
 
-		// Row-1 : Mem Tile
-		// Configure Mem-Tile to Block Events in West, North and East
+		/**
+		 * Row-1 : Mem Tile
+		 * Configure Mem-Tile to Block Events in (North East and West) directions but allow in South
+		 */
 		RegAddr = _XAie_LGetTileAddr(1, col) + ((DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) ?
 			XAIE_MEM_TILE_EVENT_BROADCAST_B_BLOCK_SOUTH_SET : XAIE_MEM_TILE_EVENT_BROADCAST_A_BLOCK_SOUTH_SET);
 		_XAie_LPartWrite32(DevInst, RegAddr, BC_DIR_UNBLOCK); // UnBlock South
@@ -209,8 +238,10 @@ AieRC XAie_SetupErrorNetwork(XAie_DevInst *DevInst)
 			_XAie_LPartWrite32(DevInst, RegAddr, BC_DIR_BLOCK); // Block East
 		}
 
-		// Row-2 and Above : Core Tile
-		// Configure Core-Tile to Block Events in West, North and East
+		/**
+		 * Row-2 and Above : Core Tile
+		 * Configure Core-Tile to Block Events in (North East and West) directions but allow in South
+		 */
 		for (int row = XAIE_AIE_TILE_ROW_START; row < XAIE_NUM_ROWS; row++) {
 			RegAddr = _XAie_LGetTileAddr(row, col) + XAIE_AIE_TILE_EVENT_BROADCAST_BLOCK_SOUTH_SET;
 			_XAie_LPartWrite32(DevInst, RegAddr, BC_DIR_UNBLOCK); // UnBlock South
@@ -226,7 +257,9 @@ AieRC XAie_SetupErrorNetwork(XAie_DevInst *DevInst)
 		}
 	}
 
-	// Enable desired group errors for each tile and configure BC0 to propagate group error0 event.
+	/**
+	 * Enable desired group errors for each tile and configure BC0 to propagate group error0 events.
+	 */
 	for (int col = 0; col < DevInst->NumCols; col++) {
 		// Row-0 : Shim Tile
 		RegAddr = _XAie_LGetTileAddr(0, col) + ((DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) ?
@@ -1179,6 +1212,11 @@ AieRC XAie_PartitionInitialize(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 	} else {
 		XAIE_DBG("XAie_PartInitOpts is NULL. Entire array will be initialized\n");
 	}
+
+	/**
+	 * Setup error network for the partition
+	 */
+	XAie_SetupErrorNetwork(DevInst);
 
 	/**
 	 * Enable L2 interrupt generation

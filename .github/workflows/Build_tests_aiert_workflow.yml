@@ -14,7 +14,7 @@ jobs:
     env:
       JENKINS_URL: "http://172.23.155.96:8080/"
       JENKINS_USER: "ips-lab"
-      JENKINS_TOKEN: ${{ secrets.JENKINS_TOKEN }}
+      JENKINS_TOKEN: ${{ vars.JENKINS_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Run aie-rt build Patch Tests.

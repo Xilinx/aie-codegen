@@ -184,6 +184,7 @@ typedef struct {
 	XAie_PartitionProp PartProp; /* Partition property */
 	XAie_List TxnList; /* Head of the list of txn buffers */
 	u32 InitialTxnCmdArraySize; /* TXN command array max size to begin with */
+        XAie_List PartitionList;
 	
 	/*use to clear A2S buffer (work-around for data leak)*/
 	u64 HostddrBuffAddr;

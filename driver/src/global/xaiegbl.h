@@ -210,13 +210,13 @@ typedef struct {
 	u8 NumRows;
 	u8 NumCols;
 	u8 ShimRowNum;
-	u8 ShimTileNumRowsNorth;
-	u8 ShimTileNumRowsSouth;
 	u8 MemTileRowStart;
 	u8 MemTileNumRows;
 	u8 AieTileRowStart;
 	u8 AieTileNumRows;
 	XAie_PartitionProp PartProp;
+	u8 ShimTileNumRowsNorth;
+	u8 ShimTileNumRowsSouth;
 } XAie_Config;
 
 /*
@@ -857,13 +857,13 @@ static inline void XAie_SetupConfigNorthSouthShimTileRows(XAie_Config *ConfigPtr
 			.NumRows = _NumRows,\
 			.NumCols = _NumCols,\
 			.ShimRowNum = _ShimRowNum,\
-			.ShimTileNumRowsNorth = 0,\
-			.ShimTileNumRowsSouth = UINT8_MAX,\
 			.MemTileRowStart = _MemTileRowStart,\
 			.MemTileNumRows = _MemTileNumRows,\
 			.AieTileRowStart = _AieTileRowStart,\
 			.AieTileNumRows = _AieTileNumRows,\
 			.PartProp = {0}, \
+			.ShimTileNumRowsNorth = 0,\
+			.ShimTileNumRowsSouth = 1,\
 		}\
 
 /*****************************************************************************/

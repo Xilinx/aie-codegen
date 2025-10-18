@@ -1713,7 +1713,13 @@ static AieRC _XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 TileType, const
 					if (TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
 						/* These ports doesnt exist in APP B space*/
 						if ((PortType == EAST) || (PortType == WEST) ||
-							(PortType == _32B_EAST) || (PortType == _32B_WEST) || (PortType == DMA_Trace)) {
+							(PortType == _32B_EAST) || (PortType == _32B_WEST) ||
+							(PortType == DMA_Trace) || (PortType == CTRL) || (PortType == _32B_TRACE) ) {
+							continue;
+						}
+					} else if (TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+						/* These ports doesnt exist in APP B space*/
+						if ( (PortType == CTRL) || (PortType == _32B_TRACE) ) {
 								continue;
 						}
 					}

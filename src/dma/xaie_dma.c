@@ -267,7 +267,6 @@ static AieRC _XAie_DmaLockConfig(XAie_DmaDesc *DmaDesc, XAie_Lock Acq,
 {
 	const XAie_DmaMod *DmaMod;
 	const XAie_LockMod *LockMod;
-	u32 NumLocks;
 
 	if((DmaDesc == XAIE_NULL) ||
 			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -277,13 +276,26 @@ static AieRC _XAie_DmaLockConfig(XAie_DmaDesc *DmaDesc, XAie_Lock Acq,
 
 	DmaMod = DmaDesc->DmaMod;
 	LockMod = DmaDesc->LockMod;
-	
-	NumLocks = _XAie_GetMaxElementValue(DmaDesc->DevGen, DmaDesc->TileType,  DmaDesc->AppMode, DmaMod->NumLocks);
 
-	if((Acq.LockId >= NumLocks) ||
-	   (Acq.LockVal > LockMod->LockValUpperBound) ||
+	/* This is special case for Dual App mode. In dual App, resource values will be half but
+	   for DMA to access Lock Indexes which are local to Tile, the numbers has too be physical
+	   So that adding hardcoded values to check error condition. */	
+	if (_XAie_IsDeviceGenAIE4(DmaDesc->DevGen) && ((DmaDesc->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A)
+		|| (DmaDesc->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B))) {
+		if (Acq.LockId < 448 || Acq.LockId > 480) {
+			XAIE_ERROR("Invalid Lock\n");
+			return XAIE_INVALID_LOCK_ID;
+		}
+	}
+	else {
+		if (Acq.LockId >= DmaMod->NumLocks) {
+			XAIE_ERROR("Invalid Lock\n");
+			return XAIE_INVALID_LOCK_ID;
+		}
+	}
+	if((Acq.LockVal > LockMod->LockValUpperBound) ||
 	   (Rel.LockVal > LockMod->LockValUpperBound)) {
-		XAIE_ERROR("Invalid Lock\n");
+		XAIE_ERROR("Invalid Lock Value \n");
 		return XAIE_INVALID_LOCK_ID;
 	}
 

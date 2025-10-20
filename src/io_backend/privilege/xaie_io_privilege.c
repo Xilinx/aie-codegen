@@ -730,10 +730,12 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 		if(RC != XAIE_OK) {
 			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
 		}
-		RC = XAie_PrivilegeSetAxiMMIsolation(DevInst, XAIE_INIT_ISOLATION);
-		if(RC!= XAIE_OK) {
-			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
-			return RC;
+		if (DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2PS) {
+			RC = XAie_PrivilegeSetAxiMMIsolation(DevInst, XAIE_INIT_ISOLATION);
+			if(RC!= XAIE_OK) {
+				_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
+				return RC;
+			}
 		}
 
 	}

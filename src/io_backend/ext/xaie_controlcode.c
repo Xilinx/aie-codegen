@@ -1771,7 +1771,7 @@ AieRC XAie_ControlCodeSetScrachPad(XAie_DevInst *DevInst, const char *Scrachpad)
         if(ControlCodeInst->ScrachpadName == NULL)
                 return XAIE_ERR;
         else {
-                strncpy(ControlCodeInst->ScrachpadName, Scrachpad, strlen(Scrachpad));
+                snprintf(ControlCodeInst->ScrachpadName, strlen(Scrachpad)+1, "%s", Scrachpad);
                 return XAIE_OK;
         }
 }

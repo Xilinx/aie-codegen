@@ -35,7 +35,7 @@
 
 #define XAIE4_TILEDMA_NUM_BD_WORDS			6U
 #define XAIE4_SHIMDMA_NUM_BD_WORDS			9U
-#define XAIE4_MEMTILEDMA_NUM_BD_WORDS		11U
+#define XAIE4_MEMTILEDMA_NUM_BD_WORDS			11U
 #define XAIE4_DMA_STEPSIZE_DEFAULT			1U
 #define XAIE4_DMA_ITERWRAP_DEFAULT			1U
 #define XAIE4_DMA_PAD_NUM_DIMS				3U
@@ -43,10 +43,14 @@
 #define XAIE4_DMA_STATUS_IDLE				0x0U
 #define XAIE4_DMA_STATUS_CHANNEL_NOT_RUNNING		0x0U
 #define XAIE4_DMA_STATUS_CHNUM_OFFSET			0x4U
-#define XAIE4_DMA_STATUS_TASK_Q_SIZE_MSB	24
+#define XAIE4_DMA_STATUS_TASK_Q_SIZE_MSB		24
 #define XAIE4_LOCK_ACQ_MASK				0x7FU
 
 #define XAIE4_DMA_PAD_WORDS_MAX				0xFFU /* 8 bits */
+/*These values are referenced from AIE4 architecture spec V1.5
+ * Table 6-7 */
+#define DMA_MEMTILE_LOCAL_LOCK_LOW			448U
+#define DMA_MEMTILE_LOCAL_LOCK_HIGH			479U
 
 /*********************** Function Definitions *************************/
 /*****************************************************************************/
@@ -3138,6 +3142,74 @@ AieRC _XAie4_AxiBurstLenCheck(u8 BurstLen, u8 *AxiBurstLen)
 		return XAIE_INVALID_BURST_LENGTH;
 	}
 }*/
+
+/*****************************************************************************/
+/**
+*
+* This API initializes the Acquire and Release Locks for a a Dma for AIE4
+* descriptor.
+*
+* @param        DmaDesc: Initialized Dma Descriptor.
+* @param        Acq: Lock object with acquire lock ID and lock value.
+* @param        Rel: Lock object with release lock ID and lock value.
+* @param        AcqEn: XAIE_ENABLE/XAIE_DISABLE for enable or disable acquire
+*               lock.
+* @param        RelEn: XAIE_ENABLE/XAIE_DISABLE for enable or disable release
+*               lock.
+*
+* @return       XAIE_OK on success, Error code on failure.
+*
+* @note         Internal Only. Should not be called directly. This function is
+*               called from the internal Dma Module data structure.
+*
+******************************************************************************/
+AieRC _XAie4_DmaSetLock(XAie_DmaDesc *DmaDesc, XAie_Lock Acq, XAie_Lock Rel,
+                u8 AcqEn, u8 RelEn)
+{
+        const XAie_DmaMod *DmaMod;
+        const XAie_LockMod *LockMod;
+
+
+        DmaMod = DmaDesc->DmaMod;
+        LockMod = DmaDesc->LockMod;
+
+
+        /* This is special case for Dual App mode. In dual App, resource values will be half but
+           for DMA to access Lock Indexes which are local to Tile, the numbers has to be physical
+           So that adding hardcoded values to check error condition. */
+        if ((DmaDesc->TileType == XAIEGBL_TILE_TYPE_MEMTILE) &&
+                ((DmaDesc->AppMode == XAIE_DEVICE_DUAL_APP_MODE_A) ||
+                (DmaDesc->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B))) {
+                if (Acq.LockId < DMA_MEMTILE_LOCAL_LOCK_LOW ||
+			Acq.LockId > DMA_MEMTILE_LOCAL_LOCK_HIGH) {
+                        XAIE_ERROR("Invalid Lock\n");
+                        return XAIE_INVALID_LOCK_ID;
+                }
+        }
+        else {
+                if (Acq.LockId >= DmaMod->NumLocks) {
+                        XAIE_ERROR("Invalid Lock\n");
+                        return XAIE_INVALID_LOCK_ID;
+                }
+        }
+
+        if((Acq.LockVal > LockMod->LockValUpperBound) ||
+           (Rel.LockVal > LockMod->LockValUpperBound)) {
+                XAIE_ERROR("Invalid Lock Value \n");
+                return XAIE_INVALID_LOCK_ID;
+        }
+
+
+        DmaDesc->LockDesc.LockAcqId = Acq.LockId;
+        DmaDesc->LockDesc.LockRelId = Rel.LockId;
+        DmaDesc->LockDesc.LockAcqEn = AcqEn;
+        DmaDesc->LockDesc.LockRelEn = RelEn;
+        DmaDesc->LockDesc.LockRelVal = Rel.LockVal;
+        DmaDesc->LockDesc.LockAcqVal = Acq.LockVal;
+
+        return XAIE_OK;
+}
+
 
 #endif /* XAIE_FEATURE_DMA_ENABLE */
 

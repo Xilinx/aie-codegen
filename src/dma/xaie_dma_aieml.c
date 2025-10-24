@@ -146,6 +146,24 @@ void _XAieMl_MemTileDmaInit(XAie_DmaDesc *Desc)
 AieRC _XAieMl_DmaSetLock(XAie_DmaDesc *DmaDesc, XAie_Lock Acq, XAie_Lock Rel,
 		u8 AcqEn, u8 RelEn)
 {
+	const XAie_DmaMod *DmaMod;
+	const XAie_LockMod *LockMod;
+
+
+	DmaMod = DmaDesc->DmaMod;
+	LockMod = DmaDesc->LockMod;
+
+	if (Acq.LockId >= DmaMod->NumLocks) {
+		XAIE_ERROR("Invalid Lock\n");
+		return XAIE_INVALID_LOCK_ID;
+	}
+
+	if((Acq.LockVal > LockMod->LockValUpperBound) ||
+			(Rel.LockVal > LockMod->LockValUpperBound)) {
+		XAIE_ERROR("Invalid Lock Value \n");
+		return XAIE_INVALID_LOCK_ID;
+	}
+
 	DmaDesc->LockDesc.LockAcqId = Acq.LockId;
 	DmaDesc->LockDesc.LockRelId = Rel.LockId;
 	DmaDesc->LockDesc.LockAcqEn = AcqEn;

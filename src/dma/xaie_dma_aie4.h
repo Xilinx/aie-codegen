@@ -38,6 +38,8 @@ typedef struct XAie4_MemTileDmaBdChMap {
 void _XAie4_ShimDmaInit(XAie_DmaDesc* Desc);
 void _XAie4_TileDmaInit(XAie_DmaDesc* Desc);
 void _XAie4_MemTileDmaInit(XAie_DmaDesc* Desc);
+AieRC _XAie4_DmaSetLock(XAie_DmaDesc *DmaDesc, XAie_Lock Acq, XAie_Lock Rel,
+                u8 AcqEn, u8 RelEn);
 u64 _XAie4_DmaGetChannelCtrlAddr(XAie_DevInst *DevInst, const XAie_DmaMod *DmaMod,
 				      XAie_LocType Loc, XAie_DmaDirection Dir, u8 ChNum);
 

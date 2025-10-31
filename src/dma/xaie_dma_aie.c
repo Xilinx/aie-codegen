@@ -666,6 +666,7 @@ AieRC _XAie_TileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 	const XAie_DmaBdProp *BdProp;
 	u8 LockAcqVal, LockRelVal;
 	u8 LockAcqVal_2, LockRelVal_2;
+	u8 IntrleaveCount;
 
 	DmaMod = DevInst->DevProp.DevMod[DmaDesc->TileType].DmaMod;
 	BdProp = DmaMod->BdProp;
@@ -861,6 +862,10 @@ AieRC _XAie_TileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 				BdProp->AddrMode->AieMultiDimAddr.CurrPtr.Lsb,
 				BdProp->AddrMode->AieMultiDimAddr.CurrPtr.Mask);
 
+	if(DmaDesc->MultiDimDesc.AieMultiDimDesc.IntrleaveCount > 0)
+		InterleaveCount = (DmaDesc->MultiDimDesc.AieMultiDimDesc.IntrleaveCount - 1U);
+	else
+		InterleaveCount = DmaDesc->MultiDimDesc.AieMultiDimDesc.IntrleaveCount;
 	if ((_XAie_CheckPrecisionExceeds(BdProp->BdEn->ValidBd.Lsb,
 				_XAie_MaxBitsNeeded(DmaDesc->BdEnDesc.ValidBd),MAX_VALID_AIE_REG_BIT_INDEX)) ||
 		(_XAie_CheckPrecisionExceeds(BdProp->BdEn->UseNxtBd.Lsb,
@@ -874,7 +879,7 @@ AieRC _XAie_TileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		(_XAie_CheckPrecisionExceeds(BdProp->DoubleBuffer->EnIntrleaved.Lsb,
 			_XAie_MaxBitsNeeded(DmaDesc->MultiDimDesc.AieMultiDimDesc.EnInterleaved),MAX_VALID_AIE_REG_BIT_INDEX))||
 		(_XAie_CheckPrecisionExceeds(BdProp->DoubleBuffer->IntrleaveCnt.Lsb,
-			_XAie_MaxBitsNeeded(DmaDesc->MultiDimDesc.AieMultiDimDesc.IntrleaveCount - 1U),MAX_VALID_AIE_REG_BIT_INDEX))||
+			_XAie_MaxBitsNeeded(InterleaveCount),MAX_VALID_AIE_REG_BIT_INDEX))||
 		(_XAie_CheckPrecisionExceeds(BdProp->BdEn->NxtBd.Lsb,
 			_XAie_MaxBitsNeeded(DmaDesc->BdEnDesc.NxtBd),MAX_VALID_AIE_REG_BIT_INDEX))||
 		(_XAie_CheckPrecisionExceeds(BdProp->BufferLen.Lsb,
@@ -899,7 +904,7 @@ AieRC _XAie_TileDmaWriteBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 		XAie_SetField(DmaDesc->MultiDimDesc.AieMultiDimDesc.EnInterleaved,
 				BdProp->DoubleBuffer->EnIntrleaved.Lsb,
 				BdProp->DoubleBuffer->EnIntrleaved.Mask) |
-		XAie_SetField((DmaDesc->MultiDimDesc.AieMultiDimDesc.IntrleaveCount - 1U),
+		XAie_SetField((InterleaveCount),
 				BdProp->DoubleBuffer->IntrleaveCnt.Lsb,
 				BdProp->DoubleBuffer->IntrleaveCnt.Mask) |
 		XAie_SetField(DmaDesc->BdEnDesc.NxtBd,

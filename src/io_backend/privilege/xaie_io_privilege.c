@@ -730,14 +730,14 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 		if(RC != XAIE_OK) {
 			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
 		}
-		if (DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2PS) {
+		if ((DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE2PS) ||
+				(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIEML)) {
 			RC = XAie_PrivilegeSetAxiMMIsolation(DevInst, XAIE_INIT_ISOLATION);
 			if(RC!= XAIE_OK) {
 				_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
 				return RC;
 			}
 		}
-
 	}
 	else {
 		RC = DevInst->DevOps->SetPartIsolationAfterRst(DevInst, XAIE_CLEAR_ISOLATION);
@@ -765,7 +765,7 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 		}
 	}
 	//use default value for mem interleaving in aie2ps to match with other branch
-	if (DevInst->DevProp.DevGen != XAIE_DEV_GEN_AIE2PS) {
+	if ((DevInst->DevProp.DevGen != XAIE_DEV_GEN_AIE2PS) || (DevInst->DevProp.DevGen != XAIE_DEV_GEN_AIEML)) {
 		if (((OptFlags & XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING)) !=
 				XAIE_MEM_INTERLEAVING_MODE_ENABLE) {
 			RC = _XAie_PrivilegeConfigMemInterleaving(DevInst,

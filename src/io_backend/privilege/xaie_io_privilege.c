@@ -765,7 +765,7 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 		}
 	}
 	//use default value for mem interleaving in aie2ps to match with other branch
-	if ((DevInst->DevProp.DevGen != XAIE_DEV_GEN_AIE2PS) || (DevInst->DevProp.DevGen != XAIE_DEV_GEN_AIEML)) {
+	if ((DevInst->DevProp.DevGen != XAIE_DEV_GEN_AIE2PS) && (DevInst->DevProp.DevGen != XAIE_DEV_GEN_AIEML)) {
 		if (((OptFlags & XAIE_PART_INIT_OPT_CONFIG_MEMINTERLEAVING)) !=
 				XAIE_MEM_INTERLEAVING_MODE_ENABLE) {
 			RC = _XAie_PrivilegeConfigMemInterleaving(DevInst,

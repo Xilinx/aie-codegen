@@ -6026,7 +6026,7 @@ static const XAie_TraceMod Aie4MemTileTraceMod =
  * Data structure to configures second level interrupt controller for
  * XAIEGBL_TILE_TYPE_SHIMNOC tile type
  */
-static const XAie_L2IntrMod Aie4NoCL2IntrMod =
+static const XAie_L2IntrMod Aie4NocL2IntrMod =
 {
 	.EnableRegOff = XAIE4GBL_NOC_MODULE_INTERRUPT_CONTROLLER_ENABLE_A,
 	.DisableRegOff = XAIE4GBL_NOC_MODULE_INTERRUPT_CONTROLLER_DISABLE_A,
@@ -6275,7 +6275,7 @@ static const XAie_CtrlPktHndlrMod Aie4ShimTileCtrlPktHndlrMod =
 	#define AIE4SHIMTILENOCMOD NULL
 #endif
 #ifdef XAIE_FEATURE_INTR_L2_ENABLE
-	#define AIE4NOCL2INTRMOD &Aie4NoCL2IntrMod
+	#define AIE4NOCL2INTRMOD &Aie4NocL2IntrMod
 #else
 	#define AIE4NOCL2INTRMOD NULL
 #endif

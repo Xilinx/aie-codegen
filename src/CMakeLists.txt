@@ -54,6 +54,7 @@ target_include_directories(
   PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME}>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../aie-regdb/globalparams>
   $<INSTALL_INTERFACE:include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
   )

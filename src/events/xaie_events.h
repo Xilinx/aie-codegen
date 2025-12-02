@@ -1228,8 +1228,7 @@ XAIE_AIG_EXPORT AieRC XAie_EventGetUserEventBase(XAie_DevInst *DevInst, XAie_Loc
 	XAie_ModuleType Module, XAie_Events *Event);
 XAIE_AIG_EXPORT AieRC XAie_EventRegStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 		XAie_ModuleType Module, u8 EventRegNo, u32 *Status);
-
+XAIE_AIG_EXPORT const char* XAie_EventGetString(XAie_Events Event);
 /**********************Function and enum for utils*************************************/
-const char* XAie_EventGetString(XAie_Events Event);
 
 #endif		/* end of protection macro */

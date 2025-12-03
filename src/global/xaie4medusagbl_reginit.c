@@ -280,11 +280,11 @@ static const  XAie_DmaBdPkt Aie4MemTileDmaBdPktProp =
         .PktId.Idx = 7U,
         .PktId.Lsb = XAIE4GBL_MEM_TILE_MODULE_DMA_S2MM_0_BD0_7_PACKET_ID_LSB,
         .PktId.Mask = XAIE4GBL_MEM_TILE_MODULE_DMA_S2MM_0_BD0_7_PACKET_ID_MASK,
-		/* PacketType is per channel for MemTile
-        .PktType.Idx = 0U,
-        .PktType.Lsb = XAIEMLGBL_MEM_TILE_MODULE_DMA_BD0_0_PACKET_TYPE_LSB,
-        .PktType.Mask = XAIEMLGBL_MEM_TILE_MODULE_DMA_BD0_0_PACKET_TYPE_MASK,
-        */
+		/* In MEM tile Packet_Type is now per-DMA-channel and is set via DMA channel control register
+			Adding channel control register filed details here for configuration */
+        .PktType.Idx = 0xFFU,
+        .PktType.Lsb = XAIE4GBL_MEM_TILE_MODULE_DMA_MM2S_0_CTRL_PACKET_TYPE_LSB,
+        .PktType.Mask = XAIE4GBL_MEM_TILE_MODULE_DMA_MM2S_0_CTRL_PACKET_TYPE_MASK,
 };
 
 static const  XAie_DmaBdLock Aie4MemTileDmaLockProp =
@@ -738,10 +738,11 @@ static const  XAie_DmaBdPkt Aie4ShimDmaBdPktProp =
 	.PktId.Idx = 8U,
 	.PktId.Lsb = XAIE4GBL_NOC_MODULE_DMA_BD0_8_PACKET_ID_LSB,
 	.PktId.Mask = XAIE4GBL_NOC_MODULE_DMA_BD0_8_PACKET_ID_MASK,
-	/* Why Packet ID is removed in AIE4 BD....Need to check?
-	.PktType.Idx = 2U,
-	.PktType.Lsb = XAIEMLGBL_NOC_MODULE_DMA_BD0_2_PACKET_TYPE_LSB,
-	.PktType.Mask = XAIEMLGBL_NOC_MODULE_DMA_BD0_2_PACKET_TYPE_MASK,*/
+	/* In Shim tile Packet_Type is now per-DMA-channel and is set via DMA channel control register
+		Adding channel control register filed details here for configuration */
+	.PktType.Idx = 0xFFU,
+	.PktType.Lsb = XAIE4GBL_NOC_MODULE_DMA_MM2S_0_CTRL_PACKET_TYPE_LSB,
+	.PktType.Mask = XAIE4GBL_NOC_MODULE_DMA_MM2S_0_CTRL_PACKET_TYPE_MASK,
 };
 
 static const  XAie_DmaBdLock Aie4ShimDmaLockProp =

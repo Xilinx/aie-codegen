@@ -1176,7 +1176,8 @@ AieRC XAie_GetCtrlPktHndlrStatus(XAie_DevInst *DevInst, XAie_LocType Loc, u32 *S
 	}
 
 	/* the control-packet handler of application B shall be disabled when in single-application mode */
-	RegAddr = CtrlPktMod->CtrlPktHndlrRegOff;
+	RegAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+				CtrlPktMod->CtrlPktHndlrRegOff;
 
 	RC = XAie_Read32(DevInst, RegAddr, Status);
 	if (RC != XAIE_OK)

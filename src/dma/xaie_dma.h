@@ -130,6 +130,8 @@ XAIE_AIG_EXPORT AieRC XAie_DmaChannelPauseStream(XAie_DevInst *DevInst, XAie_Loc
 		u8 ChNum, XAie_DmaDirection Dir, u8 Pause);
 XAIE_AIG_EXPORT AieRC XAie_DmaChannelPauseMem(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		XAie_DmaDirection Dir, u8 Pause);
+XAIE_AIG_EXPORT AieRC XAie_DmaChannelWritePktType(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
+		XAie_LocType Loc, u8 ChNum, XAie_DmaDirection Dir);
 XAIE_AIG_EXPORT AieRC XAie_DmaChannelPushBdToQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 ChNum, XAie_DmaDirection Dir, u16 BdNum);
 XAIE_AIG_EXPORT AieRC XAie_DmaChannelEnable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,

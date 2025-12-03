@@ -355,6 +355,97 @@ AieRC XAie_DmaSetPkt(XAie_DmaDesc *DmaDesc, XAie_Packet Pkt)
 /*****************************************************************************/
 /**
 *
+* This API writes the packet type configuration to the DMA channel control
+* register for AIE4 MEM and SHIM tiles.
+*
+* @param	DevInst: Device Instance.
+* @param	DmaDesc: Initialized dma descriptor containing packet type.
+* @param	Loc: Location of AIE Tile.
+* @param	ChNum: Channel number of the DMA.
+* @param	Dir: Direction of the DMA Channel. (MM2S or S2MM)
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+* @note		This API configures the packet type field in the hardware DMA
+*		channel control register. For AIE4, packet type is configured
+*		per-DMA-channel for MEM and SHIM tiles. This API is only
+*		supported for AIE4 generation and has no effect on earlier
+*		AIE versions.
+*
+******************************************************************************/
+AieRC XAie_DmaChannelWritePktType(XAie_DevInst *DevInst,
+		XAie_DmaDesc *DmaDesc, XAie_LocType Loc,
+		u8 ChNum, XAie_DmaDirection Dir)
+{
+	u64 Addr;
+	u32 Val;
+	u8 MaxNumChannels;
+	const XAie_DmaMod *DmaMod;
+
+	if((DevInst == XAIE_NULL) || (DmaDesc == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	if(Dir >= DMA_MAX) {
+		XAIE_ERROR("Invalid DMA direction\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	if((DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Dma Channel descriptor not initilized\n");
+		return XAIE_INVALID_DMA_DESC;
+	}
+
+	if(DmaDesc->TileType != DevInst->DevOps->GetTTypefromLoc(DevInst, Loc)) {
+		XAIE_ERROR("Tile type mismatch\n");
+		return XAIE_INVALID_TILE;
+	}
+
+	/* For MEM and Shim, Packet_Type is now per-DMA-channel and is set via DMA channel control register*/
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) ||
+		((DmaDesc->TileType != XAIEGBL_TILE_TYPE_MEMTILE) && 
+		 (DmaDesc->TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
+		XAIE_ERROR("Pkt type configuration in channel is only supported for AIE4 MEM and SHIM tiles\n");
+		return XAIE_FEATURE_NOT_SUPPORTED;
+	}
+
+	if(DmaDesc->PktDesc.PktEn != XAIE_ENABLE) {
+		XAIE_ERROR("Enable the packet descriptor for packet type\n");
+		return XAIE_INVALID_DMA_DESC;
+	}
+
+	DmaMod = DevInst->DevProp.DevMod[DmaDesc->TileType].DmaMod;
+	MaxNumChannels = _XAie_DmaGetMaxNumChannels(DevInst, DmaMod,
+			DmaDesc->TileType, Dir);
+	if (_XAie_DmaValidateChannelNumber(DevInst, DmaDesc->TileType,
+		Dir, ChNum, MaxNumChannels)) {
+		XAIE_ERROR("Invalid Channel number\n");
+		return XAIE_INVALID_CHANNEL_NUM;
+	}
+
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)))
+		Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
+			DmaMod->ChCtrlBase + ChNum * (u32)DmaMod->ChIdxOffset +
+			(u32)((u8)Dir * (u32)DmaMod->ChIdxOffset * DmaMod->NumChannels);
+	else
+		Addr = _XAie4_DmaGetChannelCtrlAddr(DevInst, DmaMod, Loc, Dir, ChNum);
+	
+	if (_XAie_CheckPrecisionExceeds(DmaMod->BdProp->Pkt->PktType.Lsb,
+			_XAie_MaxBitsNeeded(DmaDesc->PktDesc.PktType), MAX_VALID_AIE_REG_BIT_INDEX)){
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
+	}
+	Val = XAie_SetField(DmaDesc->PktDesc.PktType, DmaMod->BdProp->Pkt->PktType.Lsb,
+			DmaMod->BdProp->Pkt->PktType.Mask);
+
+	return XAie_MaskWrite32(DevInst, Addr, DmaMod->BdProp->Pkt->PktType.Mask, Val);
+}
+
+/*****************************************************************************/
+/**
+*
 * This api sets up the value of inserted out of order ID field in packet header.
 *
 * @param	DmaDesc: Initialized dma descriptor.
@@ -1751,9 +1842,8 @@ AieRC XAie_DmaChannelPushBdToQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
-			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
-		XAIE_ERROR("Invalid Tile Type or Direction\n");
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
 
@@ -1778,13 +1868,14 @@ AieRC XAie_DmaChannelPushBdToQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return RC;
 	}
 
-	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)))
+	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))) {
 		/* Calculate Channel base address */
 		Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
 			DmaMod->ChCtrlBase + ChNum * (u32)DmaMod->ChIdxOffset +
 			(u32)((u8)Dir * (u32)DmaMod->ChIdxOffset * DmaMod->NumChannels);
-	else
+	} else {
 		Addr = _XAie4_DmaGetChannelCtrlAddr(DevInst, DmaMod, Loc, Dir, ChNum);
+	}
 
 	return XAie_Write32(DevInst, Addr + (u64)(DmaMod->ChProp->StartBd.Idx * 4U),
 			BdNum);
@@ -1932,9 +2023,8 @@ AieRC XAie_DmaGetPendingBdCount(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if ((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
-			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
-		XAIE_ERROR("Invalid Tile Type or Direction\n");
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
 
@@ -1983,9 +2073,8 @@ AieRC XAie_DmaGetChannelStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if ((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
-			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
-		XAIE_ERROR("Invalid Tile Type or Direction\n");
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
 
@@ -2035,9 +2124,8 @@ AieRC XAie_DmaWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if ((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
-			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
-		XAIE_ERROR("Invalid Tile Type or Direction\n");
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
 
@@ -2091,9 +2179,8 @@ AieRC XAie_DmaWaitForDoneBusy(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if ((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
-			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
-		XAIE_ERROR("Invalid Tile Type or Direction\n");
+	if (TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
 
@@ -2148,9 +2235,8 @@ AieRC XAie_DmaWaitForBdTaskQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if ((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
-			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
-		XAIE_ERROR("Invalid Tile Type or Direction\n");
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
 
@@ -2210,9 +2296,8 @@ AieRC XAie_DmaWaitForBdTaskQueueBusy(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if ((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
-			((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC))) {
-		XAIE_ERROR("Invalid Tile Type or Direction\n");
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
 
@@ -2359,11 +2444,6 @@ AieRC XAie_DmaChannelSetStartQueueGeneric(XAie_DevInst *DevInst,
 		TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type to start queue\n");
 		return XAIE_INVALID_TILE;
-	}
-
-	if ((Dir == DMA_MM2S_CTRL) && (TileType != XAIEGBL_TILE_TYPE_SHIMNOC)) {
-		XAIE_ERROR("Invalid Tile Type for given Direction\n");
-		return XAIE_INVALID_DMA_DIRECTION;
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
@@ -2723,45 +2803,26 @@ AieRC XAie_DmaWriteChannel(XAie_DevInst *DevInst,
 			(u32)((u8)Dir * (u32)DmaMod->ChIdxOffset * DmaMod->NumChannels);
 	else
 		Addr = _XAie4_DmaGetChannelCtrlAddr(DevInst, DmaMod, Loc, Dir, ChNum);
-
-	if (Dir == DMA_MM2S_CTRL) {
-		if (DmaChannelDesc->EnOutofOrderId || DmaChannelDesc->EnCompression) {
-			XAIE_ERROR("Dma MM2S Control channel doesn't support OutofOrder and Compression\n");
-			return XAIE_INVALID_DMA_DIRECTION;
-		}
-
-		if (_XAie_CheckPrecisionExceeds(DmaMod->ChProp->ControllerId.Lsb,
-				_XAie_MaxBitsNeeded(DmaChannelDesc->ControllerId), MAX_VALID_AIE_REG_BIT_INDEX)  ||
-			_XAie_CheckPrecisionExceeds(DmaMod->ChProp->FoTMode.Lsb,
-				_XAie_MaxBitsNeeded(DmaChannelDesc->FoTMode), MAX_VALID_AIE_REG_BIT_INDEX)) {
-			XAIE_ERROR("Check Precision Exceeds Failed\n");
-			return XAIE_ERR;
-		}
-		Val = XAie_SetField(DmaChannelDesc->ControllerId, (DmaMod->ChProp->ControllerId.Lsb),
-					(DmaMod->ChProp->ControllerId.Mask)) |
-				XAie_SetField(DmaChannelDesc->FoTMode, (DmaMod->ChProp->FoTMode.Lsb),
-						(DmaMod->ChProp->FoTMode.Mask));
-	} else {
-		if (_XAie_CheckPrecisionExceeds(DmaMod->ChProp->ControllerId.Lsb,
-				_XAie_MaxBitsNeeded(DmaChannelDesc->ControllerId), MAX_VALID_AIE_REG_BIT_INDEX)  ||
-			_XAie_CheckPrecisionExceeds(DmaMod->ChProp->FoTMode.Lsb,
-				_XAie_MaxBitsNeeded(DmaChannelDesc->FoTMode), MAX_VALID_AIE_REG_BIT_INDEX) ||
-			_XAie_CheckPrecisionExceeds(DmaMod->ChProp->EnOutofOrder.Lsb,
-				_XAie_MaxBitsNeeded(DmaChannelDesc->EnOutofOrderId), MAX_VALID_AIE_REG_BIT_INDEX)  ||
-			_XAie_CheckPrecisionExceeds(DmaMod->ChProp->EnCompression.Lsb,
-				_XAie_MaxBitsNeeded(DmaChannelDesc->EnCompression), MAX_VALID_AIE_REG_BIT_INDEX)){
-			XAIE_ERROR("Check Precision Exceeds Failed\n");
-			return XAIE_ERR;
-		}
-		Val = XAie_SetField(DmaChannelDesc->EnOutofOrderId, (DmaMod->ChProp->EnOutofOrder.Lsb),
-				(DmaMod->ChProp->EnOutofOrder.Mask)) |
-			XAie_SetField(DmaChannelDesc->EnCompression, (DmaMod->ChProp->EnCompression.Lsb),
-				(DmaMod->ChProp->EnCompression.Mask)) |
-			XAie_SetField(DmaChannelDesc->ControllerId, (DmaMod->ChProp->ControllerId.Lsb),
-				(DmaMod->ChProp->ControllerId.Mask)) |
-			XAie_SetField(DmaChannelDesc->FoTMode, (DmaMod->ChProp->FoTMode.Lsb),
-				(DmaMod->ChProp->FoTMode.Mask));
+	
+	if (_XAie_CheckPrecisionExceeds(DmaMod->ChProp->ControllerId.Lsb,
+			_XAie_MaxBitsNeeded(DmaChannelDesc->ControllerId), MAX_VALID_AIE_REG_BIT_INDEX)  ||
+		_XAie_CheckPrecisionExceeds(DmaMod->ChProp->FoTMode.Lsb,
+			_XAie_MaxBitsNeeded(DmaChannelDesc->FoTMode), MAX_VALID_AIE_REG_BIT_INDEX) ||
+		_XAie_CheckPrecisionExceeds(DmaMod->ChProp->EnOutofOrder.Lsb,
+			_XAie_MaxBitsNeeded(DmaChannelDesc->EnOutofOrderId), MAX_VALID_AIE_REG_BIT_INDEX)  ||
+		_XAie_CheckPrecisionExceeds(DmaMod->ChProp->EnCompression.Lsb,
+			_XAie_MaxBitsNeeded(DmaChannelDesc->EnCompression), MAX_VALID_AIE_REG_BIT_INDEX)){
+		XAIE_ERROR("Check Precision Exceeds Failed\n");
+		return XAIE_ERR;
 	}
+	Val = XAie_SetField(DmaChannelDesc->EnOutofOrderId, (DmaMod->ChProp->EnOutofOrder.Lsb),
+			(DmaMod->ChProp->EnOutofOrder.Mask)) |
+		XAie_SetField(DmaChannelDesc->EnCompression, (DmaMod->ChProp->EnCompression.Lsb),
+			(DmaMod->ChProp->EnCompression.Mask)) |
+		XAie_SetField(DmaChannelDesc->ControllerId, (DmaMod->ChProp->ControllerId.Lsb),
+			(DmaMod->ChProp->ControllerId.Mask)) |
+		XAie_SetField(DmaChannelDesc->FoTMode, (DmaMod->ChProp->FoTMode.Lsb),
+			(DmaMod->ChProp->FoTMode.Mask));
 
 	return XAie_Write32(DevInst, Addr, Val);
 }

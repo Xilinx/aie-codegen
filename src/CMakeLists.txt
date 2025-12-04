@@ -27,6 +27,7 @@ file(
   HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/*/*.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/*/*/*.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../aie-regdb/globalparams/*.h"
   )
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/xaiengine.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include/)

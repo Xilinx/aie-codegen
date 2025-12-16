@@ -53,7 +53,7 @@ jobs:
         uses: ACAS-DevOps/actions/composite_actions/update_copyright_headers@main
         with:
           pr_target_branch: ${{ matrix.target_branch }}
-          pr_reviewers: '["kishorer"]'
+          pr_reviewers: '["kishorer","dhrshah"]'
           token: ${{ secrets.GHE_Z1AIEBUILD_PAT_WRITE_PRIVATE }}
           copyright_excludes_path: ${{ inputs.copyright_excludes_path || '.github/copyright_updates/COPYRIGHT_EXCLUDES' }}
           languages_path: ${{ inputs.languages_path || '.github/copyright_updates/languages_config.yml' }}

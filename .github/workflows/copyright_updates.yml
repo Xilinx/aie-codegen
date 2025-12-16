@@ -1,0 +1,63 @@
+name: Update copyrights headers and disclaimers
+on:
+  workflow_dispatch:
+    inputs:
+      disclaimer_mode:
+        description: Add disclaimers ? Use `config` to decide based on the contents of the COYRIGHT_EXCLUDES file.
+        default: never
+        type: choice
+        options:
+        - never
+        - config
+        - always
+
+      copyright_excludes_path:
+        description: Path to COPYRIGHT_EXCLUDES file to use.
+        type: string
+        default: .github/copyright_updates/COPYRIGHT_EXCLUDES
+
+      languages_path:
+        description: Path to languages definition file to use.
+        type: string
+        default: .github/copyright_updates/languages_config.yml
+
+      check_prohibited_source:
+        description: Check for prohibited sources in COYRIGHT_EXCLUDES file?
+        default: yes
+        type: choice
+        options:
+        - no
+        - yes
+
+  schedule:
+    - cron: '0 22 * * 6' # Every Saturday at 22:00
+
+jobs:
+  update_copyright:
+    name: Update copyright headers and disclaimers
+    runs-on: [self-hosted, linux, x64, ubuntu-xhdrdevl202-runner]
+    strategy:
+      fail-fast: false
+      matrix:
+        target_branch: [integ]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ matrix.target_branch }}
+          token: ${{ secrets.GHE_Z1AIEBUILD_PAT_WRITE_PRIVATE }}
+
+      - name: Run action
+        uses: ACAS-DevOps/actions/composite_actions/update_copyright_headers@main
+        with:
+          pr_target_branch: ${{ matrix.target_branch }}
+          pr_reviewers: '["dhrshah"]'
+          token: ${{ secrets.GHE_Z1AIEBUILD_PAT_WRITE_PRIVATE }}
+          copyright_excludes_path: ${{ inputs.copyright_excludes_path || '.github/copyright_updates/COPYRIGHT_EXCLUDES' }}
+          languages_path: ${{ inputs.languages_path || '.github/copyright_updates/languages_config.yml' }}
+          disclaimer_mode: ${{ inputs.disclaimer_mode || 'never' }}
+          check_prohibited_source: ${{ inputs.check_prohibited_source || 'yes' }}
+          do_whitespace_surround: 'False'
+          comment_padding: 1

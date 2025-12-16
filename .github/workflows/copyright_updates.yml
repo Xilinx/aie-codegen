@@ -35,11 +35,11 @@ on:
 jobs:
   update_copyright:
     name: Update copyright headers and disclaimers
-    runs-on: [Ubuntu]
+    runs-on: [self-hosted, linux, x64, ubuntu-xhdrdevl202-runner]
     strategy:
       fail-fast: false
       matrix:
-        target_branch: [intg]
+        target_branch: [integ]
 
     steps:
       - name: Checkout repo

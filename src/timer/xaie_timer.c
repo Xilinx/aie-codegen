@@ -1058,9 +1058,6 @@ AieRC XAie_SyncTimerWithTwoBcstChannel(XAie_DevInst *DevInst, u8 BcastChannelId1
 	/* Clear shim broadcast configuration for Chan1 */
 	_XAie_ClearShimBroadcast(DevInst, 0, DevInst->NumCols, BcastChannelId1);
 
-	/* Clear shim broadcast configuration for Chan2 */
-	_XAie_ClearShimBroadcast(DevInst, 0, DevInst->NumCols, BcastChannelId2);
-
 	free(Locs);
 	return XAIE_OK;
 }

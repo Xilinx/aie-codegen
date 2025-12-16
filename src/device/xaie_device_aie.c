@@ -282,33 +282,40 @@ AieRC _XAie_SetPartColClockAfterRst(XAie_DevInst *DevInst, u8 Enable)
 ******************************************************************************/
 AieRC _XAie_SetPartIsolationAfterRst(XAie_DevInst *DevInst, u8 IsolationFlags)
 {
-	AieRC RC = XAIE_OK;
-	(void)IsolationFlags;
+        AieRC RC = XAIE_OK;
 
-	for(u8 C = 0; C < DevInst->NumCols; C++) {
-		u8 Dir = 0;
+        for(u8 C = 0; C < DevInst->NumCols; C++) {
+                u8 Dir = 0;
 
-		if(C == 0U) {
-			Dir = XAIE_ISOLATE_WEST_MASK;
-		} else if(C == (u8)(DevInst->NumCols - 1U)) {
-			Dir = XAIE_ISOLATE_EAST_MASK;
-		} else {
-			/* No isolation for tiles by default for AIE */
-			continue;
-		}
+                if(IsolationFlags == XAIE_INIT_ISOLATION) {
+                        if(C > 0 && C < (u8)(DevInst->NumCols - 1U))
+                                continue;
+                        if(C == 0U)
+                                Dir |= XAIE_ISOLATE_WEST_MASK;
+                        if(C == (u8)(DevInst->NumCols - 1U))
+                                Dir |= XAIE_ISOLATE_EAST_MASK;
+                }
 
-		for(u8 R = 0; R < DevInst->NumRows; R++) {
-			RC = _XAie_TileCtrlSetIsolation(DevInst,
-					XAie_TileLoc(C, R), Dir);
-			if(RC != XAIE_OK) {
-				XAIE_ERROR("Failed to set partition isolation.\n");
-				return RC;
-			}
-		}
-	}
+                if(C == 0U && (IsolationFlags & XAIE_INIT_WEST_ISOLATION)) {
+                        Dir |= XAIE_ISOLATE_WEST_MASK;
+                }
+                if(C == (u8)(DevInst->NumCols - 1U) && (IsolationFlags & XAIE_INIT_EAST_ISOLATION)) {
+                        Dir |= XAIE_ISOLATE_EAST_MASK;
+                }
 
-	return RC;
+                for(u8 R = 0; R < DevInst->NumRows; R++) {
+                        RC = _XAie_TileCtrlSetIsolation(DevInst,
+                                        XAie_TileLoc(C, R), Dir);
+                        if(RC != XAIE_OK) {
+                                XAIE_ERROR("Failed to set partition isolation.\n");
+                                return RC;
+                        }
+                }
+        }
+
+        return RC;
 }
+
 
 /*****************************************************************************/
 /**

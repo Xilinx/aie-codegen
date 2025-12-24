@@ -6,7 +6,7 @@
 #include <fstream>
 #include <functional>
 #include <vector>
-#include <xaiengine.h>
+#include <aie_codegen.h>
 #include <xaiefal/common/xaiefal-base.hpp>
 #include <xaiefal/common/xaiefal-common.hpp>
 #include <xaiefal/common/xaiefal-log.hpp>

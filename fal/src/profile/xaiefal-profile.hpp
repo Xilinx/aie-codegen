@@ -4,7 +4,7 @@
 #include <fstream>
 #include <functional>
 #include <vector>
-#include <xaiengine.h>
+#include <aie_codegen.h>
 #include <xaiefal/rsc/xaiefal-groupevent.hpp>
 #include <xaiefal/rsc/xaiefal-perf.hpp>
 

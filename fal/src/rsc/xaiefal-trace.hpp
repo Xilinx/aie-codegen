@@ -6,7 +6,7 @@
 #include <functional>
 #include <string.h>
 #include <vector>
-#include <xaiengine.h>
+#include <aie_codegen.h>
 #include <bitset>
 
 #include <xaiefal/rsc/xaiefal-bc.hpp>

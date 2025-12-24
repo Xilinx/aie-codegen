@@ -8,7 +8,7 @@
 #include <bitset>
 #include <memory>
 #include <vector>
-#include <xaiengine.h>
+#include <aie_codegen.h>
 #include <xaiefal/common/xaiefal-common.hpp>
 #include <xaiefal/common/xaiefal-log.hpp>
 #include <xaiefal/rsc/xaiefal-rscmgr-backend-base.hpp>

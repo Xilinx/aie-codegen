@@ -4,7 +4,7 @@
 ###############################################################################
 
 cmake_minimum_required(VERSION 3.16.3)
-project(xaiengine LANGUAGES C VERSION 3.5)
+project(aie_codegen LANGUAGES C VERSION 3.5)
 
 set(CMAKE_C_STANDARD 11)
 
@@ -13,7 +13,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 
 # Define a custom option to control whether the library is built as a shared or static library
-option(XAIENGINE_BUILD_SHARED "Build xaiengine as a shared library" ON)
+option(AIE_CODEGEN_BUILD_SHARED "Build aie_codegen as a shared library" ON)
 
 file(
   GLOB_RECURSE
@@ -30,11 +30,11 @@ file(
   "${CMAKE_CURRENT_SOURCE_DIR}/../aie-regdb/globalparams/*.h"
   )
 
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/xaiengine.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include/)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/aie_codegen.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include/)
 
-file(COPY ${HDRS} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME})
+file(COPY ${HDRS} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include/aie_codegen_inc)
 
-if(XAIENGINE_BUILD_SHARED)
+if(AIE_CODEGEN_BUILD_SHARED)
   # Build the library as a shared library
   add_library(
     ${PROJECT_NAME}
@@ -54,10 +54,10 @@ target_include_directories(
   ${PROJECT_NAME}
   PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/${PROJECT_NAME}>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/aie_codegen_inc>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../aie-regdb/globalparams>
   $<INSTALL_INTERFACE:include>
-  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+  $<INSTALL_INTERFACE:include/aie_codegen_inc>
   )
 set_target_properties(
   ${PROJECT_NAME}
@@ -95,12 +95,12 @@ install(
   FILES
   ${HDRS}
   DESTINATION
-  ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
+  ${CMAKE_INSTALL_INCLUDEDIR}/aie_codegen_inc
   )
 
 install(
   FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/xaiengine.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/aie_codegen.h
   DESTINATION
   ${CMAKE_INSTALL_INCLUDEDIR}
   )

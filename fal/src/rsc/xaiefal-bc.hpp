@@ -5,7 +5,7 @@
 #include <functional>
 #include <string.h>
 #include <vector>
-#include <xaiengine.h>
+#include <aie_codegen.h>
 
 #include <xaiefal/rsc/xaiefal-rsc-base.hpp>
 

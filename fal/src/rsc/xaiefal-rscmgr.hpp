@@ -8,7 +8,7 @@
 #include <fstream>
 #include <memory>
 #include <vector>
-#include <xaiengine.h>
+#include <aie_codegen.h>
 
 #define BACKEND	XAieRscMgrGeneric
 #include <xaiefal/rsc/xaiefal-rscmgr-generic.hpp>

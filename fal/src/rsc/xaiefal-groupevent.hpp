@@ -3,7 +3,7 @@
 
 #include <string.h>
 #include <vector>
-#include <xaiengine.h>
+#include <aie_codegen.h>
 
 #include <xaiefal/common/xaiefal-common.hpp>
 #include <xaiefal/rsc/xaiefal-rsc-base.hpp>

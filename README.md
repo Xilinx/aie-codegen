@@ -37,7 +37,7 @@ aie-codegen/
     ├── timer
     ├── trace
     ├── util
-    └── xaiengine.h
+    └── aie_codegen.h
 ```
 ## aie-codegen/src
 AIE Codegen for AIE2/AIE2P/AIE2PS/AIE4 generation devices
@@ -125,13 +125,13 @@ cmake ../src/
 make
 ```
 
-The build will produce `libxaiengine.so` (shared library by default) in the `build/` directory.
+The build will produce `libaie_codegen.so` (shared library by default) in the `build/` directory.
 
 #### CMake Build Options
 
-- **Shared vs Static Library**: Set `XAIENGINE_BUILD_SHARED` to `ON` (default) for shared library or `OFF` for static library:
+- **Shared vs Static Library**: Set `AIE_CODEGEN_BUILD_SHARED` to `ON` (default) for shared library or `OFF` for static library:
   ```bash
-  cmake -DXAIENGINE_BUILD_SHARED=OFF ../src/
+  cmake -DAIE_CODEGEN_BUILD_SHARED=OFF ../src/
   ```
 
 - **Socket Backend**: Enable socket backend support:

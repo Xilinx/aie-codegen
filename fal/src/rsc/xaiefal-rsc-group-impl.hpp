@@ -6,7 +6,7 @@
  */
 
 #include <vector>
-#include <xaiengine.h>
+#include <aie_codegen.h>
 #include <xaiefal/rsc/xaiefal-rsc-group.hpp>
 #include <xaiefal/common/xaiefal-base.hpp>
 

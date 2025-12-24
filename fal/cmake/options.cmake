@@ -61,9 +61,9 @@ endif (WITH_TESTS AND (${_host} STREQUAL ${_target}))
 
 option (WITH_DOC "Build with documentation" ON)
 
-option (WITH_BUILD_XAIEDRV "Build libxaiengine" OFF)
+option (WITH_BUILD_XAIEDRV "Build libaie_codegen" OFF)
 if (NOT WITH_BUILD_XAIEDRV)
-  message ("Will not build libxaiengine, please make sure libxaiengine is in lib/include path")
+  message ("Will not build libaie_codegen, please make sure libaie_codegen is in lib/include path")
   option (WITH_XAIEDRV_FIND "Find libxaiegnine depends" ON)
 else()
   if ("${PROJECT_SYSTEM}" STREQUAL "linux")
@@ -76,7 +76,7 @@ else()
       set (AIEDRV_BACKEND -D__AIEBAREMETAL__)
     endif (WITH_AIEDRV_BAREMETAL)
   endif ("${PROJECT_SYSTEM}" STREQUAL "linux")
-  message ("Will build libxaiengine")
+  message ("Will build libaie_codegen")
 endif (NOT WITH_BUILD_XAIEDRV)
 
 

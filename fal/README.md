@@ -18,7 +18,7 @@ cmake ../ -DWITH_DOC=on
 make
 ```
 
-### Includes to build `libxaiengine` library
+### Includes to build `libaie_codegen` library
 Use the following cmake commands to configure the build:
 For Linux to run on target:
 ```
@@ -34,14 +34,14 @@ cd build
 make VERBOSE=1
 ```
 
-### Not build `libxaiengine` library
-If excludes building `libxaiengine` library, user will need to provide where
-`libxaiengine` is as this library depends on the AI engine driver library.
+### Not build `libaie_codegen` library
+If excludes building `libaie_codegen` library, user will need to provide where
+`libaie_codegen` is as this library depends on the AI engine driver library.
 For Linux to run on target:
 ```
 mkdir build
 cd build
-cmake ../ -DCMAKE_LIBRARY_PATH=<DIR_TO_XAIENGINE_LIB> -DCMAKE_INCLUDE_PATH=<DIR_TO_XAIENGINE_HEADER>
+cmake ../ -DCMAKE_LIBRARY_PATH=<DIR_TO_AIE_CODEGEN_LIB> -DCMAKE_INCLUDE_PATH=<DIR_TO_AIE_CODEGEN_HEADER>
 ```
 
 After running `cmake` to configure the build, can go to the build directory to

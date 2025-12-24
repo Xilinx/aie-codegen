@@ -17,7 +17,7 @@ The `aie-codegen` repository is derived from `aie-rt` and provides enhanced feat
 
 ## What Changed
 
-### Removed from xaiengine.h
+### Removed from aie_codegen.h
 
 ```c
 // These includes are removed:
@@ -72,7 +72,7 @@ If found, please reach out to dhruval.shah@amd.com for further assitance
 **Continue using the single header:**
 
 ```c
-#include <xaiengine.h>  // Single header - includes all APIs
+#include <aie_codegen.h>  // Single header - includes all APIs
 ```
 
 ### 3. Update Build System
@@ -104,7 +104,7 @@ If found, please reach out to dhruval.shah@amd.com for further assitance
 ## Resources
 
 - **Source code:** `/scratch/repos/aie-codegen/src/`
-- **Main header:** `xaiengine.h` (single include for all APIs)
+- **Main header:** `aie_codegen.h` (single include for all APIs)
 
 For detailed API documentation, refer to the inline comments in the header files.
 

@@ -1371,6 +1371,45 @@ AieRC XAie_ControlCodeIO_RemoteBarrier(void *IOInst, uint8_t RbId, uint32_t UcMa
 		return XAIE_ERR;
 	}
 }
+
+/*****************************************************************************/
+/**
+*
+* This function is used to add Save Register opcode to asm file.
+*
+* @param        IOInst: IO instance pointer
+* @param        RegOff: Register Address/Offset whose value needs to be saved
+* @param        Id: Unique Id
+* @return       XAIE_OK or XAIE_ERR.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_SaveRegister(void *IOInst, u32 RegOff, u32 Id)
+{
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+
+	if(ControlCodeInst->ControlCodefp != NULL) {
+
+		if (!ControlCodeInst->IsJobOpen) {
+    		_XAie_StartNewJob(ControlCodeInst);
+   	 	}
+
+		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_SAVE_REGISTER +
+        	ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
+    		_XAie_StartNewPage(ControlCodeInst);
+        	_XAie_StartNewJob(ControlCodeInst);
+    	}
+
+		fprintf(ControlCodeInst->ControlCodefp, "SAVE_REGISTER\t 0x%x, 0x%x\n", RegOff, Id);
+		ControlCodeInst->CombineCommands = 0;
+		ControlCodeInst->UcPageSize += ISA_OPSIZE_SAVE_REGISTER;
+		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_SAVE_REGISTER;
+		return XAIE_OK;
+	}
+	else {
+		XAIE_ERROR("Control code file pointer is NULL\n");
+		return XAIE_ERR;
+	}
+}
 /*****************************************************************************/
 /**
 *
@@ -1771,7 +1810,7 @@ AieRC XAie_ControlCodeSetScrachPad(XAie_DevInst *DevInst, const char *Scrachpad)
         if(ControlCodeInst->ScrachpadName == NULL)
                 return XAIE_ERR;
         else {
-                snprintf(ControlCodeInst->ScrachpadName, strlen(Scrachpad)+1, "%s", Scrachpad);
+                strncpy(ControlCodeInst->ScrachpadName, Scrachpad, strlen(Scrachpad));
                 return XAIE_OK;
         }
 }
@@ -2056,6 +2095,17 @@ AieRC XAie_ControlCodeIO_RemoteBarrier(void *IOInst, uint8_t RbId, uint32_t UcMa
 	return XAIE_INVALID_BACKEND;
 }
 
+AieRC XAie_ControlCodeIO_SaveRegister(void *IOInst, u32 RegOff, u32 Id)
+{
+	/* no-op */
+	(void)IOInst;
+	(void)RegOff;
+	(void)Id;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
 #endif /* __AIECONTROLCODE__ */
 
 static AieRC XAie_ControlCodeIO_CmdWrite(void *IOInst, u8 Col, u8 Row, u8 Command,
@@ -2143,6 +2193,7 @@ const XAie_Backend ControlCodeBackend =
 	.Ops.SetPadString = XAie_ControlCodeIO_SetPadString,
 	.Ops.AttachToGroup = XAie_ControlCodeIO_AttachToGroup,
 	.Ops.RemoteBarrier = XAie_ControlCodeIO_RemoteBarrier,
+	.Ops.SaveRegister = XAie_ControlCodeIO_SaveRegister,
 	.Ops.SubmitTxn = NULL,
 };
 

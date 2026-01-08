@@ -755,6 +755,18 @@ static AieRC _XAie_EventSelectDmaChannelConfig(XAie_DevInst *DevInst,
 		XAIE_ERROR("Invalid selection ID\n");
 		return XAIE_INVALID_ARGS;
 	}
+	/* 
+	 * For AIE4 mem tiles with MM2S direction, adjust channel number.
+	 * Increment by 1 if channel number is >= NumMm2sChannels to account
+	 * for hardware channel numbering offset.
+	 * Closed gaps in DMA channel indexing (MEM MM2S6-10 --> MM2S5-9)
+	 */
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) && 
+		TileType == XAIEGBL_TILE_TYPE_MEMTILE && 
+		DmaDir == DMA_MM2S && 
+		ChannelNum >= DmaMod->NumMm2sChannels) {
+		ChannelNum = ChannelNum + 1U;
+	}
 
 	/* Calculate 32-bit value to write and register address */
 	ChannelDirLsb = EvntMod->DmaChannelMM2SOff * (u32)DmaDir;

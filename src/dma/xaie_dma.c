@@ -1867,6 +1867,16 @@ AieRC XAie_DmaChannelPushBdToQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	if (RC != XAIE_OK) {
 		return RC;
 	}
+	
+	/* AIE4 single-app mode BD adjustment for ShimNOC tiles:
+	 * For channels accessing BDs 16-31, subtract 16 to get the correct BD index. */
+	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+			(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) &&
+			(TileType == XAIEGBL_TILE_TYPE_SHIMNOC) &&
+			((Dir == DMA_S2MM) || (Dir == DMA_MM2S)) &&
+			(BdNum >= DmaMod->NumBds)) {
+		BdNum -= DmaMod->NumBds;
+	}
 
 	if (!(_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))) {
 		/* Calculate Channel base address */
@@ -2485,6 +2495,15 @@ AieRC XAie_DmaChannelSetStartQueueGeneric(XAie_DevInst *DevInst,
 		RC = DmaMod->BdChValidity(DmaMod, Dir, StartBd, ChNum);
 		if(RC != XAIE_OK) {
 			return RC;
+		}
+		/* AIE4 single-app mode BD adjustment for ShimNOC tiles:
+		* For channels accessing BDs 16-31, subtract 16 to get the correct BD index. */
+		if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) &&
+				(DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) &&
+				(TileType == XAIEGBL_TILE_TYPE_SHIMNOC) &&
+				((Dir == DMA_S2MM) || (Dir == DMA_MM2S)) &&
+				(StartBd >= DmaMod->NumBds)) {
+			StartBd -= DmaMod->NumBds;
 		}
 	} else {
 		StartBd = 0;

@@ -1733,8 +1733,11 @@ AieRC _XAie4_ShimDmaWriteBd_common(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc
 	u32 BdWord[XAIE4_SHIMDMA_NUM_BD_WORDS];
 	XAie_ShimDmaBdArgs Args;
 	u8 LockAcqVal, LockRelVal;
+	const XAie_DmaMod *DmaMod;
 
 	const XAie_DmaBdProp *BdProp = DmaDesc->DmaMod->BdProp;
+
+	DmaMod = DevInst->DevProp.DevMod[DmaDesc->TileType].DmaMod;
 
 	/* Setup BdWord with the right values from DmaDesc */
 
@@ -1868,6 +1871,13 @@ AieRC _XAie4_ShimDmaWriteBd_common(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc
 			MAX_VALID_AIE_REG_BIT_INDEX))) {
 		XAIE_ERROR("Check Precision Exceeds Failed\n");
 		return XAIE_ERR;
+	}
+
+	/* AIE4 single-app mode BD adjustment for ShimNOC tiles:
+	 * For BDs 16-31 in single-application mode, use BD number-16. */
+	if ((DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) &&
+			(DmaDesc->BdEnDesc.NxtBd >= DmaMod->NumBds)) {
+		DmaDesc->BdEnDesc.NxtBd -= DmaMod->NumBds;
 	}
 
 	BdWord[5U] = XAie_SetField(DmaDesc->PktDesc.PktEn,

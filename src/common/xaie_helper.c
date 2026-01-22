@@ -571,6 +571,9 @@ AieRC XAie_MaskPollBusy(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 	if(DevInst->TxnList.Next != NULL) {
 		return XAie_Txn_MaskPollBusy(DevInst, RegOff, Mask, Value, TimeOutUs);
 	}
+	if(DevInst->AppMode == XAIE_DEVICE_DUAL_APP_MODE_B) {
+			RegOff|= XAIE4_APP_B_OFFSET;
+	}
 	return Backend->Ops.MaskPoll((void*)(DevInst->IOInst), RegOff, Mask,
 			Value, TimeOutUs);
 }

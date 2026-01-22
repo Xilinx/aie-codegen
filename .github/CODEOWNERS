@@ -1,0 +1,15 @@
+# Paths and associated code reviewers for auto-assigning PRs
+# Typically, you can include individual users or teams.
+
+# This rule assigns the CodeReviewers team to all files in the repository
+# * @org-name/CodeReviewers
+
+# To assign files in a specific directory
+# /src/ @org-name/CodeReviewers
+
+# To assign specific owners to a certain file
+# /config/settings.json @user-1 @user-2
+
+
+# CODEOWNERS for autoreview assignments in aie-codegen repo
+* @dhrshah @kotreddy @jignepat @muddur @ramanjan @asladage @kishorer

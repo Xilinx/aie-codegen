@@ -1448,14 +1448,14 @@ AieRC _XAie_DmaWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc,
 	if (BusyPoll != XAIE_ENABLE){
 		Status = XAie_MaskPoll(DevInst, Addr, Mask, Value, TimeOutUs);
 		if (Status != XAIE_OK) {
-			XAIE_ERROR("Dma Wait Done Status MaskPoll time out : %d\n", TimeOutUs);
-			return XAIE_ERR;
+			XAIE_DBG("Dma Wait Done Status MaskPoll time out : %d\n", TimeOutUs);
+			return XAIE_DMA_STATUS_TIMEOUT;
 		}	
 	} else {
 		Status = XAie_MaskPollBusy(DevInst, Addr, Mask, Value, TimeOutUs);
 		if (Status != XAIE_OK) {
-			XAIE_ERROR("Dma Wait Done Status MaskPollBusy time out : %d\n", TimeOutUs);
-			return XAIE_ERR;
+			XAIE_DBG("Dma Wait Done Status MaskPollBusy time out : %d\n", TimeOutUs);
+			return XAIE_DMA_STATUS_TIMEOUT;
 		}	
 	}
 

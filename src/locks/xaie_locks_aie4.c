@@ -94,7 +94,7 @@ AieRC _XAie4_LockRelease(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 					(XAIE4_LOCK_RESULT_SUCCESS <<
 					 XAIE4_LOCK_RESULT_LSB), TimeOut);
 		if (Status != XAIE_OK) {
-			XAIE_ERROR("Wait for lock release MaskPoll timed out : %d\n", TimeOut);
+			XAIE_DBG("Wait for lock release MaskPoll timed out : %d\n", TimeOut);
 			return XAIE_LOCK_RESULT_FAILED;
 		}
 	} else {
@@ -102,12 +102,12 @@ AieRC _XAie4_LockRelease(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 					(XAIE4_LOCK_RESULT_SUCCESS <<
 					 XAIE4_LOCK_RESULT_LSB), TimeOut);
 		if (Status != XAIE_OK) {
-			XAIE_ERROR("Wait for lock release MaskPollBusy timed out : %d\n", TimeOut);
+			XAIE_DBG("Wait for lock release MaskPollBusy timed out : %d\n", TimeOut);
 			return XAIE_LOCK_RESULT_FAILED;
 		}
 	}	
 
-	return XAIE_OK;
+	return Status;
 }
 
 /*****************************************************************************/
@@ -162,7 +162,7 @@ AieRC _XAie4_LockAcquire(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 					(XAIE4_LOCK_RESULT_SUCCESS <<
 					 XAIE4_LOCK_RESULT_LSB), TimeOut);
 		if (Status != XAIE_OK) {
-			XAIE_ERROR("Wait for lock acquire MaskPoll timed out : %d\n", TimeOut);
+			XAIE_DBG("Wait for lock acquire MaskPoll timed out : %d\n", TimeOut);
 			return XAIE_LOCK_RESULT_FAILED;
 		}
 	} else {
@@ -170,12 +170,12 @@ AieRC _XAie4_LockAcquire(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 					(XAIE4_LOCK_RESULT_SUCCESS <<
 					 XAIE4_LOCK_RESULT_LSB), TimeOut);
 		if (Status != XAIE_OK) {
-			XAIE_ERROR("Wait for lock acquire MaskPollBusy timed out : %d\n", TimeOut);
+			XAIE_DBG("Wait for lock acquire MaskPollBusy timed out : %d\n", TimeOut);
 			return XAIE_LOCK_RESULT_FAILED;
 		}
 	}	
 
-	return XAIE_OK;
+	return Status;
 }
 
 /*****************************************************************************/

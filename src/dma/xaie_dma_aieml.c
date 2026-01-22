@@ -2141,15 +2141,15 @@ AieRC _XAieMl_DmaWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc,
 	if (BusyPoll != XAIE_ENABLE){
 		Status = XAie_MaskPoll(DevInst, Addr, Mask, Value, TimeOutUs);
 		if (Status != XAIE_OK) {
-			XAIE_ERROR("Dma Wait Done Status MaskPoll time out: %d\n", TimeOutUs);
-			return XAIE_ERR;
+			XAIE_DBG("Dma Wait Done Status MaskPoll time out: %d\n", TimeOutUs);
+			return XAIE_DMA_STATUS_TIMEOUT;
 		}
 	
 	} else {
 		Status = XAie_MaskPollBusy(DevInst, Addr, Mask, Value, TimeOutUs);
 		if (Status != XAIE_OK) {
-			XAIE_ERROR("Dma Wait Done Status MaskPollBusy time out : %d\n", TimeOutUs);
-			return XAIE_ERR;
+			XAIE_DBG("Dma Wait Done Status MaskPollBusy time out : %d\n", TimeOutUs);
+			return XAIE_DMA_STATUS_TIMEOUT;
 		}	
 	}
 	
@@ -2191,15 +2191,15 @@ AieRC _XAieMl_DmaWaitForBdTaskQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 		Status = XAie_MaskPoll(DevInst, Addr, (1U << XAIEML_DMA_STATUS_TASK_Q_SIZE_MSB),
 		 0, TimeOutUs);
 		 if (Status != XAIE_OK) {
-			XAIE_ERROR("Wait for bd task queue MaskPoll timed out : %d\n", TimeOutUs);
-			return XAIE_ERR;
+			XAIE_DBG("Wait for bd task queue MaskPoll timed out : %d\n", TimeOutUs);
+			return XAIE_DMA_STATUS_TIMEOUT;
 		}
 	} else {
 		Status = XAie_MaskPollBusy(DevInst, Addr, (1U << XAIEML_DMA_STATUS_TASK_Q_SIZE_MSB),
 		 0, TimeOutUs);
 		 if (Status != XAIE_OK) {
-			XAIE_ERROR("Wait for bd task queue MaskPollBusy timed out : %d\n", TimeOutUs);
-			return XAIE_ERR;
+			XAIE_DBG("Wait for bd task queue MaskPollBusy timed out : %d\n", TimeOutUs);
+			return XAIE_DMA_STATUS_TIMEOUT;
 		}
 	}	
 

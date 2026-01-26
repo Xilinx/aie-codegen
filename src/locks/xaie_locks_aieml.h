@@ -31,6 +31,13 @@
 
 /************************** Constant Definitions *****************************/
 
+#ifdef XAIE_FEATURE_LOCK_ENABLE
+
+#define XAIEML_LOCK_VALUE_MASK		0x7FU
+#define XAIEML_LOCK_VALUE_SHIFT		0x2U
+
+#endif
+
 /************************** Function Prototypes  *****************************/
 AieRC _XAieMl_LockAcquire(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 		XAie_LocType Loc, XAie_Lock Lock, u32 TimeOut, u8 BusyPoll);

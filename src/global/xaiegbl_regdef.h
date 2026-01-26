@@ -881,6 +881,10 @@ struct XAie_LockMod {
 	AieRC (*GetValue)(XAie_DevInst *DevInst,
 			const struct XAie_LockMod *LockMod, XAie_LocType Loc,
 			XAie_Lock Lock, u32 *LockValue);
+	//For AIE2PS = XAIEML_LOCK_VALUE_MASK, XAIEML_LOCK_VALUE_SHIFT
+	//For AIE4 = XAIE4_LOCK_VALUE_MASK, XAIE4_LOCK_VALUE_SHIFT
+	u8 LockValueMask;
+	u8 LockValueShift;
 };
 
 /* This typedef contains attributes of Performace Counter module */

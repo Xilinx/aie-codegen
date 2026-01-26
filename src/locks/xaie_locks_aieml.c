@@ -34,9 +34,6 @@
 
 #include "xaie_helper_internal.h"
 /************************** Constant Definitions *****************************/
-#define XAIEML_LOCK_VALUE_MASK		0x7FU
-#define XAIEML_LOCK_VALUE_SHIFT		0x2U
-
 #define XAIEML_LOCK_RESULT_SUCCESS	1U
 #define XAIEML_LOCK_RESULT_LSB		0x0U
 #define XAIEML_LOCK_RESULT_MASK		0x1U
@@ -80,8 +77,7 @@ AieRC _XAieMl_LockRelease(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
                 LockVal = Lock.LockVal;
 
 	RegOff = LockMod->BaseAddr + (Lock.LockId * LockMod->LockIdOff) +
-		((LockVal & XAIEML_LOCK_VALUE_MASK) <<
-		 XAIEML_LOCK_VALUE_SHIFT);
+		((LockVal & LockMod->LockValueMask) << LockMod->LockValueShift);
 
 	RegAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) + RegOff;
 
@@ -145,8 +141,7 @@ AieRC _XAieMl_LockAcquire(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 
 	RegOff = LockMod->BaseAddr + (Lock.LockId * LockMod->LockIdOff) +
 		(LockMod->RelAcqOff) + ((LockVal &
-					XAIEML_LOCK_VALUE_MASK) <<
-				XAIEML_LOCK_VALUE_SHIFT);
+					LockMod->LockValueMask) << LockMod->LockValueShift);
 
 	RegAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) + RegOff;
 

@@ -22,6 +22,7 @@
 *
 ******************************************************************************/
 /***************************** Include Files *********************************/
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +33,8 @@
 #include "xaie_io_privilege.h"
 #include "xaie_npi.h"
 #include "isa_stubs.h"
+#include "xaie_locks.h"
+#include "xaie_helper_internal.h"
 
 #ifdef __AIECONTROLCODE__
 
@@ -115,6 +118,7 @@ typedef struct {
 	u32 CurrentDataBWLabel;
 	u8 LabelMatchFound;
 	int PrevMemWriteType;
+	u64 BarrierId;
 } XAie_ControlCodeIO;
 
 /************************** Function Definitions *****************************/
@@ -1932,6 +1936,93 @@ AieRC XAie_ControlCodeIO_SaveRegister(void *IOInst, u32 RegOff, u32 Id)
 		return XAIE_ERR;
 	}
 }
+
+/*****************************************************************************/
+/**
+*
+* This function generates REL_ACQ_SYNC instruction in controlcode backend
+*
+* @param        DevInst: Device Instance
+* @param		LockMod: Internal lock module data structure.
+* @param		Loc: Location of the tile.
+* @param		RelLock: Release lock structure.
+* @param		AcqLock: Acquire lock structure.
+
+* @return       AieRC status.
+*
+*******************************************************************************/
+
+AieRC XAie_ControlCodeRelAcqSync(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
+								 XAie_LocType Loc, XAie_Lock RelLock, XAie_Lock AcqLock) {
+
+	if(DevInst->Backend->Type != XAIE_IO_BACKEND_CONTROLCODE) {
+    	XAIE_ERROR("This is supported only in Controlcode Backend %d \n", DevInst->Backend->Type);
+        return XAIE_INVALID_BACKEND;
+    }
+
+	u8 TempRelVal = (u8)RelLock.LockVal;
+	u8 TempAcqVal = (u8)AcqLock.LockVal;
+	u16 LockId    = AcqLock.LockId;
+	u64 RegAddrRel;
+	u64 RegOffRel = 0;
+	u64 RegAddrAcq;
+	u64 RegOffAcq = 0;
+
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
+
+	if((DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) && (LockId >= LockMod->NumLocks)) {
+		RegOffRel = _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen, RegOffRel);
+		RegOffAcq = _XAie_ChangeRegisterSpace(DevInst->DevProp.DevGen, RegOffAcq);
+		LockId -= LockMod->NumLocks;
+	}
+
+	RegOffRel |= LockMod->BaseAddr + (LockId * (u64)LockMod->LockIdOff) +
+	((TempRelVal & LockMod->LockValueMask) << LockMod->LockValueShift);
+	
+	RegOffAcq |= LockMod->BaseAddr + (LockId * (u64)LockMod->LockIdOff) +
+	(LockMod->RelAcqOff) + ((TempAcqVal & LockMod->LockValueMask) << LockMod->LockValueShift);
+
+	RegAddrRel = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) + RegOffRel;
+	RegAddrAcq = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) + RegOffAcq;
+
+	ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
+		((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_REL_ACQ_SYNC) % DATA_SECTION_ALIGNMENT));
+	if (ControlCodeInst->DataAligner == DATA_SECTION_ALIGNMENT) {
+		ControlCodeInst->DataAligner = 0U;
+	}
+	if (ControlCodeInst->ControlCodefp != NULL) {
+		if (!ControlCodeInst->IsJobOpen) {
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+		}
+
+		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_REL_ACQ_SYNC +
+			ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+		}
+
+		fprintf(ControlCodeInst->ControlCodefp,"REL_ACQ_SYNC\t 0x%x, 0x%x\n",
+				(u32)(EXTRACT_LOWER_FOUR_BYTES(RegAddrRel)),
+				(u32)(EXTRACT_LOWER_FOUR_BYTES(RegAddrAcq)));
+
+		fprintf(ControlCodeInst->DebugAsmFile,"REL_ACQ_SYNC\t 0x%x, 0x%x ; barrierid:%" PRIu64 ", lockid:%u, relval:%d, acqval:%d\n",
+				(u32)(EXTRACT_LOWER_FOUR_BYTES(RegAddrRel)),
+				(u32)(EXTRACT_LOWER_FOUR_BYTES(RegAddrAcq)),
+				ControlCodeInst->BarrierId, LockId, RelLock.LockVal, AcqLock.LockVal);
+
+		ControlCodeInst->CombineCommands = 0;
+		ControlCodeInst->UcPageSize += ISA_OPSIZE_REL_ACQ_SYNC;
+		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_REL_ACQ_SYNC;
+		_XAie_ControlCodePageInfo(ControlCodeInst->DebugAsmFile, ControlCodeInst->PageId,
+			 ControlCodeInst->UcPageSize, ControlCodeInst->UcPageTextSize, ControlCodeInst->DataAligner);
+
+		ControlCodeInst->BarrierId++;
+
+		return XAIE_OK;
+	}
+	return XAIE_ERR;
+}
+
 /*****************************************************************************/
 /**
 *
@@ -2119,6 +2210,7 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	ControlCodeInst->CurrentDataBWLabel = ControlCodeInst->UcDmaDataNum;
 	ControlCodeInst->LabelMap = (XAie_LabelMap*)calloc(1,sizeof(XAie_LabelMap));
 	ControlCodeInst->PrevMemWriteType = -1;
+	ControlCodeInst->BarrierId = 0;
 	
 	if(ControlCodeInst->LabelMap) {
 		if(_XAie_LabelMapSetup(ControlCodeInst->LabelMap, ControlCodeInst) == XAIE_OK) {
@@ -2666,6 +2758,21 @@ AieRC XAie_ControlCodeIO_SaveRegister(void *IOInst, u32 RegOff, u32 Id)
 	XAIE_ERROR("Driver is not compiled with ControlCode generation "
 			"backend (__AIECONTROLCODE__)\n");
 	return XAIE_INVALID_BACKEND;
+}
+
+AieRC XAie_ControlCodeRelAcqSync(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
+		XAie_LocType Loc, XAie_Lock RelLock,  XAie_Lock AcqLock)
+{
+	/* no-op */
+	(void)DevInst;
+	(void)LockMod;
+	(void)Loc;
+	(void)RelLock;
+	(void)AcqLock;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+
 }
 
 #endif /* __AIECONTROLCODE__ */

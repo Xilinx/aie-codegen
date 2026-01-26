@@ -48,6 +48,7 @@
 #define ISA_OPCODE_SAVE_TIMESTAMPS 0x1c
 #define ISA_OPCODE_PREEMPT 0x19
 #define ISA_SAVE_REGISTER 0x1e
+#define ISA_REL_ACQ_SYNC 0x21
 
 // Operation sizes
 
@@ -76,6 +77,7 @@
 #define ISA_OPSIZE_SAVE_TIMESTAMPS 0x08
 #define ISA_OPSIZE_PREEMPT 0x08
 #define ISA_OPSIZE_SAVE_REGISTER 0x0c
+#define ISA_OPSIZE_REL_ACQ_SYNC 0x0c
 
 #ifdef CERT_FW
 // Operation implementation forward declarations

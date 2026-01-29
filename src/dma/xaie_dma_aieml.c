@@ -2006,9 +2006,10 @@ AieRC _XAieMl_DmaGetPendingBdCount(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u64 Addr;
 	u32 Mask, StatusReg, TaskQSize;
 
+	/* Issue #5455: Cast to u64 before multiplication to prevent overflow */
 	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChStatusBase + ChNum * XAIEML_DMA_STATUS_CHNUM_OFFSET +
-		(u32)Dir * DmaMod->ChStatusOffset;
+		DmaMod->ChStatusBase + (u64)ChNum * XAIEML_DMA_STATUS_CHNUM_OFFSET +
+		(u64)Dir * DmaMod->ChStatusOffset;
 
 	RC = XAie_Read32(DevInst, Addr, &StatusReg);
 	if(RC != XAIE_OK) {
@@ -2070,9 +2071,10 @@ AieRC _XAieMl_DmaGetChannelStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u32 Mask;
 	AieRC RC;
 
+	/* Issue #5454: Cast to u64 before multiplication to prevent overflow */
 	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChStatusBase + ChNum * XAIEML_DMA_STATUS_CHNUM_OFFSET +
-		(u32)Dir * DmaMod->ChStatusOffset;
+		DmaMod->ChStatusBase + (u64)ChNum * XAIEML_DMA_STATUS_CHNUM_OFFSET +
+		(u64)Dir * DmaMod->ChStatusOffset;
 
 	Mask = DmaMod->ChProp->DmaChStatus->AieMlDmaChStatus.TaskQSize.Mask |
 		DmaMod->ChProp->DmaChStatus->AieMlDmaChStatus.TaskQOverFlow.Mask |
@@ -2116,9 +2118,10 @@ AieRC _XAieMl_DmaWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u32 Mask, Value;
 	AieRC Status = XAIE_OK;
 
+	/* Issue #5453: Cast to u64 before multiplication to prevent overflow */
 	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChStatusBase + ChNum * XAIEML_DMA_STATUS_CHNUM_OFFSET +
-		(u32)Dir * DmaMod->ChStatusOffset;
+		DmaMod->ChStatusBase + (u64)ChNum * XAIEML_DMA_STATUS_CHNUM_OFFSET +
+		(u64)Dir * DmaMod->ChStatusOffset;
 
 	Mask = DmaMod->ChProp->DmaChStatus->AieMlDmaChStatus.TaskQSize.Mask |
 		DmaMod->ChProp->DmaChStatus->AieMlDmaChStatus.ChannelRunning.Mask |
@@ -2181,9 +2184,10 @@ AieRC _XAieMl_DmaWaitForBdTaskQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u64 Addr;
 	AieRC Status = XAIE_OK;
 
+	/* Issue #5452: Cast to u64 before multiplication to prevent overflow */
 	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChStatusBase + ChNum * XAIEML_DMA_STATUS_CHNUM_OFFSET +
-		(u32)Dir * DmaMod->ChStatusOffset;
+		DmaMod->ChStatusBase + (u64)ChNum * XAIEML_DMA_STATUS_CHNUM_OFFSET +
+		(u64)Dir * DmaMod->ChStatusOffset;
 
 	/* Poll for the MSB bit of Task_queue_size bits to ensure
 	 * queue is not full*/

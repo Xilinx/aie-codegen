@@ -1354,8 +1354,9 @@ AieRC _XAie_DmaGetPendingBdCount(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u64 Addr;
 	u32 StatusReg, StartQSize, Stalled, Status;
 
+	/* Issue #5451: Cast to u64 before multiplication to prevent overflow */
 	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChStatusBase +(u32)Dir * DmaMod->ChStatusOffset;
+		DmaMod->ChStatusBase + (u64)Dir * DmaMod->ChStatusOffset;
 
 	RC = XAie_Read32(DevInst, Addr, &StatusReg);
 	if(RC != XAIE_OK) {
@@ -1429,8 +1430,9 @@ AieRC _XAie_DmaWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u32 Mask, Value;
 	AieRC Status = XAIE_OK;
 
+	/* Issue #5450: Cast to u64 before multiplication to prevent overflow */
 	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChStatusBase + (u32)Dir * DmaMod->ChStatusOffset;
+		DmaMod->ChStatusBase + (u64)Dir * DmaMod->ChStatusOffset;
 	Mask = DmaMod->ChProp->DmaChStatus[ChNum].AieDmaChStatus.Status.Mask |
 		DmaMod->ChProp->DmaChStatus[ChNum].AieDmaChStatus.StartQSize.Mask |
 		DmaMod->ChProp->DmaChStatus[ChNum].AieDmaChStatus.Stalled.Mask;
@@ -1487,8 +1489,9 @@ AieRC _XAie_DmaGetChannelStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u32 Mask;
 	AieRC RC;
 
+	/* Issue #5449: Cast to u64 before multiplication to prevent overflow */
 	Addr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
-		DmaMod->ChStatusBase + (u32)Dir * DmaMod->ChStatusOffset;
+		DmaMod->ChStatusBase + (u64)Dir * DmaMod->ChStatusOffset;
 
 	Mask = DmaMod->ChProp->DmaChStatus[ChNum].AieDmaChStatus.Status.Mask |
 		DmaMod->ChProp->DmaChStatus[ChNum].AieDmaChStatus.StartQSize.Mask |

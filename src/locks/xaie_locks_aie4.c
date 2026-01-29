@@ -255,7 +255,8 @@ AieRC _XAie4_LockGetValue(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 		Lock.LockId -= LockMod->NumLocks;
 	}
 
-	RegAddr = Lock.LockId * LockMod->LockSetValOff +
+	/* Issue #5456: Cast to u64 before multiplication to prevent overflow */
+	RegAddr = (u64)Lock.LockId * LockMod->LockSetValOff +
 		RegOff +
 		XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col);
 

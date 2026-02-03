@@ -95,8 +95,9 @@ AieRC _XAie_RstShims(XAie_DevInst *DevInst, u32 StartCol, u32 NumCols)
 		XAIE_ERROR(" Columns Exceed Max Range\n");
 		return XAIE_ERR;
 	}
-	for (u8 C = StartCol; C < (StartCol + NumCols); C++) {
-		XAie_LocType Loc = XAie_TileLoc(C, 0);
+	/* Issue #5464: Use u32 for loop variable to match comparison type */
+	for (u32 C = StartCol; C < (StartCol + NumCols); C++) {
+		XAie_LocType Loc = XAie_TileLoc((u8)C, 0);
 
 		_XAie_RstSetShimReset(DevInst, Loc, XAIE_ENABLE);
 	}
@@ -107,8 +108,9 @@ AieRC _XAie_RstShims(XAie_DevInst *DevInst, u32 StartCol, u32 NumCols)
 	XAie_RunOp(DevInst, XAIE_BACKEND_OP_ASSERT_SHIMRST,
 			(void *)(uintptr_t)XAIE_DISABLE);
 
-	for (u8 C = StartCol; C < (StartCol + NumCols); C++) {
-		XAie_LocType Loc = XAie_TileLoc(C, 0);
+	/* Issue #5465: Use u32 for loop variable to match comparison type */
+	for (u32 C = StartCol; C < (StartCol + NumCols); C++) {
+		XAie_LocType Loc = XAie_TileLoc((u8)C, 0);
 
 		_XAie_RstSetShimReset(DevInst, Loc, XAIE_DISABLE);
 	}

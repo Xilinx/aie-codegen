@@ -2419,6 +2419,8 @@ static const  XAie_LockMod Aie2PTileLockMod =
 	.Release = &_XAieMl_LockRelease,
 	.SetValue = &_XAieMl_LockSetValue,
 	.GetValue = &_XAieMl_LockGetValue,
+	.LockValueMask = XAIEML_LOCK_VALUE_MASK,
+	.LockValueShift = XAIEML_LOCK_VALUE_SHIFT,
 };
 
 static const XAie_RegFldAttr Aie2PShimNocLockInit =
@@ -2444,6 +2446,8 @@ static const  XAie_LockMod Aie2PShimNocLockMod =
 	.Release = &_XAieMl_LockRelease,
 	.SetValue = &_XAieMl_LockSetValue,
 	.GetValue = &_XAieMl_LockGetValue,
+	.LockValueMask = XAIEML_LOCK_VALUE_MASK,
+	.LockValueShift = XAIEML_LOCK_VALUE_SHIFT,
 };
 
 static const XAie_RegFldAttr Aie2PMemTileLockInit =
@@ -2469,6 +2473,8 @@ static const  XAie_LockMod Aie2PMemTileLockMod =
 	.Release = &_XAieMl_LockRelease,
 	.SetValue = &_XAieMl_LockSetValue,
 	.GetValue = &_XAieMl_LockGetValue,
+	.LockValueMask = XAIEML_LOCK_VALUE_MASK,
+	.LockValueShift = XAIEML_LOCK_VALUE_SHIFT,
 };
 #endif /* XAIE_FEATURE_LOCK_ENABLE */
 

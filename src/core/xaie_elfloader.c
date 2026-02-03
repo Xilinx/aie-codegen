@@ -520,8 +520,8 @@ static AieRC XAieSim_GetStackRange(const char *MapPtr,
 
 	Fd = fopen(MapPtr, "r");
 	if(Fd == NULL) {
-		XAIE_ERROR("Invalid Map file, %d: %s\n",
-			errno, strerror(errno));
+		XAIE_ERROR("Invalid Map file, %s: %s\n",
+			MapPtr, strerror(errno));
 		return XAIE_ERR;
 	}
 

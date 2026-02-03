@@ -1106,10 +1106,11 @@ static AieRC _XAie_StrmSlaveSlotConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
 		}
 	}
 
+	/* Issue #5457: Cast to u64 before multiplication to prevent overflow */
 	RegAddr |= XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) +
 				StrmMod->SlvSlotConfig[Slave].PortBaseAddr +
-				(SlvPortNum + AddPlaceHolderPort) * StrmMod->SlotOffsetPerPort +
-				SlotNum * StrmMod->SlotOffset;
+				(u64)(SlvPortNum + AddPlaceHolderPort) * StrmMod->SlotOffsetPerPort +
+				(u64)SlotNum * StrmMod->SlotOffset;
 
 	if ((_XAie_CheckPrecisionExceeds(StrmMod->SlotPktId.Lsb,
 			_XAie_MaxBitsNeeded(Pkt.PktId), MAX_VALID_AIE_REG_BIT_INDEX)) ||

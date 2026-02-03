@@ -432,9 +432,11 @@ static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enab
 	u8 C, R;
 
 	for(C = 0; C < DevInst->NumCols; C++) {
-		for(R = DevInst->MemTileRowStart;
-		    R < (DevInst->MemTileRowStart + DevInst->MemTileNumRows);
-		    R++) {
+		/* Issue #5462: Use u32 for loop variable to match comparison type */
+		for(u32 R_idx = DevInst->MemTileRowStart;
+		    R_idx < (DevInst->MemTileRowStart + DevInst->MemTileNumRows);
+		    R_idx++) {
+			R = (u8)R_idx;
 			if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
 				if (Enable > XAIE_MEMINTERLEAV_MODES_3) {
 					RC = XAIE_INVALID_ARGS;
@@ -470,9 +472,11 @@ static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enab
 				return XAIE_INVALID_ARGS;
 			}
 
-			for (R = DevInst->AieTileRowStart;
-			     R < (DevInst->AieTileRowStart + DevInst->AieTileNumRows);
-			     R++) {
+			/* Issue #5463: Use u32 for loop variable to match comparison type */
+			for (u32 R_idx2 = DevInst->AieTileRowStart;
+			     R_idx2 < (DevInst->AieTileRowStart + DevInst->AieTileNumRows);
+			     R_idx2++) {
+				R = (u8)R_idx2;
 				MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_AIETILE].MemCtrlInterLvMod;
 				RegAddr = MCtrlMod->MemInterleavingCtrlRegOff + XAie_GetTileAddr(DevInst, R, C);
 				RC = _XAie_SetInterLeavingMode(DevInst, MCtrlMod, RegAddr, Enable);

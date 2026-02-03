@@ -1268,6 +1268,8 @@ static const XAie_LockMod AieTileLockMod =
 	.Release = &(_XAie_LockRelease),
 	.SetValue = &_XAie_LockSetValue,
 	.GetValue = &(_XAie_LockGetValue),
+	.LockValueMask = 0, //Arch specific ARCQUIRE RELEASE functions doesnot used these members
+	.LockValueShift = 0, //Arch specific ARCQUIRE RELEASE functions doesnot used these members
 };
 
 /* Lock Module for SHIM NOC Tiles  */
@@ -1284,6 +1286,8 @@ static const XAie_LockMod AieShimNocLockMod =
 	.Release = &(_XAie_LockRelease),
 	.SetValue = &_XAie_LockSetValue,
 	.GetValue = &(_XAie_LockGetValue),
+	.LockValueMask = 0, //Arch specific ARCQUIRE RELEASE functions doesnot used these members
+	.LockValueShift = 0, //Arch specific ARCQUIRE RELEASE functions doesnot used these members
 };
 #endif /* XAIE_FEATURE_LOCK_ENABLE */
 

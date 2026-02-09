@@ -808,8 +808,8 @@ static AieRC _XAie_CoreStatusDump(XAie_DevInst *DevInst,
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 
 	if(TileType != XAIEGBL_TILE_TYPE_AIETILE) {
-		XAIE_ERROR("Invalid Tile Type\n");
-		return XAIE_INVALID_TILE;
+		/* Core status is only applicable for AIE tiles, skip others */
+		return XAIE_OK;
 	}
 
 	/* core status */
@@ -883,57 +883,101 @@ static AieRC _XAie_DmaStatusDump(XAie_DevInst *DevInst,
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 	if((TileType >= XAIEGBL_TILE_TYPE_MAX) ||
 			(TileType == XAIEGBL_TILE_TYPE_SHIMPL)) {
-		XAIE_ERROR("Invalid Tile Type\n");
-		return XAIE_INVALID_TILE;
+		/* DMA status not applicable for this tile type, skip */
+		return XAIE_OK;
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
+	if(DmaMod == NULL) {
+		/* DMA module not present for this tile type */
+		return XAIE_OK;
+	}
+
 	CoreTile = Status[Loc.Col].CoreTile;
 	MemTile = Status[Loc.Col].MemTile;
 	ShimTile = Status[Loc.Col].ShimTile;
 
-	/* iterate all tile dma channels */
-	for (u8 Chan = 0; Chan < DmaMod->NumChannels; Chan++) {
+	if(!_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+		/* iterate all tile dma channels */
+		for (u8 Chan = 0; Chan < DmaMod->NumChannels; Chan++) {
 
-		/* read s2mm channel status */
-		RC = XAie_DmaGetChannelStatus(DevInst, Loc, Chan,
-				DMA_S2MM, &RegVal);
-		if (RC != XAIE_OK) {
-			return RC;
-		}
+			/* read s2mm channel status */
+			RC = XAie_DmaGetChannelStatus(DevInst, Loc, Chan,
+					DMA_S2MM, &RegVal);
+			if (RC != XAIE_OK) {
+				return RC;
+			}
 
-		if(Loc.Row < AieTileStart ||  Loc.Row < MemTileStart){
-			XAIE_ERROR("Loc.Row should not be less than TileStart\n");
-			return XAIE_ERR;
-		}
+			if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
+				Index = Loc.Row - AieTileStart;
+				CoreTile[Index].Dma[Chan].S2MMStatus = RegVal;
+			} else if(TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+				Index = Loc.Row - MemTileStart;
+				MemTile[Index].Dma[Chan].S2MMStatus = RegVal;
+			} else {
+				ShimTile[Loc.Row].Dma[Chan].S2MMStatus = RegVal;
+			}
 
-		if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
-			Index = Loc.Row - AieTileStart;
-			CoreTile[Index].Dma[Chan].S2MMStatus = RegVal;
-		} else if(TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
-			Index = Loc.Row - MemTileStart;
-			MemTile[Index].Dma[Chan].S2MMStatus = RegVal;
-		} else {
-			ShimTile[Loc.Row].Dma[Chan].S2MMStatus = RegVal;
-		}
+			/* read mm2s channel status */
+			RC = XAie_DmaGetChannelStatus(DevInst, Loc, Chan,
+					DMA_MM2S, &RegVal);
+			if (RC != XAIE_OK) {
+				return RC;
+			}
 
-		/* read mm2s channel status */
-		RC = XAie_DmaGetChannelStatus(DevInst, Loc, Chan,
-				DMA_MM2S, &RegVal);
-		if (RC != XAIE_OK) {
-			return RC;
+			if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
+				Index = Loc.Row - AieTileStart;
+				CoreTile[Index].Dma[Chan].MM2SStatus = RegVal;
+			} else if(TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+				Index = Loc.Row - MemTileStart;
+				MemTile[Index].Dma[Chan].MM2SStatus = RegVal;
+			} else {
+				ShimTile[Loc.Row].Dma[Chan].MM2SStatus = RegVal;
+			}
 		}
+	} else {
+		/* iterate all s2mm dma channels */
+		for (u8 Chan = 0; Chan < DmaMod->NumChannels; Chan++) {
 
-		if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
-			Index = Loc.Row - AieTileStart;
-			CoreTile[Index].Dma[Chan].MM2SStatus = RegVal;
-		} else if(TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
-			Index = Loc.Row - MemTileStart;
-			MemTile[Index].Dma[Chan].MM2SStatus = RegVal;
-		} else {
-			ShimTile[Loc.Row].Dma[Chan].MM2SStatus = RegVal;
+			/* read s2mm channel status */
+			RC = XAie_DmaGetChannelStatus(DevInst, Loc, Chan,
+					DMA_S2MM, &RegVal);
+			if (RC != XAIE_OK) {
+				return RC;
+			}
+
+			if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
+				Index = Loc.Row - AieTileStart;
+				CoreTile[Index].Dma[Chan].S2MMStatus = RegVal;
+			} else if(TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+				Index = Loc.Row - MemTileStart;
+				MemTile[Index].Dma[Chan].S2MMStatus = RegVal;
+			} else {
+				ShimTile[Loc.Row].Dma[Chan].S2MMStatus = RegVal;
+			}			
 		}
-	}
+		/* iterate all mm2s dma channels */
+		for (u8 Chan = 0; Chan < DmaMod->NumMm2sChannels; Chan++) {			
+
+			/* read mm2s channel status */
+			RC = XAie_DmaGetChannelStatus(DevInst, Loc, Chan,
+					DMA_MM2S, &RegVal);
+			if (RC != XAIE_OK) {
+				return RC;
+			}
+
+			if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
+				Index = Loc.Row - AieTileStart;
+				CoreTile[Index].Dma[Chan].MM2SStatus = RegVal;
+			} else if(TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+				Index = Loc.Row - MemTileStart;
+				MemTile[Index].Dma[Chan].MM2SStatus = RegVal;
+			} else {
+				ShimTile[Loc.Row].Dma[Chan].MM2SStatus = RegVal;
+			}
+		}
+	}	
+	
 	return XAIE_OK;
 }
 
@@ -971,16 +1015,16 @@ static AieRC _XAie_LockValueStatusDump(XAie_DevInst *DevInst,
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 	if((TileType >= XAIEGBL_TILE_TYPE_MAX) ||
 			(TileType == XAIEGBL_TILE_TYPE_SHIMPL)) {
-		XAIE_ERROR("Invalid Tile Type\n");
-		return XAIE_INVALID_TILE;
-	}
-
-	if(Loc.Row < AieTileStart ||  Loc.Row < MemTileStart){
-		XAIE_ERROR("Loc.Row should not be less than TileStart\n");
-		return XAIE_ERR;
+		/* Lock status not applicable for this tile type, skip */
+		return XAIE_OK;
 	}
 
 	LockMod = DevInst->DevProp.DevMod[TileType].LockMod;
+	if(LockMod == NULL) {
+		/* Lock module not present for this tile type */
+		return XAIE_OK;
+	}
+
 	CoreTile = Status[Loc.Col].CoreTile;
 	MemTile = Status[Loc.Col].MemTile;
 	ShimTile = Status[Loc.Col].ShimTile;
@@ -1047,19 +1091,14 @@ static AieRC _XAie_EventStatusDump(XAie_DevInst *DevInst,
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 	if(TileType >= XAIEGBL_TILE_TYPE_MAX) {
-		XAIE_ERROR("Invalid Tile Type\n");
-		return XAIE_INVALID_TILE;
+		/* Invalid tile type, skip */
+		return XAIE_OK;
 	}
 
 	CoreTile = Status[Loc.Col].CoreTile;
 	MemTile = Status[Loc.Col].MemTile;
 	ShimTile = Status[Loc.Col].ShimTile;
 	DevMod = DevInst->DevProp.DevMod;
-
-	if(Loc.Row < AieTileStart || Loc.Row < MemTileStart ){
-		XAIE_ERROR("Loc.Row should not be less than TileStart\n");
-		return XAIE_ERR;
-	}
 
 	if(TileType == XAIEGBL_TILE_TYPE_AIETILE) {
 		EvntCoreMod = &DevMod[TileType].EvntMod[XAIE_CORE_MOD];
@@ -1077,14 +1116,16 @@ static AieRC _XAie_EventStatusDump(XAie_DevInst *DevInst,
 
 			CoreTile[Index].EventCoreModStatus[EventReg] = RegVal;
 
-			/* read event status register and store in output
-			 * buffer */
-			RC = XAie_EventRegStatus(DevInst, Loc, XAIE_MEM_MOD,
-					(u8)EventReg, &RegVal);
-			if (RC != XAIE_OK) {
-				return RC;
+			/* For AIE4 devices, skip memory module event status for core tiles */
+			if(!_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
+				/* read event status register for memory module */
+				RC = XAie_EventRegStatus(DevInst, Loc, XAIE_MEM_MOD,
+						(u8)EventReg, &RegVal);
+				if (RC != XAIE_OK) {
+					return RC;
+				}
+				CoreTile[Index].EventMemModStatus[EventReg] = RegVal;
 			}
-			CoreTile[Index].EventMemModStatus[EventReg] = RegVal;
 		}
 	} else if(TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
 		EvntMod = &DevMod[TileType].EvntMod[XAIE_MEM_MOD];
@@ -1113,6 +1154,7 @@ static AieRC _XAie_EventStatusDump(XAie_DevInst *DevInst,
 	return XAIE_OK;
 }
 
+
 /*****************************************************************************/
 /**
 *
@@ -1128,7 +1170,7 @@ static AieRC _XAie_EventStatusDump(XAie_DevInst *DevInst,
 ******************************************************************************/
 AieRC XAie_StatusDump(XAie_DevInst *DevInst, XAie_ColStatus *Status)
 {
-	AieRC RC = XAIE_ERR;
+	AieRC RC = XAIE_OK;
 	u8 StartCol = DevInst->StartCol;
 	u8 NumCols  = DevInst->NumCols;
 	u8 NumRows  = DevInst->NumRows;
@@ -1139,11 +1181,11 @@ AieRC XAie_StatusDump(XAie_DevInst *DevInst, XAie_ColStatus *Status)
 	}
 
 	/* iterate specified columns */
-	for(u8 Col = StartCol; Col < NumCols; Col++) {
+	for(u8 Col = StartCol; Col < (StartCol + NumCols); Col++) {
 		for(u8 Row = 0; Row < NumRows; Row++) {
 			Loc.Row = Row;
 			Loc.Col = Col;
-			RC |= (u32)_XAie_CoreStatusDump(DevInst,Status, Loc);
+			RC |= (u32)_XAie_CoreStatusDump(DevInst, Status, Loc);
 			RC |= (u32)_XAie_DmaStatusDump(DevInst, Status, Loc);
 			RC |= (u32)_XAie_LockValueStatusDump(DevInst, Status, Loc);
 			RC |= (u32)_XAie_EventStatusDump(DevInst, Status, Loc);

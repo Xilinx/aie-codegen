@@ -470,6 +470,83 @@ void XAie_ControlCodeIO_swig_CloseControlCodeFile(Swig_DevInst *DevInst)
 /*****************************************************************************/
 /**
 *
+* This is the public interface swig controlcode IO function to open control code
+* in memory mode.
+*
+* @param	DevInst: Device instance pointer.
+* @param	PageSize: Page Size for the control code.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+*******************************************************************************/
+int XAie_ControlCodeIO_swig_OpenControlCodeInMemory(Swig_DevInst *DevInst, u32 PageSize)
+{
+	AieRC RC;
+	RC = XAie_AllocControlCodeBuffer((XAie_DevInst *)DevInst, PageSize);
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the public interface swig controlcode IO function to retrieve the
+* control code buffer.
+*
+* @param	DevInst: Device instance pointer.
+* @param	Buffer: Pointer to receive the buffer pointer.
+* @param	Size: Pointer to receive the buffer size.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+*******************************************************************************/
+int XAie_ControlCodeIO_swig_GetControlCodeBuffer(Swig_DevInst *DevInst,
+	const char **Buffer, size_t *Size)
+{
+	AieRC RC;
+	RC = XAie_GetControlCodeBuffer((XAie_DevInst *)DevInst, Buffer, Size);
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the public interface swig controlcode IO function to retrieve the
+* debug ASM buffer.
+*
+* @param	DevInst: Device instance pointer.
+* @param	Buffer: Pointer to receive the buffer pointer.
+* @param	Size: Pointer to receive the buffer size.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+*******************************************************************************/
+int XAie_ControlCodeIO_swig_GetDebugAsmBuffer(Swig_DevInst *DevInst,
+	const char **Buffer, size_t *Size)
+{
+	AieRC RC;
+	RC = XAie_GetDebugAsmBuffer((XAie_DevInst *)DevInst, Buffer, Size);
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the public interface swig controlcode IO function to close control code
+* in memory mode.
+*
+* @param	DevInst: Device instance pointer.
+*
+* @return	None.
+*
+*******************************************************************************/
+void XAie_ControlCodeIO_swig_CloseControlCodeInMemory(Swig_DevInst *DevInst)
+{
+	XAie_ReleaseControlCodeBuffer((XAie_DevInst *)DevInst);
+}
+
+/*****************************************************************************/
+/**
+*
 * This is the public interface swig controlcode IO function to free the global
 * IO instance
 *

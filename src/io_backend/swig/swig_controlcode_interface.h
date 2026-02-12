@@ -128,6 +128,10 @@ int XAie_ControlCodeIO_swig_WaitTaskCompleteToken(Swig_DevInst *DevInst, u16 Col
 int XAie_ControlCodeIO_swig_SaveTimestamp(Swig_DevInst *DevInst, u32 Timestamp);
 int XAie_ControlCodeIO_swig_RunOp(Swig_DevInst *DevInst, XAie_BackendOpCode Op, void *Arg);
 int XAie_ControlCodeIO_swig_OpenControlCodeFile(Swig_DevInst *DevInst, const char *FileName, u32 PageSize);
+int XAie_ControlCodeIO_swig_OpenControlCodeInMemory(Swig_DevInst *DevInst, u32 PageSize);
+int XAie_ControlCodeIO_swig_GetControlCodeBuffer(Swig_DevInst *DevInst, const char **Buffer, size_t *Size);
+int XAie_ControlCodeIO_swig_GetDebugAsmBuffer(Swig_DevInst *DevInst, const char **Buffer, size_t *Size);
+void XAie_ControlCodeIO_swig_CloseControlCodeInMemory(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_StartNewJob(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_EndJob(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_EndPage(Swig_DevInst *DevInst);
@@ -154,6 +158,10 @@ AieRC XAie_WaitTaskCompleteToken(XAie_DevInst *DevInst, uint16_t Column, uint16_
 AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp);
 AieRC XAie_ControlCodeIO_RunOp(void *IOInst, XAie_DevInst *DevInst, XAie_BackendOpCode Op, void *Arg);
 AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 PageSize);
+AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize);
+AieRC XAie_GetControlCodeBuffer(XAie_DevInst *DevInst, const char **Buffer, size_t *Size);
+AieRC XAie_GetDebugAsmBuffer(XAie_DevInst *DevInst, const char **Buffer, size_t *Size);
+void XAie_ReleaseControlCodeBuffer(XAie_DevInst *DevInst);
 AieRC XAie_StartNewJob(XAie_DevInst *DevInst);
 AieRC XAie_EndJob(XAie_DevInst *DevInst);
 AieRC XAie_EndPage(XAie_DevInst *DevInst);

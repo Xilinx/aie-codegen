@@ -700,6 +700,12 @@ XAIE_AIG_EXPORT AieRC XAie_ConfigMemInterleaving(XAie_DevInst *DevInst,
 		XAie_LocType *Locs, u32 NumTiles, u8 Enable);
 XAIE_AIG_EXPORT AieRC XAie_GetCtrlPktHndlrStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u32 *Status);
+
+//New APIs to retrieve ASM file content as in-memory buffer in controlcode backend
+XAIE_AIG_EXPORT AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize);
+XAIE_AIG_EXPORT AieRC XAie_GetControlCodeBuffer(XAie_DevInst *DevInst, const char **Buffer, size_t *Size);
+XAIE_AIG_EXPORT AieRC XAie_GetDebugAsmBuffer(XAie_DevInst *DevInst, const char **Buffer, size_t *Size);
+XAIE_AIG_EXPORT void XAie_ReleaseControlCodeBuffer(XAie_DevInst *DevInst);		
 /*****************************************************************************/
 /*
 *

@@ -1435,7 +1435,7 @@ CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA,
 	if(ControlCodeInst->LabelMatchFound)
 	{
 		ControlCodeInst->CombinedMemWriteSize = 0;
-		ControlCodeInst->CalculatedNextRegOff = 0;
+		ControlCodeInst->CalculatedNextRegOff = UINT64_MAX;
 	}
 	else if(ControlCodeInst->IsAdjacentMemWrite == 1) {
 		ControlCodeInst->CombinedMemWriteSize += 1;
@@ -1780,8 +1780,6 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 						Size);
 					ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
 					ControlCodeInst->UcDmaDataNum = ControlCodeInst->CurrentDataBWLabel;
-					ControlCodeInst->CombinedMemWriteSize = 0;
-					ControlCodeInst->CalculatedNextRegOff = 0;
 					_XAie_ControlCodePageInfo(ControlCodeInst->DebugAsmFile, ControlCodeInst->PageId,
 						 ControlCodeInst->UcPageSize, ControlCodeInst->UcPageTextSize, ControlCodeInst->DataAligner);
 					break;
@@ -1854,7 +1852,11 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 
 	ControlCodeInst->CalculatedNextRegOff = (u64)(RegOff + (Size * (sizeof(*Data))));
 
-	if(PageBreakOccured == 1) {
+	if(ControlCodeInst->LabelMatchFound == 1) {
+		ControlCodeInst->CombinedMemWriteSize = 0;
+		ControlCodeInst->CalculatedNextRegOff = UINT64_MAX;
+	}
+	else if(PageBreakOccured == 1) {
 		ControlCodeInst->CombinedMemWriteSize =  NewPagePayloadSize;
 		ControlCodeInst->CalculatedNextRegOff =  (u64) ( NewPageRegOff + (NewPagePayloadSize * (sizeof(*Data))) );
 	}

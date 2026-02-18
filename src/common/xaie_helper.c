@@ -727,12 +727,12 @@ XAie_ModeSelect XAie_GetModeConfig(XAie_DevInst *DevInst)
 	}
 }
 
-AieRC XAie_Preempt(XAie_DevInst *DevInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel)
+AieRC XAie_Preempt(XAie_DevInst *DevInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel, u32* HintMap, u32 HintMapSizeInWords)
 {
 	const XAie_Backend *Backend = DevInst->Backend;
 	if (Backend->Ops.Preempt != NULL)
 	{
-		return Backend->Ops.Preempt((void *)DevInst->IOInst, PreemptId, SaveLabel, RestoreLabel);
+		return Backend->Ops.Preempt((void *)DevInst->IOInst, PreemptId, SaveLabel, RestoreLabel, HintMap, HintMapSizeInWords);
 	}
 	else
 	{

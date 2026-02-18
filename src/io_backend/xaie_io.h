@@ -179,7 +179,7 @@ typedef struct XAie_BackendOps {
 	AieRC (*WaitUcDMA) (void *IOInst);
 	AieRC (*ConfigMode)(void *IOInst, XAie_ModeSelect Mode);
 	XAie_ModeSelect (*GetConfigMode) (void *IOInst);
-	AieRC (*Preempt)(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel);
+	AieRC (*Preempt)(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel, u32* HintMap, u32 HintMapSizeInWords);
 	AieRC (*SetPadInteger)(void *IOInst, char* BuffName, u32 BuffSize);
 	AieRC (*SetPadString)(void *IOInst, char* BuffName, char* BuffBlobPath);
 	AieRC (*AttachToGroup)(void *IOInst, uint8_t GroupId);

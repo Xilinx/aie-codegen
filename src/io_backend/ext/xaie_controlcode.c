@@ -218,6 +218,7 @@ typedef struct {
 	u8 LabelMatchFound;
 	int PrevMemWriteType;
 	u64 BarrierId;
+	u32 HintMapId;
 } XAie_ControlCodeIO;
 
 /************************** Function Definitions *****************************/
@@ -2214,11 +2215,13 @@ AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
 * @param        PreemptId: Preemption level
 * @param        SaveLabel: Name of Save Label
 * @param        RestoreLabel: Name of Restore Label
-*
+* @param        HintMap: Pointer to the hint map array which needs to be saved along with preempt opcode.
+* @param        HintMapSizeInWords: Size of the hint map in words. 
+
 * @return       XAIE_OK or XAIE_ERR.
 *
 *******************************************************************************/
-AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel)
+AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel, u32* HintMap, u32 HintMapSizeInWords)
 {
 	if(SaveLabel == NULL || RestoreLabel == NULL) {
 		XAIE_ERROR("SaveLabel and RestoreLabel cannot be NULL\n");
@@ -2233,19 +2236,32 @@ AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, c
 
 	if (ControlCodeInst->ControlCodefp != NULL)
 	{
-        if((ControlCodeInst->UcPageSize + ISA_OPSIZE_PREEMPT +
-        	ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
+
+        if((ControlCodeInst->UcPageSize + ISA_OPSIZE_PREEMPT + (HintMapSizeInWords * UC_DMA_WORD_LEN)
+        	+ ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
         	_XAie_StartNewPage(ControlCodeInst);
         }
 		
 		_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
-		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "PREEMPT\t0x%x, @%s, @%s\n",PreemptId, SaveLabel, RestoreLabel);
-		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "PREEMPT\t0x%x, @%s, @%s\n",PreemptId, SaveLabel, RestoreLabel);
+		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "PREEMPT\t0x%x, @%s, @%s , @hintmap_%d\n",PreemptId, SaveLabel, RestoreLabel, ControlCodeInst->HintMapId);
+		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "PREEMPT\t0x%x, @%s, @%s , @hintmap_%d\n",PreemptId, SaveLabel, RestoreLabel, ControlCodeInst->HintMapId);
 		_XAie_EndJob(ControlCodeInst);
 
+
+		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA2, "hintmap_%d:\n",
+					ControlCodeInst->HintMapId);
+		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA1, "hintmap_%d:\n",
+					ControlCodeInst->HintMapId);
+
+		for(u32 i=0; i<HintMapSizeInWords; i++) {
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA2, "\t.long 0x%08x\n", HintMap[i]);
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA1, "\t.long 0x%08x\n", HintMap[i]);
+		}
+
 		ControlCodeInst->CombineCommands = 0;
-		ControlCodeInst->UcPageSize += ISA_OPSIZE_PREEMPT;
+		ControlCodeInst->UcPageSize += ISA_OPSIZE_PREEMPT + (HintMapSizeInWords * UC_DMA_WORD_LEN);
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_PREEMPT;
+		ControlCodeInst->HintMapId++;
 		_XAie_ControlCodePageInfo(ControlCodeInst->DebugAsmFile, ControlCodeInst->PageId, ControlCodeInst->UcPageSize, 
 								  ControlCodeInst->UcPageTextSize, ControlCodeInst->DataAligner);
 	}
@@ -2445,6 +2461,12 @@ AieRC XAie_ControlCodeIO_RemoteBarrier(void *IOInst, uint8_t RbId, uint32_t UcMa
 AieRC XAie_ControlCodeIO_SaveRegister(void *IOInst, u32 RegOff, u32 Id)
 {
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
+		((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_SAVE_REGISTER) % DATA_SECTION_ALIGNMENT));
+	if (ControlCodeInst->DataAligner == DATA_SECTION_ALIGNMENT)
+	{
+		ControlCodeInst->DataAligner = 0U;
+	}
 
 	if(ControlCodeInst->ControlCodefp != NULL) {
 
@@ -3699,13 +3721,15 @@ XAie_ModeSelect XAie_GetConfigMode(void *IOInst)
 	return XAIE_INVALID_MODE;
 }
 
-AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel)
+AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel, u32* HintMap, u32 HintMapSizeInWords)
 {
 	/* no-op */
 	(void)IOInst;
 	(void)PreemptId;
 	(void)SaveLabel;
 	(void)RestoreLabel;
+	(void)HintMap;
+	(void)HintMapSizeInWords;
 	XAIE_ERROR("Driver is not compiled with ControlCode generation "
 			"backend (__AIECONTROLCODE__)\n");
 	return XAIE_INVALID_BACKEND;

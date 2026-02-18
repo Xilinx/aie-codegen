@@ -2231,18 +2231,16 @@ AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, c
 
 	if (ControlCodeInst->ControlCodefp != NULL)
 	{
-		if (!ControlCodeInst->IsJobOpen) {
-        	_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
-        }
-
         if((ControlCodeInst->UcPageSize + ISA_OPSIZE_PREEMPT +
         	ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
         	_XAie_StartNewPage(ControlCodeInst);
-            _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
         }
 		
+		_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "PREEMPT\t0x%x, @%s, @%s\n",PreemptId, SaveLabel, RestoreLabel);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "PREEMPT\t0x%x, @%s, @%s\n",PreemptId, SaveLabel, RestoreLabel);
+		_XAie_EndJob(ControlCodeInst);
+
 		ControlCodeInst->CombineCommands = 0;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_PREEMPT;
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_PREEMPT;

@@ -702,7 +702,7 @@ AieRC XAie_ControlCodeAddComment(XAie_DevInst *DevInst, const char *Comment)
 
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
-	if (ControlCodeInst->ControlCodefp != NULL) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "; %s\n", Comment);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "; %s\n", Comment);
 		return XAIE_OK;
@@ -737,7 +737,7 @@ AieRC XAie_ControlCodeAddAnnotation(XAie_DevInst *DevInst,
 
         XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
-        if (ControlCodeInst->ControlCodefp != NULL) {
+        if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
                 CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".section annotation\n");
                 CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "id: %d\n", Id);
                 CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "name: %s\n", Name);
@@ -938,7 +938,7 @@ AieRC XAie_ControlCodeIO_Finish(void *IOInst)
 {
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	XAie_DevInst *DevInst = ControlCodeInst->DevInst;
-        if(ControlCodeInst->ControlCodefp != NULL) {
+        if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
                 XAie_CloseControlCodeFile(DevInst);
         }
 
@@ -1280,7 +1280,7 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 		ControlCodeInst->DataAligner = 0U;
 	}
 
-	if (ControlCodeInst->ControlCodefp != NULL || ControlCodeInst->UseInMemoryBuffers) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -1502,7 +1502,7 @@ AieRC XAie_ControlCodeIO_MaskWrite32(void *IOInst, u64 RegOff, u32 Mask,
 		ControlCodeInst->DataAligner = 0U;
 	}
 
-	if (ControlCodeInst->ControlCodefp != NULL || ControlCodeInst->UseInMemoryBuffers) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
@@ -1556,7 +1556,7 @@ AieRC XAie_ControlCodeIO_MaskPoll(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
 	}
 
 	(void) TimeOutUs;
-	if (ControlCodeInst->ControlCodefp != NULL || ControlCodeInst->UseInMemoryBuffers) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
@@ -1623,7 +1623,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 	}
 
 	while (Size > CompletedSize) {
-		if (ControlCodeInst->ControlCodefp != NULL || ControlCodeInst->UseInMemoryBuffers) {
+		if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 			if (!ControlCodeInst->IsJobOpen) {
 				_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 			}
@@ -1901,7 +1901,7 @@ AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u32 Size
 
 	CompletedSize = 0;
 	while (Size > CompletedSize) {
-		if (ControlCodeInst->ControlCodefp != NULL) {
+		if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 			if (!ControlCodeInst->IsJobOpen) {
 				_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 			}
@@ -2007,7 +2007,7 @@ AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u16 Arg_Index, u8 Num_BDs
 		ControlCodeInst->DataAligner = 0U;
 	}
 
-	if (ControlCodeInst->ControlCodefp != NULL || ControlCodeInst->UseInMemoryBuffers) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -2125,7 +2125,7 @@ AieRC XAie_WaitTaskCompleteToken(XAie_DevInst *DevInst,
 		ControlCodeInst->DataAligner = 0U;
 	}
 
-	if (ControlCodeInst->ControlCodefp != NULL) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -2178,7 +2178,7 @@ AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
                 ControlCodeInst->DataAligner = 0U;
         }
 
-        if (ControlCodeInst->ControlCodefp != NULL) {
+        if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 
                 if (!ControlCodeInst->IsJobOpen) {
                         _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -2234,7 +2234,7 @@ AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, c
 		ControlCodeInst->DataAligner = 0U;
 	}
 
-	if (ControlCodeInst->ControlCodefp != NULL)
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers)
 	{
 
         if((ControlCodeInst->UcPageSize + ISA_OPSIZE_PREEMPT + (HintMapSizeInWords * UC_DMA_WORD_LEN)
@@ -2292,7 +2292,7 @@ AieRC XAie_ControlCodeIO_SetPadInteger(void *IOInst, char* BuffName, u32 BuffSiz
 	}
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	
-	if(ControlCodeInst->ControlCodefp != NULL) {
+	if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".setpad\t %s, 0x%x\n",BuffName, BuffSize);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".setpad\t %s, 0x%x\n",BuffName, BuffSize);
 		ControlCodeInst->CombineCommands = 0;
@@ -2328,7 +2328,7 @@ AieRC XAie_ControlCodeIO_SetPadString(void *IOInst, char* BuffName, char* BuffBl
 	}
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	
-	if(ControlCodeInst->ControlCodefp != NULL) {
+	if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".setpad\t %s, %s\n",BuffName, BuffBlobPath);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".setpad\t %s, %s\n",BuffName, BuffBlobPath);
 		ControlCodeInst->CombineCommands = 0;
@@ -2366,7 +2366,7 @@ AieRC XAie_ControlCodeIO_AttachToGroup(void *IOInst, uint8_t UcIndex)
 {
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	
-	if(ControlCodeInst->ControlCodefp != NULL) {
+	if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".attach_to_group\t %d\n",UcIndex);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".attach_to_group\t %d\n",UcIndex);
 		ControlCodeInst->CombineCommands = 0;
@@ -2421,7 +2421,7 @@ AieRC XAie_ControlCodeIO_RemoteBarrier(void *IOInst, uint8_t RbId, uint32_t UcMa
 		ControlCodeInst->DataAligner = 0U;
 	}
 
-	if(ControlCodeInst->ControlCodefp != NULL) {
+	if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
         if (!ControlCodeInst->IsJobOpen) {
             _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
         }
@@ -2468,7 +2468,7 @@ AieRC XAie_ControlCodeIO_SaveRegister(void *IOInst, u32 RegOff, u32 Id)
 		ControlCodeInst->DataAligner = 0U;
 	}
 
-	if(ControlCodeInst->ControlCodefp != NULL) {
+	if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 
 		if (!ControlCodeInst->IsJobOpen) {
     		_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -2548,7 +2548,7 @@ AieRC XAie_ControlCodeRelAcqSync(XAie_DevInst *DevInst, const XAie_LockMod *Lock
 	if (ControlCodeInst->DataAligner == DATA_SECTION_ALIGNMENT) {
 		ControlCodeInst->DataAligner = 0U;
 	}
-	if (ControlCodeInst->ControlCodefp != NULL) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
@@ -3270,7 +3270,7 @@ void XAie_ReleaseControlCodeBuffer(XAie_DevInst *DevInst)
 	}
 
 	/* If file mode is still active, don't free buffers yet - they're still needed */
-	if (ControlCodeInst->ControlCodefp != NULL) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		/* Just mark in-memory mode as closed, buffers will be freed by XAie_CloseControlCodeFile */
 		ControlCodeInst->UseInMemoryBuffers = 0;
 		return;
@@ -3314,7 +3314,7 @@ AieRC XAie_StartNewJob(XAie_DevInst *DevInst, XAie_CertStartJobType JobType)
 {
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
-	if (ControlCodeInst->ControlCodefp != NULL || ControlCodeInst->UseInMemoryBuffers) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		_XAie_StartNewJob(ControlCodeInst, JobType);
 		return XAIE_OK;
 	}
@@ -3333,7 +3333,7 @@ AieRC XAie_StartNewJob(XAie_DevInst *DevInst, XAie_CertStartJobType JobType)
 AieRC XAie_EndJob(XAie_DevInst *DevInst) {
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
-	if (ControlCodeInst->ControlCodefp != NULL || ControlCodeInst->UseInMemoryBuffers) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		_XAie_EndJob(ControlCodeInst);
 		return XAIE_OK;
 	}
@@ -3354,7 +3354,7 @@ AieRC XAie_EndPage(XAie_DevInst *DevInst) {
 
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
-	if (ControlCodeInst->ControlCodefp != NULL || ControlCodeInst->UseInMemoryBuffers) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		_XAie_EndPage(ControlCodeInst);
 		ControlCodeInst->PageBreak = 1;
 		return XAIE_OK;
@@ -3398,7 +3398,7 @@ static void _XAie_MegreFiles(FILE *SrcFp, FILE *DesFp) {
 void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
 
-	if (ControlCodeInst->ControlCodefp != NULL) {
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		_XAie_EndPage(ControlCodeInst);
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "EOF\n\n");
 		if (ControlCodeInst->DebugAsmFile) {

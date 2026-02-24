@@ -15,7 +15,11 @@ Key Features:
 - Handles hex and decimal size formats consistently
 
 Usage:
-  python Data_Integrity_Validator.py input_file.asm [output_report.txt]
+    # Validate a single file
+    python Data_Integrity_Validator.py input_file.asm [output_report.txt]
+
+    # Validate all .asm files in a directory (recursive)
+    python Data_Integrity_Validator.py <folder_path> [output_report_folder]
   
 Integration:
   from Data_Integrity_Validator import DataIntegrityValidator
@@ -100,6 +104,12 @@ class DataIntegrityValidator:
         self.uc_dma_bd_references: Dict[str, List[UcDmaBdReference]] = {}
         self.data_sections: Dict[str, DataSection] = {}
         self.integrity_results: List[IntegrityResult] = []
+
+    def reset_state(self) -> None:
+        """Reset all per-file state so this instance can validate multiple files."""
+        self.uc_dma_bd_references = {}
+        self.data_sections = {}
+        self.integrity_results = []
         
     def debug_print(self, message: str) -> None:
         """Print debug information if debug mode is enabled."""
@@ -475,6 +485,8 @@ class DataIntegrityValidator:
         Returns:
             True if all integrity checks pass, False otherwise
         """
+        # Ensure we don't carry state across multiple files.
+        self.reset_state()
         safe_print(f"[START] Starting data integrity validation for: {filepath}")
         
         # Parse file
@@ -512,26 +524,74 @@ class DataIntegrityValidator:
 def main():
     """Command-line interface for the data integrity validator."""
     parser = argparse.ArgumentParser(description="Universal Data Integrity Validator for Assembly Files")
-    parser.add_argument("input_file", help="Input assembly file to validate")
-    parser.add_argument("report_file", nargs='?', help="Optional output report file")
+    parser.add_argument(
+        "input_path",
+        help="Input assembly file (.asm) OR a directory containing .asm files to validate",
+    )
+    parser.add_argument(
+        "report_path",
+        nargs='?',
+        help=(
+            "Optional output report path. "
+            "If input_path is a file, this is a report file. "
+            "If input_path is a directory, this is a report directory (per-file reports are created)."
+        ),
+    )
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
     parser.add_argument("--quiet", action="store_true", help="Suppress non-error output")
     
     args = parser.parse_args()
     
-    if not os.path.exists(args.input_file):
-        safe_print(f"[ERROR] ERROR: Input file '{args.input_file}' not found")
+    if not os.path.exists(args.input_path):
+        safe_print(f"[ERROR] ERROR: Input path '{args.input_path}' not found")
         sys.exit(1)
     
     # Create validator
     validator = DataIntegrityValidator(debug_mode=args.debug and not args.quiet)
     
-    # Validate file
     try:
-        is_valid = validator.validate_file(args.input_file, args.report_file)
-        
-        # Exit with appropriate code
-        sys.exit(0 if is_valid else 1)
+        input_path = os.path.abspath(args.input_path)
+
+        if os.path.isfile(input_path):
+            is_valid = validator.validate_file(input_path, args.report_path)
+            sys.exit(0 if is_valid else 1)
+
+        if not os.path.isdir(input_path):
+            safe_print(f"[ERROR] ERROR: '{input_path}' is not a file or directory")
+            sys.exit(1)
+
+        # Directory mode: validate all *.asm files in the directory (recursive)
+        asm_files: List[str] = []
+        for root, _dirs, files in os.walk(input_path):
+            for name in files:
+                if name.lower().endswith(".asm"):
+                    asm_files.append(os.path.join(root, name))
+        asm_files.sort(key=lambda p: os.path.relpath(p, input_path).lower())
+
+        if not asm_files:
+            safe_print(f"[ERROR] ERROR: No .asm files found in directory '{input_path}'")
+            sys.exit(1)
+
+        report_dir: Optional[str] = None
+        if args.report_path:
+            report_dir = os.path.abspath(args.report_path)
+            os.makedirs(report_dir, exist_ok=True)
+
+        safe_print(f"[INFO] Validating {len(asm_files)} .asm file(s) under directory (recursive): {input_path}")
+
+        all_valid = True
+        for asm_file in asm_files:
+            per_file_report: Optional[str] = None
+            if report_dir:
+                rel_asm = os.path.relpath(asm_file, input_path)
+                rel_report = os.path.splitext(rel_asm)[0] + ".integrity_report.txt"
+                per_file_report = os.path.join(report_dir, rel_report)
+                os.makedirs(os.path.dirname(per_file_report), exist_ok=True)
+
+            is_valid = validator.validate_file(asm_file, per_file_report)
+            all_valid = all_valid and is_valid
+
+        sys.exit(0 if all_valid else 1)
         
     except Exception as e:
         safe_print(f"[ERROR] ERROR: Validation failed: {e}")

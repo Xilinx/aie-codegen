@@ -2820,10 +2820,9 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 		if (ControlCodeInst->DebugAsmFile) {
 			fclose(ControlCodeInst->DebugAsmFile);
 		}
-		//printf("File could not be opened, fopen Error: %s\n", strerror(errno));
 		return XAIE_ERR;
 	}
-	printf("Generating: %s\n", FileName);
+	XAIE_DBG("Generating: %s\n", FileName);
 
 	if(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4) {
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".target\t aie4\n");
@@ -3066,7 +3065,7 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	}
 
 	XAIE_DBG("XAie_AllocControlCodeBuffer: Completed successfully\n");
-	printf("Control code in-memory initialization complete\n");
+	XAIE_DBG("Control code in-memory initialization complete\n");
 	fflush(stdout);
 	
 	return XAIE_OK;
@@ -3085,7 +3084,7 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 ******************************************************************************/
 static AieRC _XAie_MergeMemBuffers(XAie_MemBuffer *SrcBuf, XAie_MemBuffer *DesBuf) {
 	if (!SrcBuf || !DesBuf) {
-		printf("Buffers not initialized\n");
+		XAIE_ERROR("Buffers not initialized\n");
 		return XAIE_ERR;
 	}
 	
@@ -3426,7 +3425,7 @@ static void _XAie_MergeFiles(FILE *SrcFp, FILE *DesFp) {
 	char TempBuf;
 
 	if (!SrcFp || !DesFp) {
-		printf("Files not opened\n");
+		XAIE_ERROR("Files not opened\n");
 		return;
 	}
 

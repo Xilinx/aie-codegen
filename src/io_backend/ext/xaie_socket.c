@@ -164,7 +164,7 @@ AieRC XAie_SocketIO_Init(XAie_DevInst *DevInst)
 
 	fclose(Fd);
 	PortNum[FileSize] = '\0';
-	printf("[AIE INFO]: Connecting to simulator - localhost:%s\n", PortNum);
+	XAIE_DBG("[AIE INFO]: Connecting to simulator - localhost:%s\n", PortNum);
 
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = AF_INET;

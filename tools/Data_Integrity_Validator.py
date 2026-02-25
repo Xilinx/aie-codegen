@@ -16,10 +16,10 @@ Key Features:
 
 Usage:
     # Validate a single file
-    python Data_Integrity_Validator.py input_file.asm [output_report.txt]
+    python Data_Integrity_Validator.py input_file.asm
 
     # Validate all .asm files in a directory (recursive)
-    python Data_Integrity_Validator.py <folder_path> [output_report_folder]
+    python Data_Integrity_Validator.py <folder_path>
   
 Integration:
   from Data_Integrity_Validator import DataIntegrityValidator
@@ -94,6 +94,18 @@ class IntegrityResult:
     status: str  # "PASSED", "FAILED", "MISSING"
     line_number: int
     details: str
+
+
+@dataclass
+class FileValidationSummary:
+    """Aggregated validation summary for a single file."""
+    file_path: str
+    passed: int
+    failed: int
+    missing: int
+    total: int
+    is_valid: bool
+    issues: List[IntegrityResult]
 
 
 class DataIntegrityValidator:
@@ -521,6 +533,88 @@ class DataIntegrityValidator:
         return is_valid
 
 
+def generate_combined_report(base_dir: str, file_summaries: List[FileValidationSummary],
+                             output_file: Optional[str] = None) -> str:
+    """Generate a combined report for all validated asm files."""
+    report_lines: List[str] = []
+    report_lines.append("=" * 100)
+    report_lines.append("COMBINED DATA INTEGRITY VALIDATION REPORT")
+    report_lines.append("=" * 100)
+    report_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report_lines.append(f"Base directory: {base_dir}")
+    report_lines.append(f"Files validated: {len(file_summaries)}")
+    report_lines.append("")
+
+    total_passed = sum(s.passed for s in file_summaries)
+    total_failed = sum(s.failed for s in file_summaries)
+    total_missing = sum(s.missing for s in file_summaries)
+    total_checks = sum(s.total for s in file_summaries)
+    total_valid_files = sum(1 for s in file_summaries if s.is_valid)
+    total_invalid_files = len(file_summaries) - total_valid_files
+
+    report_lines.append("OVERALL SUMMARY:")
+    report_lines.append(f"  Files passed: {total_valid_files}")
+    report_lines.append(f"  Files failed: {total_invalid_files}")
+    report_lines.append(f"  Total validations: {total_checks}")
+    report_lines.append(f"  Passed: {total_passed}")
+    report_lines.append(f"  Failed: {total_failed}")
+    report_lines.append(f"  Missing: {total_missing}")
+    report_lines.append("")
+
+    if total_failed == 0 and total_missing == 0:
+        report_lines.append("OVERALL STATUS: [OK] ALL FILES PASSED DATA INTEGRITY VALIDATION")
+    else:
+        report_lines.append("OVERALL STATUS: [ERROR] DATA INTEGRITY ISSUES DETECTED")
+    report_lines.append("")
+
+    report_lines.append("PER-FILE SUMMARY:")
+    report_lines.append("-" * 100)
+    for summary in file_summaries:
+        rel_path = os.path.relpath(summary.file_path, base_dir)
+        status = "PASSED" if summary.is_valid else "FAILED"
+        report_lines.append(
+            f"{rel_path}: {status} | Total={summary.total}, Passed={summary.passed}, "
+            f"Failed={summary.failed}, Missing={summary.missing}"
+        )
+    report_lines.append("")
+
+    issue_file_summaries = [s for s in file_summaries if s.failed > 0 or s.missing > 0]
+    if issue_file_summaries:
+        report_lines.append("DETAILED ISSUES BY FILE:")
+        report_lines.append("-" * 100)
+        for summary in issue_file_summaries:
+            rel_path = os.path.relpath(summary.file_path, base_dir)
+            report_lines.append(f"File: {rel_path}")
+            for issue in summary.issues:
+                report_lines.append(f"  - Line {issue.line_number}: {issue.label} [{issue.status}] - {issue.details}")
+            report_lines.append("")
+
+    report_text = "\n".join(report_lines)
+
+    if output_file:
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(report_text)
+        safe_print(f"[FILE] Combined report written to: {output_file}")
+
+    return report_text
+
+
+def _default_report_path(input_path: str, is_file_input: bool) -> str:
+    """Return default report path in the same directory as this script."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    if is_file_input:
+        input_name = os.path.splitext(os.path.basename(input_path))[0]
+    else:
+        input_name = os.path.basename(os.path.normpath(input_path))
+
+    if not input_name:
+        input_name = "integrity"
+
+    return os.path.join(script_dir, f"{input_name}_integrity_report.txt")
+
+
 def main():
     """Command-line interface for the data integrity validator."""
     parser = argparse.ArgumentParser(description="Universal Data Integrity Validator for Assembly Files")
@@ -532,9 +626,9 @@ def main():
         "report_path",
         nargs='?',
         help=(
-            "Optional output report path. "
-            "If input_path is a file, this is a report file. "
-            "If input_path is a directory, this is a report directory (per-file reports are created)."
+            "Deprecated and ignored. "
+            "Reports are now always generated in the script directory using "
+            "<input_name>_integrity_report.txt naming."
         ),
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
@@ -551,9 +645,12 @@ def main():
     
     try:
         input_path = os.path.abspath(args.input_path)
+        if args.report_path:
+            safe_print("[WARN] WARNING: report_path argument is ignored. Using default naming in script directory.")
 
         if os.path.isfile(input_path):
-            is_valid = validator.validate_file(input_path, args.report_path)
+            output_report = _default_report_path(input_path, is_file_input=True)
+            is_valid = validator.validate_file(input_path, output_report)
             sys.exit(0 if is_valid else 1)
 
         if not os.path.isdir(input_path):
@@ -572,24 +669,39 @@ def main():
             safe_print(f"[ERROR] ERROR: No .asm files found in directory '{input_path}'")
             sys.exit(1)
 
-        report_dir: Optional[str] = None
-        if args.report_path:
-            report_dir = os.path.abspath(args.report_path)
-            os.makedirs(report_dir, exist_ok=True)
-
         safe_print(f"[INFO] Validating {len(asm_files)} .asm file(s) under directory (recursive): {input_path}")
 
         all_valid = True
+        file_summaries: List[FileValidationSummary] = []
         for asm_file in asm_files:
-            per_file_report: Optional[str] = None
-            if report_dir:
-                rel_asm = os.path.relpath(asm_file, input_path)
-                rel_report = os.path.splitext(rel_asm)[0] + ".integrity_report.txt"
-                per_file_report = os.path.join(report_dir, rel_report)
-                os.makedirs(os.path.dirname(per_file_report), exist_ok=True)
+            is_valid = validator.validate_file(asm_file, None)
 
-            is_valid = validator.validate_file(asm_file, per_file_report)
+            passed = len([r for r in validator.integrity_results if r.status == "PASSED"])
+            failed = len([r for r in validator.integrity_results if r.status == "FAILED"])
+            missing = len([r for r in validator.integrity_results if r.status == "MISSING"])
+            total = passed + failed + missing
+            issues = [r for r in validator.integrity_results if r.status in ["FAILED", "MISSING"]]
+            file_summaries.append(FileValidationSummary(
+                file_path=asm_file,
+                passed=passed,
+                failed=failed,
+                missing=missing,
+                total=total,
+                is_valid=is_valid,
+                issues=issues
+            ))
+
             all_valid = all_valid and is_valid
+
+        combined_report_file = _default_report_path(input_path, is_file_input=False)
+        generate_combined_report(input_path, file_summaries, combined_report_file)
+
+        total_valid_files = sum(1 for s in file_summaries if s.is_valid)
+        total_invalid_files = len(file_summaries) - total_valid_files
+        safe_print("\n[INFO] DIRECTORY VALIDATION SUMMARY:")
+        safe_print(f"   [FILE] Files validated: {len(file_summaries)}")
+        safe_print(f"   [OK] Files passed: {total_valid_files}")
+        safe_print(f"   [ERROR] Files failed: {total_invalid_files}")
 
         sys.exit(0 if all_valid else 1)
         

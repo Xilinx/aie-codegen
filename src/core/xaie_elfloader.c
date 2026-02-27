@@ -437,6 +437,12 @@ static AieRC _XAie_ProcessFillSegments(XAie_DevInst *DevInst, XAie_LocType Loc,
 	XAie_LocType TgtLoc;
 	const XAie_CoreMod *CoreMod;
 
+	/* Input parameter validation */
+	if((DevInst == XAIE_NULL) || (SectionPtr == XAIE_NULL) || (Phdr == XAIE_NULL)) {
+		XAIE_ERROR("Invalid input parameters\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	CoreMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_AIETILE].CoreMod;
 
 	DataSize = Phdr->p_filesz;
@@ -444,63 +450,87 @@ static AieRC _XAie_ProcessFillSegments(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	XAIE_DBG("Processing fillsegments data, size=%d bytes\n", DataSize);
 
+	/* Validate minimum data size and alignment */
+	if(DataSize < 16U) {
+		XAIE_WARN("Fillsegments data too small (%d bytes), skipping\n", DataSize);
+		return XAIE_OK;
+	}
+
+	if((DataSize % 4U) != 0U) {
+		XAIE_WARN("Fillsegments data size (%d) not word-aligned, may cause issues\n", DataSize);
+	}
+
 	/* Parse the fillsegments data - format may vary */
-	if(DataSize >= 16U)
+	/* Standard format: addr, size, [metadata], value */
+	FillAddr = FillData[0U];
+	FillSize = FillData[1U];
+	FillValue = FillData[3U];  /* Value is in the 4th word */
+
+	XAIE_DBG("Fill operation: addr=0x%x, size=%d, value=0x%x\n", FillAddr, FillSize, FillValue);
+
+	/* Input validation */
+	if(FillSize == 0U) {
+		XAIE_WARN("Fill size is zero, skipping\n");
+		return XAIE_OK;
+	}
+
+	/* Check for potential overflow in bounds calculation */
+	if( ((0xFFFFFFFFU - FillAddr) < FillSize) || (FillSize > (0xFFFFFFFFU - 3U)) ) {
+		XAIE_ERROR("Fill operation would cause address overflow\n");
+		return XAIE_ERR;
+	}
+
+	u32 DataMemEnd = CoreMod->DataMemAddr + (CoreMod->DataMemSize * 4U);
+	u32 FillEnd = FillAddr + FillSize;
+
+	/* Check if the entire fill region is within data memory bounds */
+	if(FillAddr >= CoreMod->DataMemAddr && FillEnd <= DataMemEnd)
 	{
-		/* Standard format: addr, size, [metadata], value */
-		FillAddr = FillData[0U];
-		FillSize = FillData[1U];
-		FillValue = FillData[3U];  /* Value is in the 4th word */
-
-		XAIE_DBG("Fill operation: addr=0x%x, size=%d, value=0x%x\n", FillAddr, FillSize, FillValue);
-
-		/* Check if this is a data memory address */
-		if(FillAddr >= CoreMod->DataMemAddr && FillAddr < (CoreMod->DataMemAddr + CoreMod->DataMemSize * 4U))
+		RC = _XAie_GetTargetTileLoc(DevInst, Loc, FillAddr, &TgtLoc);
+		if(RC != XAIE_OK)
 		{
-			RC = _XAie_GetTargetTileLoc(DevInst, Loc, FillAddr, &TgtLoc);
-			if(RC != XAIE_OK)
-			{
-				XAIE_ERROR("Failed to get target location for fill addr 0x%x\n", FillAddr);
-				return RC;
-			}
-
-			/* Create buffer with fill value */
-			u32 NumWords = (FillSize + 3U) / 4U;  /* Round up to word boundary */
-			u32 *FillBuffer = (u32 *)calloc(NumWords, sizeof(u32));
-			if(FillBuffer == XAIE_NULL)
-			{
-				XAIE_ERROR("Memory allocation failed for fill buffer\n");
-				return XAIE_ERR;
-			}
-
-			/* Fill buffer with the specified value */
-			for(u32 j = 0U; j < NumWords; j++)
-			{
-				FillBuffer[j] = FillValue;
-			}
-
-			/* Write to data memory */
-			u32 LocalAddr = FillAddr & (CoreMod->DataMemSize - 1U);
-			RC = XAie_DataMemBlockWrite(DevInst, TgtLoc, LocalAddr, (const void*)FillBuffer, FillSize);
-
-			free(FillBuffer);
-
-			if(RC != XAIE_OK)
-			{
-				XAIE_ERROR("Failed to write fill data to memory at 0x%x\n", FillAddr);
-				return RC;
-			}
-
-			XAIE_DBG("Successfully filled %d bytes at 0x%x with value 0x%x\n", FillSize, FillAddr, FillValue);
+			XAIE_ERROR("Failed to get target location for fill addr 0x%x\n", FillAddr);
+			return RC;
 		}
-		else
+
+		u32 NumWords = (FillSize + 3U) / 4U;  /* Round up to word boundary */
+		u32 *FillBuffer = (u32 *)calloc(NumWords, sizeof(u32));
+		if(FillBuffer == XAIE_NULL)
 		{
-			XAIE_WARN("Fill address 0x%x is not in data memory range, skipping\n", FillAddr);
+			XAIE_ERROR("Memory allocation failed for fill buffer\n");
+			return XAIE_ERR;
 		}
+
+		/* Fill buffer with the specified value */
+		for(u32 j = 0U; j < NumWords; j++)
+		{
+			FillBuffer[j] = FillValue;
+		}
+
+		/* Calculate local address - handle non-power-of-2 DataMemSize */
+		u32 LocalAddr;
+		if((CoreMod->DataMemSize & (CoreMod->DataMemSize - 1U)) == 0U) {
+			/* DataMemSize is power of 2, use fast bitwise AND */
+			LocalAddr = (FillAddr - CoreMod->DataMemAddr) & (CoreMod->DataMemSize - 1U);
+		} else {
+			/* DataMemSize is not power of 2, use modulo */
+			LocalAddr = (FillAddr - CoreMod->DataMemAddr) % CoreMod->DataMemSize;
+		}
+		RC = XAie_DataMemBlockWrite(DevInst, TgtLoc, LocalAddr, (const void*)FillBuffer, FillSize);
+
+		free(FillBuffer);
+
+		if(RC != XAIE_OK)
+		{
+			XAIE_ERROR("Failed to write fill data to memory at 0x%x\n", FillAddr);
+			return RC;
+		}
+
+		XAIE_DBG("Successfully filled %d bytes at 0x%x with value 0x%x\n", FillSize, FillAddr, FillValue);
 	}
 	else
 	{
-		XAIE_WARN("Fillsegments data too small (%d bytes), skipping\n", DataSize);
+		XAIE_WARN("Fill address 0x%x is not in data memory range, skipping\n", FillAddr);
 	}
 	return XAIE_OK;
 }

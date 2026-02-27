@@ -2221,6 +2221,56 @@ AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
 /*****************************************************************************/
 /**
 *
+* This function is used to insert a NOP (no-operation) opcode into the
+* control code. NOP does not perform any action and is typically used for
+* padding or timing alignment.
+*
+* @param        IOInst: IO instance pointer
+*
+* @return       XAIE_OK on success, error code on failure.
+*
+* @note         Internal only.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_Nop(void *IOInst)
+{
+        XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+
+        ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
+                ((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_NOP) % DATA_SECTION_ALIGNMENT));
+        if (ControlCodeInst->DataAligner == DATA_SECTION_ALIGNMENT) {
+                ControlCodeInst->DataAligner = 0U;
+        }
+
+        if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
+
+                if (!ControlCodeInst->IsJobOpen) {
+                        _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+                }
+
+                if((ControlCodeInst->UcPageSize + ISA_OPSIZE_NOP +
+                        ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
+                        _XAie_StartNewPage(ControlCodeInst);
+                        _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+                }
+
+                CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "NOP\n");
+                CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "NOP\n");
+                ControlCodeInst->CombineCommands = 0;
+                ControlCodeInst->UcPageSize += ISA_OPSIZE_NOP;
+                ControlCodeInst->UcPageTextSize += ISA_OPSIZE_NOP;
+                _XAie_ControlCodePageInfo(ControlCodeInst->DebugAsmFile, ControlCodeInst->PageId,
+                         ControlCodeInst->UcPageSize, ControlCodeInst->UcPageTextSize, ControlCodeInst->DataAligner);
+
+                return XAIE_OK;
+        }
+        else
+                return XAIE_ERR;
+}
+
+/*****************************************************************************/
+/**
+*
 * This function is used to add preempt opcode to asm file.
 *
 * @param        IOInst: IO instance pointer
@@ -3742,6 +3792,15 @@ AieRC XAie_ControlCodeSetScrachPad(XAie_DevInst *DevInst, const char *Scrachpad)
         return XAIE_INVALID_BACKEND;
 }
 
+AieRC XAie_ControlCodeIO_Nop(void *IOInst)
+{
+	/* no-op */
+	(void)IOInst;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
 AieRC XAie_ControlCodeIO_WaitUcDMA(void *IOInst)
 {
 	/* no-op */
@@ -3941,6 +4000,7 @@ const XAie_Backend ControlCodeBackend =
 	.Ops.AttachToGroup = XAie_ControlCodeIO_AttachToGroup,
 	.Ops.RemoteBarrier = XAie_ControlCodeIO_RemoteBarrier,
 	.Ops.SaveRegister = XAie_ControlCodeIO_SaveRegister,
+	.Ops.Nop = XAie_ControlCodeIO_Nop,
 	.Ops.SubmitTxn = NULL,
 };
 

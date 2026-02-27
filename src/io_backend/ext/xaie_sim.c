@@ -710,6 +710,7 @@ const XAie_Backend SimBackend =
 	.Ops.AttachToGroup = NULL,
 	.Ops.RemoteBarrier = NULL,
 	.Ops.SaveRegister = NULL,
+	.Ops.Nop = NULL,
 };
 
 /** @} */

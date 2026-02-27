@@ -828,6 +828,7 @@ const XAie_Backend SocketBackend =
 	.Ops.AttachToGroup = NULL,
 	.Ops.RemoteBarrier = NULL,
 	.Ops.SaveRegister = NULL,
+	.Ops.Nop = NULL,
 };
 
 /** @} */

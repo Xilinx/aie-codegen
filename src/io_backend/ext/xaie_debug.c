@@ -584,6 +584,7 @@ const XAie_Backend DebugBackend =
 	.Ops.AttachToGroup = NULL,
 	.Ops.RemoteBarrier = NULL,
 	.Ops.SaveRegister = NULL,
+	.Ops.Nop = NULL,
 };
 
 /** @} */

@@ -185,6 +185,7 @@ typedef struct XAie_BackendOps {
 	AieRC (*AttachToGroup)(void *IOInst, uint8_t GroupId);
 	AieRC (*RemoteBarrier)(void *IOInst, uint8_t RbId, uint32_t UcMask);
 	AieRC (*SaveRegister) (void *IOInst, u32 RegOff, u32 Id);
+	AieRC (*Nop) (void *IOInst);
 } XAie_BackendOps;
 
 /* Typedef to capture all backend information */

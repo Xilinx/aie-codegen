@@ -868,6 +868,126 @@ AieRC XAie_MemDetach(XAie_MemInst *MemInst)
 }
 
 /*****************************************************************************/
+/**
+*
+* This is memory function to free the memory by virtual address from the AI
+* engine partition memory allocator.
+*
+* @param	DevInst: Device Instance
+* @param	VAddr: Virtual Address pointer to the memory to free.
+*
+* @return	XAIE_OK for success, or error code for failure.
+*
+*******************************************************************************/
+AieRC XAie_MemFreeVAddr(XAie_DevInst *DevInst, void *VAddr)
+{
+	const XAie_Backend *Backend;
+	AieRC RC;
+
+	if(DevInst == XAIE_NULL) {
+		XAIE_ERROR("Invalid device instance\n");
+		return XAIE_ERR;
+	}
+
+	Backend = DevInst->Backend;
+	RC = (Backend->Ops.MemFreeVAddr != NULL) ?
+		Backend->Ops.MemFreeVAddr(DevInst, VAddr) :
+		(AieRC)XAIE_FEATURE_NOT_SUPPORTED;
+
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is memory function to sync the memory for CPU access by virtual address.
+*
+* @param	DevInst: Device Instance
+* @param	VAddr: Virtual Address pointer to start of the memory.
+* @param	size: Size in bytes of the memory to sync.
+*
+* @return	XAIE_OK for success, or error code for failure.
+*
+*******************************************************************************/
+AieRC XAie_MemSyncForCPUVAddr(XAie_DevInst *DevInst, void *VAddr, uint64_t size)
+{
+	const XAie_Backend *Backend;
+	AieRC RC;
+
+	if(DevInst == XAIE_NULL) {
+		XAIE_ERROR("Invalid device instance\n");
+		return XAIE_ERR;
+	}
+
+	Backend = DevInst->Backend;
+	RC = (Backend->Ops.MemSyncForCPUVAddr != NULL) ?
+		Backend->Ops.MemSyncForCPUVAddr(DevInst, VAddr, size) :
+		(AieRC)XAIE_FEATURE_NOT_SUPPORTED;
+
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is memory function to sync the memory for device access by virtual address.
+*
+* @param	DevInst: Device Instance
+* @param	VAddr: Virtual Address pointer to start of the memory.
+* @param	size: Size in bytes of the memory to sync.
+*
+* @return	XAIE_OK for success, or error code for failure.
+*
+*******************************************************************************/
+AieRC XAie_MemSyncForDevVAddr(XAie_DevInst *DevInst, void *VAddr, uint64_t size)
+{
+	const XAie_Backend *Backend;
+	AieRC RC;
+
+	if(DevInst == XAIE_NULL) {
+		XAIE_ERROR("Invalid device instance\n");
+		return XAIE_ERR;
+	}
+
+	Backend = DevInst->Backend;
+	RC = (Backend->Ops.MemSyncForDevVAddr != NULL) ?
+		Backend->Ops.MemSyncForDevVAddr(DevInst, VAddr, size) :
+		(AieRC)XAIE_FEATURE_NOT_SUPPORTED;
+
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is memory function to get device address from virtual address.
+*
+* @param	DevInst: Device Instance
+* @param	VAddr: Virtual Address pointer.
+* @param	DevAddr: Pointer to device address to return.
+*
+* @return	XAIE_OK for success, or error code for failure.
+*
+*******************************************************************************/
+AieRC XAie_MemGetDevAddrFromVAddr(XAie_DevInst *DevInst, void *VAddr, uint64_t *DevAddr)
+{
+	const XAie_Backend *Backend;
+	AieRC RC;
+
+	if(DevInst == XAIE_NULL) {
+		XAIE_ERROR("Invalid device instance\n");
+		return XAIE_ERR;
+	}
+
+	Backend = DevInst->Backend;
+	RC = (Backend->Ops.MemGetDevAddrFromVAddr != NULL) ?
+		Backend->Ops.MemGetDevAddrFromVAddr(DevInst, VAddr, DevAddr) :
+		(AieRC)XAIE_FEATURE_NOT_SUPPORTED;
+
+	return RC;
+}
+
+/*****************************************************************************/
 /*
 * This API disables the ECC flag in the Device Instance of the partition. It
 * should be called before calling elf loader to disable ECC. ECC configuration

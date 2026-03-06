@@ -167,11 +167,16 @@ typedef struct XAie_BackendOps {
 	XAie_MemInst* (*MemAllocate)(XAie_DevInst *DevInst, u64 Size,
 			XAie_MemCacheProp Cache);
 	AieRC (*MemFree)(XAie_MemInst *MemInst);
+	AieRC (*MemFreeVAddr)(XAie_DevInst *DevInst, void *VAddr);
 	AieRC (*MemSyncForCPU)(XAie_MemInst *MemInst);
+	AieRC (*MemSyncForCPUVAddr)(XAie_DevInst *DevInst, void *VAddr, uint64_t size);
 	AieRC (*MemSyncForDev)(XAie_MemInst *MemInst);
+	AieRC (*MemSyncForDevVAddr)(XAie_DevInst *DevInst, void *VAddr, uint64_t size);
+	AieRC (*MemGetDevAddrFromVAddr)(XAie_DevInst *DevInst, void *VAddr, uint64_t *DevAddr);
 	AieRC (*MemAttach)(XAie_MemInst *MemInst, u64 MemHandle);
 	AieRC (*MemDetach)(XAie_MemInst *MemInst);
 	u64 (*GetTid)(void);
+	int (*GetPartFd)(void *IOInst);
 	AieRC (*SubmitTxn)(void *IOInst, XAie_TxnInst *TxnInst);
 	void* (*GetShimDmaBdConfig)(XAie_ShimDmaBdArgs *Args);
 	u64 (*GetAttr)(void *IOInst, XAie_BackendAttrType Type);
@@ -185,6 +190,7 @@ typedef struct XAie_BackendOps {
 	AieRC (*AttachToGroup)(void *IOInst, uint8_t GroupId);
 	AieRC (*RemoteBarrier)(void *IOInst, uint8_t RbId, uint32_t UcMask);
 	AieRC (*SaveRegister) (void *IOInst, u32 RegOff, u32 Id);
+	AieRC (*Nop) (void *IOInst);
 } XAie_BackendOps;
 
 /* Typedef to capture all backend information */

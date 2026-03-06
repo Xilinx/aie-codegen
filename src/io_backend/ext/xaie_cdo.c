@@ -574,6 +574,7 @@ const XAie_Backend CdoBackend =
 	.Ops.AttachToGroup = NULL,
 	.Ops.RemoteBarrier = NULL,
 	.Ops.SaveRegister = NULL,
+	.Ops.Nop = NULL,
 };
 
 /** @} */

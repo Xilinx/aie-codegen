@@ -168,4 +168,5 @@ AieRC XAie_EndPage(XAie_DevInst *DevInst);
 void XAie_CloseControlCodeFile(XAie_DevInst *DevInst);
 AieRC XAie_ControlCodeAddAnnotation(XAie_DevInst *DevInst, u32 Id, const char *Name, const char *Description);
 AieRC XAie_ControlCodeSetScrachPad(XAie_DevInst *DevInst, const char *Scrachpad);
+AieRC XAie_Nop(XAie_DevInst *DevInst);
 #endif

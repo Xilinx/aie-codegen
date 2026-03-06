@@ -674,6 +674,10 @@ XAIE_AIG_EXPORT AieRC XAie_MemSyncForCPU(XAie_MemInst *MemInst);
 XAIE_AIG_EXPORT AieRC XAie_MemSyncForDev(XAie_MemInst *MemInst);
 XAIE_AIG_EXPORT void* XAie_MemGetVAddr(XAie_MemInst *MemInst);
 XAIE_AIG_EXPORT u64 XAie_MemGetDevAddr(XAie_MemInst *MemInst);
+XAIE_AIG_EXPORT AieRC XAie_MemFreeVAddr(XAie_DevInst *DevInst, void *VAddr);
+XAIE_AIG_EXPORT AieRC XAie_MemSyncForCPUVAddr(XAie_DevInst *DevInst, void *VAddr, uint64_t size);
+XAIE_AIG_EXPORT AieRC XAie_MemSyncForDevVAddr(XAie_DevInst *DevInst, void *VAddr, uint64_t size);
+XAIE_AIG_EXPORT AieRC XAie_MemGetDevAddrFromVAddr(XAie_DevInst *DevInst, void *VAddr, uint64_t *DevAddr);
 XAIE_AIG_EXPORT AieRC XAie_MemAttach(XAie_DevInst *DevInst, XAie_MemInst *MemInst, u64 DAddr,
 		u64 VAddr, u64 Size, XAie_MemCacheProp Cache, u64 MemHandle);
 XAIE_AIG_EXPORT AieRC XAie_MemDetach(XAie_MemInst *MemInst);

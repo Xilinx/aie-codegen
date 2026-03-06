@@ -3782,9 +3782,9 @@ static inline u16 XAie_GetEventNumber(const struct XAie_EvntMod *EventMod, XAie_
             (EventMod->XAie_EventNumber == NULL)) {
                 return _XAIE_EVENT_INVALID;
         }
-        if ((EventId < EventMod->EventMin) ||
-            (EventId > EventMod->EventMax) ||
-            ((EventId != EventMod->EventMin) && (EventMod->XAie_EventNumber[(u32)EventId] == 0))) {
+        if (((u32)EventId < (u32)EventMod->EventMin) ||
+            ((u32)EventId > (u32)EventMod->EventMax) ||
+            (((u32)EventId != (u32)EventMod->EventMin) && (EventMod->XAie_EventNumber[(u32)EventId] == 0))) {
                 return _XAIE_EVENT_INVALID;
         }
 
@@ -3971,7 +3971,7 @@ typedef enum class XAie_DmaFifoCounter {
 	    (Value) &= (Value) - 1, (Index) = first_set_bit((Value)) - 1)
 
 /* Generate value with a set bit at given Index */
-constexpr long long int _BIT(int Index) { return 1 << Index; }
+constexpr long long int _BIT(int Index) { return 1LL << Index; }
 
 /*as AIE address space is 32bit , the max valid bit index will be 31*/
 constexpr int _MAX_VALID_AIE_REG_BIT_INDEX = 32;

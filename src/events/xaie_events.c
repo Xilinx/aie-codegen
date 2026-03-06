@@ -833,11 +833,24 @@ AieRC XAie_EventSelectDmaChannel(XAie_DevInst *DevInst, XAie_LocType Loc,
 			return XAIE_INVALID_TILE;
 		}
 	} else {
-		if ((TileType != XAIEGBL_TILE_TYPE_MEMTILE) && 
-			(TileType != XAIEGBL_TILE_TYPE_SHIMPL) && 
+		if ((TileType != XAIEGBL_TILE_TYPE_MEMTILE) &&			
 			(TileType != XAIEGBL_TILE_TYPE_SHIMNOC)) {
 			XAIE_ERROR("Tile is not memory/shim tile\n");
 			return XAIE_INVALID_TILE;
+		}
+		/* For AIE4 shim tiles, only MM2S direction is allowed */
+		if (TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
+			if (DmaDir != DMA_MM2S) {
+				XAIE_ERROR("Shim tile only supports MM2S direction\n");
+				return XAIE_INVALID_ARGS;
+			}
+		}
+		/* For memtiles, only MM2S and S2MM directions are allowed */
+		if (TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+			if ((DmaDir != DMA_MM2S) && (DmaDir != DMA_S2MM)) {
+				XAIE_ERROR("Memtile only supports MM2S and S2MM directions\n");
+				return XAIE_INVALID_ARGS;
+			}
 		}
 	}
 
@@ -881,11 +894,24 @@ AieRC XAie_EventSelectDmaChannelReset(XAie_DevInst *DevInst, XAie_LocType Loc,
 			return XAIE_INVALID_TILE;
 		}
 	} else {
-		if ((TileType != XAIEGBL_TILE_TYPE_MEMTILE) && 
-			(TileType != XAIEGBL_TILE_TYPE_SHIMPL) && 
+		if ((TileType != XAIEGBL_TILE_TYPE_MEMTILE) &&			
 			(TileType != XAIEGBL_TILE_TYPE_SHIMNOC)) {
 			XAIE_ERROR("Tile is not memory/shim tile\n");
 			return XAIE_INVALID_TILE;
+		}
+		/* For AIE4 shim tiles, only MM2S direction is allowed */
+		if (TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
+			if (DmaDir != DMA_MM2S) {
+				XAIE_ERROR("Shim tile only supports MM2S direction\n");
+				return XAIE_INVALID_ARGS;
+			}
+		}
+		/* For memtiles, only MM2S and S2MM directions are allowed */
+		if (TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+			if ((DmaDir != DMA_MM2S) && (DmaDir != DMA_S2MM)) {
+				XAIE_ERROR("Memtile only supports MM2S and S2MM directions\n");
+				return XAIE_INVALID_ARGS;
+			}
 		}
 	}
 

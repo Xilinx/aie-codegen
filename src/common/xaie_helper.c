@@ -783,6 +783,20 @@ AieRC XAie_SaveRegister(XAie_DevInst *DevInst, u32 RegOff, u32 Id)
 	}
 }
 
+AieRC XAie_Nop(XAie_DevInst *DevInst)
+{
+	const XAie_Backend *Backend = DevInst->Backend;
+	if (Backend->Ops.Nop != NULL)
+	{
+		return Backend->Ops.Nop((void *)DevInst->IOInst);
+	}
+	else
+	{
+		XAIE_ERROR("Nop function pointer points to NULL\n");
+		return XAIE_NOT_SUPPORTED;
+	}
+}
+
 /*****************************************************************************/
 /**
 *

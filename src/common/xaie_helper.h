@@ -262,6 +262,7 @@ XAIE_AIG_EXPORT AieRC XAie_SetPadString(XAie_DevInst *DevInst, char* BuffName, c
 XAIE_AIG_EXPORT AieRC XAie_AttachToGroup(XAie_DevInst *DevInst, uint8_t UcIndex);
 XAIE_AIG_EXPORT AieRC XAie_RemoteBarrier(XAie_DevInst *DevInst,  uint8_t RbId, uint32_t UcMask);
 XAIE_AIG_EXPORT AieRC XAie_SaveRegister(XAie_DevInst *DevInst, u32 RegOff, u32 Id);
+XAIE_AIG_EXPORT AieRC XAie_Nop(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_ControlCodeRelAcqSync(XAie_DevInst *DevInst, const XAie_LockMod *LockMod,
 												 XAie_LocType Loc, XAie_Lock RelLock, XAie_Lock AcqLock);
 #endif		/* end of protection macro */

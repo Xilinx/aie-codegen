@@ -4,9 +4,10 @@
 ###############################################################################
 
 cmake_minimum_required(VERSION 3.16.3)
-project(aie_codegen LANGUAGES C VERSION 3.5)
+project(aie_codegen LANGUAGES C CXX VERSION 3.5)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -82,11 +83,25 @@ list(APPEND IO_BACKEND -D__AIECONTROLCODE__)
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE
    /wd4018 /wd4024 /wd4047 /wd4061 /wd4100 /wd4200 /wd4206 /wd4242 /wd4244 /wd4267 /wd4388 /wd4389 /wd4431 /wd4668 /wd4701 /wd4710 /wd4711 /wd4716
-   /wd4820 /wd4996 /wd5045
+   /wd4820 /wd4996 /wd5045 /wd5105
    )
   target_compile_options(${PROJECT_NAME} PRIVATE /Wall -DXAIE_FEATURE_MSVC ${IO_BACKEND})
 else()
   target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra ${IO_BACKEND})
+endif()
+
+# C++ compile check for the standalone aie_codegen.hpp header
+# This ensures the C++ header stays valid and warning-free.
+add_library(aie_codegen_hpp_check OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/aie_codegen.hpp)
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/aie_codegen.hpp PROPERTIES LANGUAGE CXX)
+target_include_directories(aie_codegen_hpp_check PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/../aie-regdb/globalparams
+  )
+if(MSVC)
+  target_compile_options(aie_codegen_hpp_check PRIVATE /W4 /WX)
+else()
+  target_compile_options(aie_codegen_hpp_check PRIVATE -Wall -Wextra -Werror)
 endif()
 
 include(GNUInstallDirs)

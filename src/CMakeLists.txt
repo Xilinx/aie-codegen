@@ -4,10 +4,9 @@
 ###############################################################################
 
 cmake_minimum_required(VERSION 3.16.3)
-project(aie_codegen LANGUAGES C CXX VERSION 3.5)
+project(aie_codegen LANGUAGES C VERSION 3.5)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -88,20 +87,6 @@ if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE /Wall -DXAIE_FEATURE_MSVC ${IO_BACKEND})
 else()
   target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra ${IO_BACKEND})
-endif()
-
-# C++ compile check for the standalone aie_codegen.hpp header
-# This ensures the C++ header stays valid and warning-free.
-add_library(aie_codegen_hpp_check OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/aie_codegen.hpp)
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/aie_codegen.hpp PROPERTIES LANGUAGE CXX)
-target_include_directories(aie_codegen_hpp_check PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/../aie-regdb/globalparams
-  )
-if(MSVC)
-  target_compile_options(aie_codegen_hpp_check PRIVATE /W4 /WX)
-else()
-  target_compile_options(aie_codegen_hpp_check PRIVATE -Wall -Wextra -Werror)
 endif()
 
 include(GNUInstallDirs)

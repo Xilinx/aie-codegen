@@ -1,0 +1,10 @@
+# compiler artifacts
+*.o
+*.so*
+
+# AI agent
+.codex
+.claude
+
+# clangd
+*.clangd

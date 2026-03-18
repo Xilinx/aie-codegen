@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright (c) 2024 AMD, Inc.  All rights reserved.
+ * Copyright (C) 2024-2026 Advanced Micro Devices, Inc. All rights reserved.
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
 

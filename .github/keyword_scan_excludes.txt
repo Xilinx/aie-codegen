@@ -6,3 +6,5 @@
 .gitmodules
 
 .git/**
+
+.pre-commit-config.yaml

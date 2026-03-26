@@ -82,7 +82,7 @@ endif (NOT WITH_BUILD_XAIEDRV)
 
 set_property (GLOBAL PROPERTY "PROJECT_EC_FLAGS" -Wall -Wextra)
 if(CMAKE_BUILD_TYPE STREQUAL "coverage" OR CODE_COVERAGE)
-    if("${CMAKE_CXX_COMPILER_ID}" MATCHES "(Apple)?[Cc]lang")
+    if("${CMAKE_CXX_COMPILER_ID}" MATCHES "[Cc]lang")
         message("Building with llvm Code Coverage Tools")
 
         # Warning/Error messages

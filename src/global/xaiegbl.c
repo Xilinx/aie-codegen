@@ -25,6 +25,8 @@
 * 1.4   Dishita 07/28/2020  Add api to turn ECC On and Off.
 * 1.5   Nishad  09/15/2020  Add check to validate XAie_MemCacheProp value in
 *			    XAie_MemAllocate().
+* 1.6   Muddur  03/23/2026  Add XAie_SpareRegisterWrite to configure core
+*			    tile memory module spare register.
 * </pre>
 * @addtogroup AIEAPI AI Engine Software APIs
 * @{
@@ -1304,6 +1306,134 @@ AieRC XAie_GetCtrlPktHndlrStatus(XAie_DevInst *DevInst, XAie_LocType Loc, u32 *S
 		XAIE_ERROR("Failed to read control packet handler status\n");
 
 	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API writes to the spare register of the specified module for the given
+* tile location. The register offset and mask are read from the per-architecture
+* module descriptors populated during device initialisation.
+* AIE1 does not implement spare registers and returns XAIE_FEATURE_NOT_SUPPORTED.
+*
+* Supported module / tile combinations:
+*   AIE tile  + XAIE_CORE_MOD : Core module spare register
+*   AIE tile  + XAIE_MEM_MOD  : Memory module spare register
+*   Mem tile  + XAIE_MEM_MOD  : Mem-tile module spare register
+*   Shim tile + XAIE_PL_MOD   : Shim tile spare register
+*
+* @param	DevInst: Pointer to the AIE device instance.
+* @param	Loc: Tile location (col, row).
+* @param	Module: Module within the tile (XAIE_CORE_MOD, XAIE_MEM_MOD,
+*			or XAIE_PL_MOD).
+* @param	Val: 32-bit value to write into the Spare_Reg field.
+*
+* @return	XAIE_OK on success, or an error code on failure.
+*
+* @note		None.
+*
+******************************************************************************/
+AieRC XAie_SpareRegisterWrite(XAie_DevInst *DevInst, XAie_LocType Loc,
+		XAie_ModuleType Module, u32 Val)
+{
+	const XAie_CoreMod *CoreMod;
+	const XAie_MemMod  *MemMod;
+	const XAie_PlIfMod *PlIfMod;
+	u64 RegAddr;
+	u32 RegOff;
+	u32 Mask;
+	u8 TileType;
+	AieRC RC;
+
+	if ((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	/* AIE1 does not implement spare registers */
+	if (DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE) {
+		XAIE_ERROR("Spare register not supported for AIE1\n");
+		return XAIE_FEATURE_NOT_SUPPORTED;
+	}
+
+	RC = XAie_CheckModule(DevInst, Loc, Module);
+	if (RC != XAIE_OK) {
+		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = XAie_GetTileTypefromLoc(DevInst, Loc);
+
+	switch (Module) {
+	case XAIE_CORE_MOD:
+		/* Core module spare register — only valid for AIE tiles */
+		if (TileType != XAIEGBL_TILE_TYPE_AIETILE) {
+			XAIE_ERROR("XAIE_CORE_MOD spare register only supported for AIE tile\n");
+			return XAIE_INVALID_TILE;
+		}
+		CoreMod = DevInst->DevProp.DevMod[TileType].CoreMod;
+		if ((CoreMod == XAIE_NULL) ||
+			(CoreMod->CoreModSpareRegOff == 0U)) {
+			XAIE_ERROR("Core module spare register not available\n");
+			return XAIE_FEATURE_NOT_SUPPORTED;
+		}
+		RegOff = CoreMod->CoreModSpareRegOff;
+		Mask   = CoreMod->CoreModSpareRegMask;
+		break;
+
+	case XAIE_MEM_MOD:
+		MemMod = DevInst->DevProp.DevMod[TileType].MemMod;
+		if (MemMod == XAIE_NULL) {
+			XAIE_ERROR("Memory module not available for this tile\n");
+			return XAIE_FEATURE_NOT_SUPPORTED;
+		}
+		if (TileType == XAIEGBL_TILE_TYPE_AIETILE) {
+			/* AIE core-tile memory module spare register */
+			if (MemMod->CoreMemModSpareRegOff == 0U) {
+				XAIE_ERROR("AIE tile memory module spare register not available\n");
+				return XAIE_FEATURE_NOT_SUPPORTED;
+			}
+			RegOff = MemMod->CoreMemModSpareRegOff;
+			Mask   = MemMod->CoreMemModSpareRegMask;
+		} else if (TileType == XAIEGBL_TILE_TYPE_MEMTILE) {
+			/* Mem tile spare register */
+			if (MemMod->MemTileSpareRegOff == 0U) {
+				XAIE_ERROR("Mem tile spare register not available\n");
+				return XAIE_FEATURE_NOT_SUPPORTED;
+			}
+			RegOff = MemMod->MemTileSpareRegOff;
+			Mask   = MemMod->MemTileSpareRegMask;
+		} else {
+			XAIE_ERROR("XAIE_MEM_MOD spare register not supported for this tile type\n");
+			return XAIE_INVALID_TILE;
+		}
+		break;
+
+	case XAIE_PL_MOD:
+		/* Shim tile spare register */
+		if ((TileType != XAIEGBL_TILE_TYPE_SHIMNOC) &&
+			(TileType != XAIEGBL_TILE_TYPE_SHIMPL)) {
+			XAIE_ERROR("XAIE_PL_MOD spare register only supported for Shim tiles\n");
+			return XAIE_INVALID_TILE;
+		}
+		PlIfMod = DevInst->DevProp.DevMod[TileType].PlIfMod;
+		if ((PlIfMod == XAIE_NULL) ||
+			(PlIfMod->ShimTileSpareRegOff == 0U)) {
+			XAIE_ERROR("Shim tile spare register not available\n");
+			return XAIE_FEATURE_NOT_SUPPORTED;
+		}
+		RegOff = PlIfMod->ShimTileSpareRegOff;
+		Mask   = PlIfMod->ShimTileSpareRegMask;
+		break;
+
+	default:
+		XAIE_ERROR("Invalid module type\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	RegAddr = XAie_GetTileAddr(DevInst, Loc.Row, Loc.Col) + RegOff;
+
+	return XAie_MaskWrite32(DevInst, RegAddr, Mask, Val);
 }
 
 /** @}@} */

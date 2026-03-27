@@ -80,7 +80,8 @@ typedef uint64_t		u64;
 #define __FORCE_INLINE__			__attribute__((always_inline))
 
 #define REGISTER_NOT_AVAILABLE (0xFFFFFFFF)
-/************************** Variable Definitions *****************************/
+
+/************************** Variable Definitions ****************************/
 /************************** Function Prototypes  *****************************/
 #endif		/* end of protection macro */
 /** @} */

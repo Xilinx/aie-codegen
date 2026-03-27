@@ -34,6 +34,8 @@
 * 2.1   Tejus   06/10/2020  Add IO backend data structures.
 * 2.2   Tejus   06/10/2020  Add ess simulation backend.
 * 2.3   Tejus   06/10/2020  Add api to change backend at runtime.
+* 2.4   Muddur  03/23/2026  Add API to configure core tile memory module
+*                          spare register.
 * </pre>
 *
 ******************************************************************************/
@@ -709,7 +711,10 @@ XAIE_AIG_EXPORT AieRC XAie_GetCtrlPktHndlrStatus(XAie_DevInst *DevInst, XAie_Loc
 XAIE_AIG_EXPORT AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize);
 XAIE_AIG_EXPORT AieRC XAie_GetControlCodeBuffer(XAie_DevInst *DevInst, const char **Buffer, size_t *Size);
 XAIE_AIG_EXPORT AieRC XAie_GetDebugAsmBuffer(XAie_DevInst *DevInst, const char **Buffer, size_t *Size);
-XAIE_AIG_EXPORT void XAie_ReleaseControlCodeBuffer(XAie_DevInst *DevInst);		
+XAIE_AIG_EXPORT void XAie_ReleaseControlCodeBuffer(XAie_DevInst *DevInst);
+//New APIs to write to Spare register, used for testing and debugging
+XAIE_AIG_EXPORT AieRC XAie_SpareRegisterWrite(XAie_DevInst *DevInst,
+		XAie_LocType Loc, XAie_ModuleType Module, u32 Val);
 /*****************************************************************************/
 /*
 *

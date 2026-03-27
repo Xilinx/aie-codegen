@@ -290,6 +290,8 @@ typedef struct XAie_CoreMod {
 	u32 DataMemShift;
 	u32 EccEvntRegOff;
 	u32 EccScubPeriodRegOff;
+	u32 CoreModSpareRegOff;  /* Core module spare register offset (0 = unavailable) */
+	u32 CoreModSpareRegMask; /* Core module spare register mask */
 	u32 CorePCOff;
 	u32 CoreSPOff;
 	u32 CoreLROff;
@@ -753,6 +755,11 @@ typedef struct {
 	u32 MemAddr;
 	u32 EccEvntRegOff;
 	u32 EccScubPeriodRegOff;
+	u32 CoreMemModSpareRegOff;  /* Core tile mem-module spare register offset (0 = unavailable) */
+	u32 CoreMemModSpareRegMask; /* Core tile mem-module spare register mask */
+	u32 MemTileSpareRegOff;     /* Mem tile spare register offset (0 = unavailable) */
+	u32 MemTileSpareRegAppBOffset; /* Mem tile spare register APP B offset (0 = unavailable) */
+	u32 MemTileSpareRegMask;    /* Mem tile spare register mask */
 } XAie_MemMod;
 
 /*
@@ -831,6 +838,9 @@ typedef struct {
 	const XAie_ShimNocAxiMMConfig *ShimNocAxiMM; /* SHIM NOC AXI MM configuration */
 	const XAie_ShimModClkCntr0 *ModClkCntr0; /* Module_Clock_Control_0  configuration */
 	const XAie_ShimModClkCntr1 *ModClkCntr1; /* Module_Clock_Control_1  configuration */
+	u32 ShimTileSpareRegOff;  /* Shim tile spare register offset (0 = unavailable) */
+	u32 MemTileSpareRegAppBOffset; /* Shim tile spare register APP B offset (0 = unavailable) */
+	u32 ShimTileSpareRegMask; /* Shim tile spare register mask */
 } XAie_PlIfMod;
 
 

@@ -30,9 +30,18 @@ file(
   "${CMAKE_CURRENT_SOURCE_DIR}/../aie-regdb/globalparams/*.h"
   )
 
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/aie_codegen.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include/)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include/aie_codegen_inc)
 
-file(COPY ${HDRS} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include/aie_codegen_inc)
+add_custom_target(copy_headers ALL
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_CURRENT_SOURCE_DIR}/aie_codegen.h
+    ${CMAKE_CURRENT_BINARY_DIR}/include/
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${HDRS}
+    ${CMAKE_CURRENT_BINARY_DIR}/include/aie_codegen_inc/
+  COMMENT "Syncing headers to build include directory"
+)
 
 if(AIE_CODEGEN_BUILD_SHARED)
   # Build the library as a shared library
@@ -49,6 +58,8 @@ else()
     ${SRCS}
   )
 endif()
+
+add_dependencies(${PROJECT_NAME} copy_headers)
 
 target_include_directories(
   ${PROJECT_NAME}

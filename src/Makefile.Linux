@@ -41,6 +41,8 @@ ifdef D__SWIGINTERFACE__
   INCLUDEFILES += $(SWIG_CONTROLCODE_INCLUDEFILES)
 endif
 
+.PHONY: all include externalInclude clean doc-generate doc-clean swigSocketInclude swigControlCodeInclude
+
 all: include lib$(NAME).so $(BACKEND_TARGET)
 swig_socket: include lib$(NAME).so $(BACKEND_TARGET) swigSocketInclude
 swig_controlcode: include lib$(NAME).so $(BACKEND_TARGET) swigControlCodeInclude

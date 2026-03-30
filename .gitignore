@@ -2,6 +2,10 @@
 *.o
 *.so*
 
+# build directories
+build/
+build-*/
+
 # AI agent
 .codex
 .claude

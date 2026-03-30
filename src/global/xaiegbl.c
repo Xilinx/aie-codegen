@@ -382,12 +382,7 @@ AieRC XAie_SoftPartitionInitialize(XAie_DevInst *DevInst, XAie_PartInitOpts *Opt
 			IsolationFlags |= XAIE_INIT_EAST_ISOLATION;
 		}
 		RC = DevInst->DevOps->SetPartIsolationAfterRst(DevInst, IsolationFlags);
-		RC = XAie_PrivilegeSetAxiMMIsolation(DevInst, IsolationFlags);
-		if(RC!= XAIE_OK) {
-			XAIE_ERROR("Failed to set the AxiMM Isolation\n");
-			return RC;
-		}
-
+		
 		if (DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE) {
 			RC = _XAie_PmSetPartitionClock(DevInst, XAIE_DISABLE);
 

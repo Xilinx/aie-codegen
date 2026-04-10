@@ -188,6 +188,8 @@ typedef struct {
 	u32 InitialTxnCmdArraySize; /* TXN command array max size to begin with */
         XAie_List PartitionList;
 	
+	u8 DisableDebugAsm;  /* Set to 1 before XAie_OpenControlCodeFile() to skip .DEBUG file generation */
+
 	/*use to clear A2S buffer (work-around for data leak)*/
 	u64 HostddrBuffAddr;
 	size_t HostddrBuffSize;

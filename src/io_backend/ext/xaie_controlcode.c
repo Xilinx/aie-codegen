@@ -891,7 +891,7 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 		long FileSize = ftell(ControlCodeInst->ControlCodedatafp);
 		long Position = FileSize - 1;
 		int Count = 0;
-		char Data;
+		int Data;
 
 		SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, 0, SEEK_END);
 
@@ -3536,7 +3536,7 @@ AieRC XAie_EndPage(XAie_DevInst *DevInst) {
 *
 ******************************************************************************/
 static void _XAie_MergeFiles(FILE *SrcFp, FILE *DesFp) {
-	char TempBuf;
+	int TempBuf;
 
 	if (!SrcFp || !DesFp) {
 		XAIE_ERROR("Files not opened\n");

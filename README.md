@@ -144,6 +144,32 @@ The build will produce `libaie_codegen.so` (shared library by default) in the `b
   cmake -DDEBUG_BACKEND=ON ../src/
   ```
 
+### CodeQL Static Analysis
+
+The CMake build includes targets for running [CodeQL](https://codeql.github.com/) security analysis. CodeQL CLI must be installed and available in your `PATH`.
+
+1. Build and generate codeql report
+```bash
+cd src
+mkdir -p build && cd build
+cmake .. -G Ninja
+ninja codeql
+```
+
+This single command will:
+- Create a CodeQL database by performing a clean rebuild
+- Run the `cpp-security-extended` query suite against the database
+- Generate a SARIF report at `build/codeql-results/codeql-results.sarif`
+- Generate a human-readable text report at `build/codeql-results/codeql-results.txt`
+
+#### CodeQL CMake Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `CODEQL_DB_DIR` | `${CMAKE_CURRENT_BINARY_DIR}/codeql-db` | Directory for the CodeQL database |
+| `CODEQL_RESULTS_DIR` | `${CMAKE_CURRENT_BINARY_DIR}/codeql-results` | Directory for SARIF and text reports |
+| `CODEQL_QUERY_SUITE` | `codeql/cpp-queries:codeql-suites/cpp-security-extended.qls` | Query suite to run |
+
 ### Build System Comparison
 
 | Feature | CMake | Makefile.Linux |

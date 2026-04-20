@@ -1237,10 +1237,10 @@ AieRC XAie_StatusDump(XAie_DevInst *DevInst, XAie_ColStatus *Status)
 	}
 
 	/* iterate specified columns */
-	for(u8 Col = StartCol; Col < (StartCol + NumCols); Col++) {
-		for(u8 Row = 0; Row < NumRows; Row++) {
-			Loc.Row = Row;
-			Loc.Col = Col;
+	for(u32 Col = StartCol; Col < ((u32)StartCol + NumCols); Col++) {
+		for(u32 Row = 0; Row < NumRows; Row++) {
+			Loc.Row = (u8)Row;
+			Loc.Col = (u8)Col;
 			RC |= (u32)_XAie_CoreStatusDump(DevInst, Status, Loc);
 			RC |= (u32)_XAie_DmaStatusDump(DevInst, Status, Loc);
 			RC |= (u32)_XAie_LockValueStatusDump(DevInst, Status, Loc);

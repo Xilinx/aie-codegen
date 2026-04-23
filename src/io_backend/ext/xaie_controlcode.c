@@ -264,12 +264,12 @@ typedef struct {
 } XAie_SavedPageState;
 
 /**
- * XAie_LoadCoresContext - Buffers for capturing LoadCores label content
+ * XAie_LoadCoresContext - Buffers for capturing LoadCores/LoadCoresCP content
  *
- * When a LoadCores label is active (first use, not reused), all instructions
- * and data are captured in these buffers instead of going to the main/global
- * files. On LoadCoresEnd, the buffered content is emitted in the correct order:
- * label, instructions, data section, .endl directive.
+ * When a LoadCores label is active (first use, not reused) or LoadCoresCP is
+ * active, all instructions and data are captured in these buffers instead of
+ * going to the main/global files. On LoadCoresEnd/LoadCoresCPEnd, the buffered
+ * content is emitted in the correct order.
  */
 typedef struct {
 	XAie_MemBuffer *InstructionBuffer;      /* Instructions within the label (CONTROLCODE) */
@@ -279,6 +279,7 @@ typedef struct {
 	XAie_MemBuffer *DebugDataBuffer0;       /* Debug asm data 0 (DEBUGASMDATA0) */
 	XAie_MemBuffer *DebugDataBuffer1;       /* Debug asm data 1 (DEBUGASMDATA1) */
 	XAie_SavedPageState SavedState;         /* Outer page state snapshot */
+	u32 UniqueCoreElfId;
 } XAie_LoadCoresContext;
 
 typedef struct {
@@ -337,6 +338,8 @@ typedef struct {
 	u8 IsLoadCoresReused;          /* 1 when current LoadCores block is a label reuse (no body allowed) */
 	XAie_LoadCoresCache* LoadCoresCache; /* Cache of seen (UniqueCoreElfId, Label) pairs for label reuse */
 	XAie_LoadCoresContext* LoadCoresContext; /* Buffers for capturing LoadCores label content */
+	u8 IsLoadCoresCPActive;        /* 1 when between LoadCoresCPStart/LoadCoresCPEnd, 0 otherwise */
+	XAie_LoadCoresContext* LoadCoresCPContext; /* Buffers for capturing LoadCoresCP job content */
 } XAie_ControlCodeIO;
 
 /************************** Function Definitions *****************************/
@@ -611,6 +614,59 @@ static AieRC _XAie_LabelMapTeardown(XAie_LabelMap *Map)
 * @note         Internal only.
 *
 *******************************************************************************/
+/*****************************************************************************/
+/**
+*
+* Returns the buffer pointer from a LoadCoresContext corresponding to the
+* given FileTarget. Centralises the FileTarget-to-buffer mapping so that
+* callers (Printf, SeekAndOverwrite, etc.) don't each need their own switch.
+*
+* @param	ctx: LoadCoresContext pointer (must not be NULL)
+* @param	FileTarget: Target file/buffer enum
+*
+* @return	Pointer to the matching XAie_MemBuffer, or NULL for unknown targets.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static inline XAie_MemBuffer* _XAie_GetContextBuffer(
+		XAie_LoadCoresContext *ctx, XAie_FileTarget FileTarget) {
+	switch(FileTarget) {
+		case XAIE_FILE_TARGET_CONTROLCODE:      return ctx->InstructionBuffer;
+		case XAIE_FILE_TARGET_CONTROLCODEDATA:  return ctx->DataBuffer;
+		case XAIE_FILE_TARGET_CONTROLCODEDATA2: return ctx->DataBuffer2;
+		case XAIE_FILE_TARGET_DEBUGASM:         return ctx->DebugInstructionBuffer;
+		case XAIE_FILE_TARGET_DEBUGASMDATA0:    return ctx->DebugDataBuffer0;
+		case XAIE_FILE_TARGET_DEBUGASMDATA1:    return ctx->DebugDataBuffer1;
+		default: return NULL;
+	}
+}
+
+/*****************************************************************************/
+/**
+*
+* Returns only the instruction buffer from a LoadCoresContext for the given
+* FileTarget. Data targets return NULL so they fall through to the global
+* data sections. Used by LoadCoresCP which buffers instructions but writes
+* data to the global data sections.
+*
+* @param	ctx: LoadCoresContext pointer (must not be NULL)
+* @param	FileTarget: Target file/buffer enum
+*
+* @return	Pointer to the matching instruction XAie_MemBuffer, or NULL.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static inline XAie_MemBuffer* _XAie_GetContextInstructionBuffer(
+		XAie_LoadCoresContext *ctx, XAie_FileTarget FileTarget) {
+	switch(FileTarget) {
+		case XAIE_FILE_TARGET_CONTROLCODE: return ctx->InstructionBuffer;
+		case XAIE_FILE_TARGET_DEBUGASM:    return ctx->DebugInstructionBuffer;
+		default: return NULL;
+	}
+}
+
 static int _XAie_ControlCodePrintf(XAie_ControlCodeIO *ControlCodeInst, XAie_FileTarget FileTarget, const char *fmt, ...) {
 	va_list args;
 	va_list args_file;
@@ -629,37 +685,23 @@ static int _XAie_ControlCodePrintf(XAie_ControlCodeIO *ControlCodeInst, XAie_Fil
 
 	va_start(args, fmt);
 
-	/* Redirect to LoadCores buffers if we're in an active, non-reused LoadCores block */
+	/* Redirect to LoadCores/LoadCoresCP context buffers if active.
+	 * LoadCores redirects ALL targets (instructions + data).
+	 * LoadCoresCP redirects only instruction targets; data goes to global sections. */
+	XAie_LoadCoresContext *activeCtx = NULL;
+	int instructionsOnly = 0;
 	if (ControlCodeInst->IsLoadCoresActive && !ControlCodeInst->IsLoadCoresReused &&
 	    ControlCodeInst->LoadCoresContext != NULL) {
-		XAie_MemBuffer *buf = NULL;
+		activeCtx = ControlCodeInst->LoadCoresContext;
+	} else if (ControlCodeInst->IsLoadCoresCPActive && ControlCodeInst->LoadCoresCPContext != NULL) {
+		activeCtx = ControlCodeInst->LoadCoresCPContext;
+		instructionsOnly = 1;
+	}
 
-		XAIE_DBG("_XAie_ControlCodePrintf: FileTarget=%d, LoadCores active, redirecting\n", FileTarget);
-
-		switch(FileTarget) {
-			case XAIE_FILE_TARGET_CONTROLCODE:
-				buf = ControlCodeInst->LoadCoresContext->InstructionBuffer;
-				break;
-			case XAIE_FILE_TARGET_CONTROLCODEDATA:
-				buf = ControlCodeInst->LoadCoresContext->DataBuffer;
-				break;
-			case XAIE_FILE_TARGET_CONTROLCODEDATA2:
-				buf = ControlCodeInst->LoadCoresContext->DataBuffer2;
-				break;
-			case XAIE_FILE_TARGET_DEBUGASM:
-				buf = ControlCodeInst->LoadCoresContext->DebugInstructionBuffer;
-				break;
-			case XAIE_FILE_TARGET_DEBUGASMDATA0:
-				buf = ControlCodeInst->LoadCoresContext->DebugDataBuffer0;
-				break;
-			case XAIE_FILE_TARGET_DEBUGASMDATA1:
-				buf = ControlCodeInst->LoadCoresContext->DebugDataBuffer1;
-				break;
-			default:
-				/* Other file targets go to their normal destinations */
-				break;
-		}
-
+	if (activeCtx != NULL) {
+		XAie_MemBuffer *buf = instructionsOnly
+			? _XAie_GetContextInstructionBuffer(activeCtx, FileTarget)
+			: _XAie_GetContextBuffer(activeCtx, FileTarget);
 		if (buf != NULL) {
 			result = _XAie_MemBufferVPrintf(buf, fmt, args);
 			if (result < 0) {
@@ -771,52 +813,45 @@ static int _XAie_ControlCodeSeekAndOverwrite(XAie_ControlCodeIO *ControlCodeInst
 	size_t rep_len = strlen(Replacement);
 	int result = 0;
 
-	/* Redirect to LoadCores context buffers if active */
+	/* Redirect to LoadCores/LoadCoresCP context buffers if active.
+	 * LoadCores redirects ALL targets; LoadCoresCP only instruction targets. */
+	XAie_LoadCoresContext *activeCtx = NULL;
+	int instructionsOnly = 0;
 	if (ControlCodeInst->IsLoadCoresActive && !ControlCodeInst->IsLoadCoresReused &&
 	    ControlCodeInst->LoadCoresContext != NULL) {
-		XAie_MemBuffer *buf = NULL;
+		activeCtx = ControlCodeInst->LoadCoresContext;
+	} else if (ControlCodeInst->IsLoadCoresCPActive && ControlCodeInst->LoadCoresCPContext != NULL) {
+		activeCtx = ControlCodeInst->LoadCoresCPContext;
+		instructionsOnly = 1;
+	}
 
-		switch(FileTarget) {
-			case XAIE_FILE_TARGET_CONTROLCODE:
-				buf = ControlCodeInst->LoadCoresContext->InstructionBuffer;
-				break;
-			case XAIE_FILE_TARGET_CONTROLCODEDATA:
-				buf = ControlCodeInst->LoadCoresContext->DataBuffer;
-				break;
-			case XAIE_FILE_TARGET_CONTROLCODEDATA2:
-				buf = ControlCodeInst->LoadCoresContext->DataBuffer2;
-				break;
-			case XAIE_FILE_TARGET_DEBUGASM:
-				buf = ControlCodeInst->LoadCoresContext->DebugInstructionBuffer;
-				break;
-			case XAIE_FILE_TARGET_DEBUGASMDATA0:
-				buf = ControlCodeInst->LoadCoresContext->DebugDataBuffer0;
-				break;
-			case XAIE_FILE_TARGET_DEBUGASMDATA1:
-				buf = ControlCodeInst->LoadCoresContext->DebugDataBuffer1;
-				break;
-			default: return -1;
+	if (activeCtx != NULL) {
+		XAie_MemBuffer *buf = instructionsOnly
+			? _XAie_GetContextInstructionBuffer(activeCtx, FileTarget)
+			: _XAie_GetContextBuffer(activeCtx, FileTarget);
+		if (buf != NULL) {
+			if (!buf->Data) {
+				return -1;
+			}
+
+			ssize_t overwrite_pos = (ssize_t)buf->Size + Offset;
+			if (overwrite_pos < 0 || overwrite_pos >= (ssize_t)buf->Size) {
+				XAIE_ERROR("Invalid seek position: %zd (buf size: %zu)\n", overwrite_pos, buf->Size);
+				return -1;
+			}
+
+			size_t bytes_to_write = rep_len;
+			size_t available = buf->Size - overwrite_pos;
+			if (bytes_to_write > available) {
+				XAIE_WARN("Replacement string longer than available space, truncating\n");
+				bytes_to_write = available;
+			}
+
+			memcpy(buf->Data + overwrite_pos, Replacement, bytes_to_write);
+			return (int)bytes_to_write;
 		}
-
-		if (!buf || !buf->Data) {
-			return -1;
-		}
-
-		ssize_t overwrite_pos = (ssize_t)buf->Size + Offset;
-		if (overwrite_pos < 0 || overwrite_pos >= (ssize_t)buf->Size) {
-			XAIE_ERROR("Invalid seek position: %zd (buf size: %zu)\n", overwrite_pos, buf->Size);
-			return -1;
-		}
-
-		size_t bytes_to_write = rep_len;
-		size_t available = buf->Size - overwrite_pos;
-		if (bytes_to_write > available) {
-			XAIE_WARN("Replacement string longer than available space, truncating\n");
-			bytes_to_write = available;
-		}
-
-		memcpy(buf->Data + overwrite_pos, Replacement, bytes_to_write);
-		return (int)bytes_to_write;
+		/* buf is NULL — data target during LoadCoresCP; fall through to
+		 * global buffer/file path below. */
 	}
 
 	/* Write to buffer if in memory mode */
@@ -903,6 +938,12 @@ static inline void _XAie_ControlCodePageInfoPrintf(
 		XAie_ControlCodeIO *ControlCodeInst,
 		XAie_FileTarget DebugTarget)
 {
+	/* Suppress page info during LoadCoresCP buffering — the isolated
+	 * counters (starting at 0) would produce misleading comments.
+	 * The correct page info is emitted by LoadCoresCPEnd after the
+	 * outer page state is restored. */
+	if (ControlCodeInst->IsLoadCoresCPActive) return;
+
 	_XAie_ControlCodePrintf(ControlCodeInst, DebugTarget,
 		";Page#: %d, PageSize: %d, TextSecSize: %d, DataAligner: %d\n",
 		ControlCodeInst->PageId, ControlCodeInst->UcPageSize,
@@ -1105,14 +1146,19 @@ AieRC XAie_ControlCodeAddAnnotation(XAie_DevInst *DevInst,
 static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u32 Datalength)
 {
 	/* When LoadCores is active, data lives in context buffers regardless of
-	 * UseInMemoryBuffers — _XAie_ControlCodePrintf always redirects there.
-	 * Handle this case first and return early since file pointers are not
-	 * involved in LoadCores data output. */
+	 * UseInMemoryBuffers. Handle this case first and return early since file
+	 * pointers are not involved in LoadCores data output.
+	 * Note: LoadCoresCP is NOT handled here — its data goes to global sections. */
+	XAie_LoadCoresContext *activeCtx = NULL;
 	if (ControlCodeInst->IsLoadCoresActive && !ControlCodeInst->IsLoadCoresReused &&
 	    ControlCodeInst->LoadCoresContext != NULL) {
+		activeCtx = ControlCodeInst->LoadCoresContext;
+	}
+
+	if (activeCtx != NULL) {
 		XAie_MemBuffer *bufs[2] = {
-			ControlCodeInst->LoadCoresContext->DataBuffer,
-			ControlCodeInst->LoadCoresContext->DebugDataBuffer0
+			activeCtx->DataBuffer,
+			activeCtx->DebugDataBuffer0
 		};
 
 		for (int i = 0; i < 2; i++) {
@@ -1400,6 +1446,18 @@ AieRC XAie_ControlCodeIO_Init(XAie_DevInst *DevInst)
 *******************************************************************************/
 static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 
+	/* When LoadCoresCP is active, suppress all job-framing text and
+	 * pending-flush instructions (WAIT_UC_DMA, UC_DMA_WRITE_DES_SYNC).
+	 * Job framing is handled entirely by LoadCoresCPEnd. Only reset
+	 * state flags so the next operation sees a clean slate. */
+	if (ControlCodeInst->IsLoadCoresCPActive) {
+		if (ControlCodeInst->IsPageOpen && ControlCodeInst->IsJobOpen) {
+			ControlCodeInst->IsJobOpen       = 0;
+			ControlCodeInst->CombineCommands = 0;
+		}
+		return;
+	}
+
 	if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE)
 	{
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "WAIT_UC_DMA\t $r0\n");
@@ -1424,7 +1482,7 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 		ControlCodeInst->CombineCommands = 0;
 		ControlCodeInst->UcbdLabelNum++;
 	}
-	
+
 	if(ControlCodeInst->IsPageOpen && ControlCodeInst->IsJobOpen) {
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "END_JOB\n\n");
 		XAIE_DBG("Writing END_JOB to DebugAsmFile (fp=%p)\n", (void*)ControlCodeInst->DebugAsmFile);
@@ -1453,6 +1511,17 @@ static void _XAie_EndPage(XAie_ControlCodeIO  *ControlCodeInst) {
 
 	if(ControlCodeInst->IsPageOpen) {
 		_XAie_EndJob(ControlCodeInst);
+
+		/* When LoadCoresCP is active, suppress .eop emission — the
+		 * buffered content must not contain page directives.  Only
+		 * increment PageId so LoadCoresCPEnd can detect the overflow
+		 * and return an error. */
+		if (ControlCodeInst->IsLoadCoresCPActive) {
+			ControlCodeInst->IsPageOpen = 0;
+			ControlCodeInst->PageId++;
+			return;
+		}
+
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".eop\n\n");
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".eop\n\n");
 
@@ -1509,6 +1578,24 @@ static void _XAie_StartNewJob(XAie_ControlCodeIO  *ControlCodeInst,
 
 	if (JobType > XAIE_START_COND_JOB_PREEMPT) {
 		XAIE_ERROR("Invalid Job Type\n");
+		return;
+	}
+
+	/* When LoadCoresCP is active, suppress job framing — the outer
+	 * LoadCoresCPEnd wraps everything in a single job. Just ensure
+	 * we have a page open, recompute DataAligner, and mark the job
+	 * as open for state tracking. */
+	if (ControlCodeInst->IsLoadCoresCPActive) {
+		if (!ControlCodeInst->IsPageOpen) {
+			_XAie_StartNewPage(ControlCodeInst);
+		}
+		ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
+			(ControlCodeInst->UcPageTextSize % DATA_SECTION_ALIGNMENT));
+		if (ControlCodeInst->DataAligner == DATA_SECTION_ALIGNMENT) {
+			ControlCodeInst->DataAligner = 0U;
+		}
+		ControlCodeInst->IsJobOpen = 1;
+		ControlCodeInst->CombineCommands = 0;
 		return;
 	}
 
@@ -1745,9 +1832,11 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 			}
 
 			if(ControlCodeInst->CombineCommands) {
-				/* When LoadCores is active, data always lives in context
-				 * buffers regardless of UseInMemoryBuffers.
-				 * SeekAndOverwrite already handles this redirect. */
+				/* When LoadCores is active, data lives in context buffers
+				 * regardless of UseInMemoryBuffers.
+				 * SeekAndOverwrite already handles this redirect.
+				 * Note: LoadCoresCP data goes to global sections, so it
+				 * falls through to the normal buffer/file path below. */
 				if (ControlCodeInst->IsLoadCoresActive && !ControlCodeInst->IsLoadCoresReused &&
 				    ControlCodeInst->LoadCoresContext != NULL) {
 					_XAie_ControlCodeSeekAndOverwrite(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA, -3, " 1\n");
@@ -3123,24 +3212,30 @@ static inline AieRC _XAie_LoadCoresContextInit(XAie_ControlCodeIO *ControlCodeIn
 /*****************************************************************************/
 /**
 *
-* This function frees the LoadCoresContext and all its buffers.
+* This function frees a LoadCoresContext and all its buffers.
 *
-* @param	ControlCodeInst: ControlCode instance pointer
+* @param	Context: LoadCoresContext pointer to free
 *
 * @return	None
 *
 * @note		Internal only.
 *
 *******************************************************************************/
+static inline void _XAie_FreeLoadCoresContext(XAie_LoadCoresContext *Context) {
+	if (Context) {
+		_XAie_MemBufferFree(Context->InstructionBuffer);
+		_XAie_MemBufferFree(Context->DataBuffer);
+		_XAie_MemBufferFree(Context->DataBuffer2);
+		_XAie_MemBufferFree(Context->DebugInstructionBuffer);
+		_XAie_MemBufferFree(Context->DebugDataBuffer0);
+		_XAie_MemBufferFree(Context->DebugDataBuffer1);
+		free(Context);
+	}
+}
+
 static inline void _XAie_LoadCoresContextFree(XAie_ControlCodeIO *ControlCodeInst) {
 	if (ControlCodeInst->LoadCoresContext) {
-		_XAie_MemBufferFree(ControlCodeInst->LoadCoresContext->InstructionBuffer);
-		_XAie_MemBufferFree(ControlCodeInst->LoadCoresContext->DataBuffer);
-		_XAie_MemBufferFree(ControlCodeInst->LoadCoresContext->DataBuffer2);
-		_XAie_MemBufferFree(ControlCodeInst->LoadCoresContext->DebugInstructionBuffer);
-		_XAie_MemBufferFree(ControlCodeInst->LoadCoresContext->DebugDataBuffer0);
-		_XAie_MemBufferFree(ControlCodeInst->LoadCoresContext->DebugDataBuffer1);
-		free(ControlCodeInst->LoadCoresContext);
+		_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresContext);
 		ControlCodeInst->LoadCoresContext = NULL;
 	}
 }
@@ -3318,6 +3413,11 @@ AieRC XAie_ControlCodeIO_LoadCoresStart(void *IOInst, u32 UniqueCoreElfId, const
 
 	if(ControlCodeInst->IsLoadCoresActive) {
 		XAIE_ERROR("LoadCoresStart called while a previous LoadCoresStart is still active\n");
+		return XAIE_ERR;
+	}
+
+	if(ControlCodeInst->IsLoadCoresCPActive) {
+		XAIE_ERROR("LoadCoresStart called while LoadCoresCPStart is still active\n");
 		return XAIE_ERR;
 	}
 
@@ -3510,6 +3610,254 @@ cleanup_context:
 
 	_XAie_ResetLoadCoresLabel(ControlCodeInst);
 	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API generates the LOAD_CORES_CP instruction in the control code assembly.
+* The LOAD_CORES_CP instruction is similar to LOAD_CORES but assumes control packet
+* loading fits within a single page. All control packet loading instructions are
+* buffered and emitted as a complete job within one page.
+*
+* @param	IOInst: IO instance pointer
+* @param	UniqueCoreElfId: A unique 32bit ID provided by the application
+*
+* @return	XAIE_OK on success, XAIE_ERR on failure.
+*
+* @note		It's the application's responsibility to ensure:
+*		1. The UniqueCoreElfId is unique per uC
+*		2. Control packet loading instructions fit within one page
+*		This API will automatically switch to a new page if needed.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_LoadCoresCPStart(void *IOInst, u32 UniqueCoreElfId)
+{
+	XAie_ControlCodeIO *ControlCodeInst;
+
+	ControlCodeInst = (XAie_ControlCodeIO *)(IOInst);
+	if(ControlCodeInst == NULL) {
+		XAIE_ERROR("Invalid ControlCode Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	CHECK_ERROR_STATE(ControlCodeInst);
+
+	if(ControlCodeInst->IsLoadCoresCPActive) {
+		XAIE_ERROR("LoadCoresCPStart called while a previous LoadCoresCPStart is still active\n");
+		return XAIE_ERR;
+	}
+
+	if(ControlCodeInst->IsLoadCoresActive) {
+		XAIE_ERROR("LoadCoresCPStart called while LoadCoresStart is still active\n");
+		return XAIE_ERR;
+	}
+
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
+		/* Initialize LoadCoresCP context to capture instructions and data */
+		AieRC RC = _XAie_LoadCoresContextInit(ControlCodeInst);
+		if (RC != XAIE_OK) return RC;
+
+		ControlCodeInst->LoadCoresCPContext = ControlCodeInst->LoadCoresContext;
+		ControlCodeInst->LoadCoresContext = NULL; /* Transfer ownership to LoadCoresCPContext */
+
+		ControlCodeInst->LoadCoresCPContext->UniqueCoreElfId = UniqueCoreElfId;
+
+		/* Save outer page state so we can restore it in LoadCoresCPEnd.
+		 * This lets the buffered writes track their own page size independently. */
+		_XAie_SavePageState(ControlCodeInst,
+		                    &ControlCodeInst->LoadCoresCPContext->SavedState);
+
+		/* Reset page/job counters so the buffered content starts with
+		 * clean tracking. The outer state is preserved in SavedState.
+		 * Label-related fields (UcbdLabelNum, UcbdDataNum, etc.) are NOT
+		 * reset — they track global label numbering across scopes.
+		 *
+		 * IsJobOpen is set to 1 to prevent Write32/BlockWrite32 from
+		 * auto-opening a job — the LOAD_CORES_CP job framing (START_JOB/
+		 * END_JOB) is handled by LoadCoresCPEnd. The page size starts at
+		 * zero (no page overhead) since we only care about the net
+		 * content size for the page-fit check in LoadCoresCPEnd. */
+		ControlCodeInst->UcPageSize           = 0;
+		ControlCodeInst->UcPageTextSize       = 0;
+		ControlCodeInst->DataAligner          = 0;
+		ControlCodeInst->UcJobNum             = 0;
+		ControlCodeInst->NumShimBDsChained    = 0;
+		ControlCodeInst->CombinedMemWriteSize = 0;
+		ControlCodeInst->CalculatedNextRegOff = 0;
+		ControlCodeInst->PrevMemWriteType     = -1;
+		ControlCodeInst->CombineCommands      = 0;
+		ControlCodeInst->IsShimBd             = 0;
+		ControlCodeInst->Mode                 = 0;
+		ControlCodeInst->IsAdjacentMemWrite   = 0;
+		ControlCodeInst->PageBreak            = 0;
+		ControlCodeInst->LabelMatchFound      = 0;
+		ControlCodeInst->IsJobOpen            = 1;
+		ControlCodeInst->IsPageOpen           = 1;
+
+		ControlCodeInst->IsLoadCoresCPActive = 1;
+
+		return XAIE_OK;
+	}
+
+	return XAIE_ERR;
+}
+
+/*****************************************************************************/
+/**
+*
+* This API ends the LOAD_CORES_CP instruction block and emits the complete job.
+* If the complete job (START_JOB + LOAD_CORES_CP + buffered instructions + END_JOB)
+* will not fit on the current page, it automatically moves to a new page.
+*
+* @param	IOInst: IO instance pointer
+*
+* @return	XAIE_OK on success, XAIE_ERR on failure.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_LoadCoresCPEnd(void *IOInst) {
+	XAie_ControlCodeIO *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	if (ControlCodeInst == NULL) {
+		XAIE_ERROR("Invalid ControlCode Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+	if (!ControlCodeInst->IsLoadCoresCPActive) {
+		XAIE_ERROR("LoadCoresCPEnd called without a prior LoadCoresCPStart\n");
+		return XAIE_FEATURE_NOT_SUPPORTED;
+	}
+
+	if (ControlCodeInst->LoadCoresCPContext == NULL) {
+		XAIE_ERROR("LoadCoresCPContext is NULL\n");
+		return XAIE_ERR;
+	}
+
+	if (ControlCodeInst->ErrorState) {
+		XAIE_ERROR("LoadCoresCPEnd: aborting due to previous critical error\n");
+		ControlCodeInst->IsLoadCoresCPActive = 0;
+		_XAie_RestorePageState(ControlCodeInst, &ControlCodeInst->LoadCoresCPContext->SavedState);
+		_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+		ControlCodeInst->LoadCoresCPContext = NULL;
+		return XAIE_ERR;
+	}
+
+	/* 1. Validate that a page break did not occur during the buffered phase.
+	 * The entire LoadCoresCP job must fit on a single page.  PageId is
+	 * inherited (not reset) in LoadCoresCPStart; if _XAie_EndPage fired
+	 * during buffering it would have incremented PageId.  Compare against
+	 * the saved outer PageId to detect this. */
+	if (ControlCodeInst->PageId != ControlCodeInst->LoadCoresCPContext->SavedState.PageId) {
+		XAIE_ERROR("LoadCoresCP control packet loading exceeded page size — "
+		           "content must fit within a single page\n");
+		ControlCodeInst->IsLoadCoresCPActive = 0;
+		_XAie_RestorePageState(ControlCodeInst,
+		                       &ControlCodeInst->LoadCoresCPContext->SavedState);
+		_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+		ControlCodeInst->LoadCoresCPContext = NULL;
+		return XAIE_ERR;
+	}
+
+	/* 2. Capture the buffered sizes before restoring outer state.
+	 * UcPageSize/UcPageTextSize were reset to 0 in LoadCoresCPStart.
+	 * UcPageSize tracks the total size (instructions + data sections).
+	 * UcPageTextSize tracks only the instruction (text) portion.
+	 * These must be kept separate because DataAligner is computed from
+	 * UcPageTextSize, not UcPageSize. */
+	u32 bufferedContentSize = ControlCodeInst->UcPageSize;
+	u32 bufferedTextSize    = ControlCodeInst->UcPageTextSize;
+
+	/* 3. Deactivate LoadCoresCP so subsequent emits go to main output */
+	ControlCodeInst->IsLoadCoresCPActive = 0;
+
+	/* 4. Restore outer page state from SavedState */
+	XAie_SavedPageState saved = ControlCodeInst->LoadCoresCPContext->SavedState;
+	_XAie_RestorePageState(ControlCodeInst, &saved);
+
+	/* 5. Calculate total LoadCoresCP job size.
+	 *    For the page-fit check we need the full size (text + data).
+	 *    For DataAligner we need only the text portion, since alignment
+	 *    is computed from UcPageTextSize. */
+	u32 loadCoresCPTextSize = ISA_OPSIZE_START_JOB + ISA_OPSIZE_LOAD_CORES_CP
+	                        + bufferedTextSize + ISA_OPSIZE_END_JOB;
+	u32 loadCoresCPJobSize  = ISA_OPSIZE_START_JOB + ISA_OPSIZE_LOAD_CORES_CP
+	                        + bufferedContentSize + ISA_OPSIZE_END_JOB;
+
+	_XAie_UpdateDataAligner(ControlCodeInst, loadCoresCPTextSize);
+	u32 totalWithAlignment = loadCoresCPJobSize + ControlCodeInst->DataAligner;
+
+	/* 6. Check if the LoadCoresCP job fits on the current page */
+	if (ControlCodeInst->UcPageSize + totalWithAlignment > ControlCodeInst->PageSizeMax) {
+		_XAie_StartNewPage(ControlCodeInst);
+	}
+
+	/* 7. Close current job if one is open */
+	if (ControlCodeInst->IsJobOpen) {
+		_XAie_EndJob(ControlCodeInst);
+	}
+
+	/* 8. Emit the LoadCoresCP job directly to main output:
+	 *    START_JOB, LOAD_CORES_CP, buffered instructions, END_JOB */
+	if (!ControlCodeInst->IsPageOpen) {
+		_XAie_StartNewPage(ControlCodeInst);
+	}
+
+	/* Use direct _XAie_ControlCodePrintf calls (not CONTROLCODE_PRINTF_CHECK)
+	 * so that errors go through the cleanup path instead of returning early
+	 * and leaking LoadCoresCPContext. */
+	AieRC RC = XAIE_OK;
+
+	_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "START_JOB %d\n",
+		ControlCodeInst->UcJobNum);
+	_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "START_JOB %d\n",
+		ControlCodeInst->UcJobNum);
+	if (ControlCodeInst->ErrorState) { RC = XAIE_ERR; goto cleanup; }
+	ControlCodeInst->UcJobNum++;
+	ControlCodeInst->IsJobOpen = 1;
+	ControlCodeInst->UcPageTextSize += ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB;
+	ControlCodeInst->UcPageSize += ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB;
+	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+
+	_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "LOAD_CORES_CP\t 0x%x\n",
+		ControlCodeInst->LoadCoresCPContext->UniqueCoreElfId);
+	_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "LOAD_CORES_CP\t 0x%x\n",
+		ControlCodeInst->LoadCoresCPContext->UniqueCoreElfId);
+	if (ControlCodeInst->ErrorState) { RC = XAIE_ERR; goto cleanup; }
+	ControlCodeInst->UcPageSize += ISA_OPSIZE_LOAD_CORES_CP;
+	ControlCodeInst->UcPageTextSize += ISA_OPSIZE_LOAD_CORES_CP;
+	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+
+	/* Emit buffered instructions to the main output */
+	if (ControlCodeInst->LoadCoresCPContext->InstructionBuffer->Size > 0) {
+		RC = _XAie_EmitLoadCoresBuffer(ControlCodeInst,
+		                               ControlCodeInst->LoadCoresCPContext->InstructionBuffer,
+		                               ControlCodeInst->ControlCodefp,
+		                               ControlCodeInst->ControlCodeBuf,
+		                               "ControlCodeBuf (LOAD_CORES_CP)");
+		if (RC != XAIE_OK) goto cleanup;
+
+		if (!ControlCodeInst->DisableDebugAsm) {
+			RC = _XAie_EmitLoadCoresBuffer(ControlCodeInst,
+			                               ControlCodeInst->LoadCoresCPContext->DebugInstructionBuffer,
+			                               ControlCodeInst->DebugAsmFile,
+			                               ControlCodeInst->DebugAsmBuf,
+			                               "DebugAsmBuf (LOAD_CORES_CP)");
+			if (RC != XAIE_OK) goto cleanup;
+		}
+	}
+
+	/* Update page size with the buffered content.
+	 * UcPageSize gets the full size (text + data).
+	 * UcPageTextSize gets only the text portion. */
+	ControlCodeInst->UcPageSize += bufferedContentSize;
+	ControlCodeInst->UcPageTextSize += bufferedTextSize;
+	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+
+	_XAie_EndJob(ControlCodeInst);
+
+cleanup:
+	_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+	ControlCodeInst->LoadCoresCPContext = NULL;
+
+	return RC;
 }
 
 /*****************************************************************************/
@@ -4431,9 +4779,17 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 		if (ControlCodeInst->IsLoadCoresActive) {
 			XAIE_WARN("LoadCoresStart called but not ended with LoadCoresEnd\n");
 		}
+		/* Warn if LoadCoresCPStart was called but not ended with LoadCoresCPEnd */
+		if (ControlCodeInst->IsLoadCoresCPActive) {
+			XAIE_WARN("LoadCoresCPStart called but not ended with LoadCoresCPEnd\n");
+		}
 		/* Clean up any lingering LoadCoresContext (shouldn't happen in normal flow) */
 		if (ControlCodeInst->LoadCoresContext != NULL) {
 			_XAie_LoadCoresContextFree(ControlCodeInst);
+		}
+		if (ControlCodeInst->LoadCoresCPContext != NULL) {
+			_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+			ControlCodeInst->LoadCoresCPContext = NULL;
 		}
 
 		_XAie_EndPage(ControlCodeInst);
@@ -4505,6 +4861,14 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 			XAIE_ERROR("LoadCoresStart called but not ended with LoadCoresEnd\n");
 			ControlCodeInst->IsLoadCoresActive = 0;
 			ControlCodeInst->IsLoadCoresReused = 0;
+		}
+		if(ControlCodeInst->IsLoadCoresCPActive) {
+			XAIE_ERROR("LoadCoresCPStart called but not ended with LoadCoresCPEnd\n");
+			ControlCodeInst->IsLoadCoresCPActive = 0;
+		}
+		if (ControlCodeInst->LoadCoresCPContext != NULL) {
+			_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+			ControlCodeInst->LoadCoresCPContext = NULL;
 		}
 		if(ControlCodeInst->LoadCoresLabel) {
 			free(ControlCodeInst->LoadCoresLabel);
@@ -4888,6 +5252,25 @@ AieRC XAie_ControlCodeIO_LoadCoresEnd(void *IOInst)
 	return XAIE_INVALID_BACKEND;
 }
 
+AieRC XAie_ControlCodeIO_LoadCoresCPStart(void *IOInst, u32 UniqueCoreElfId)
+{
+	/* no-op */
+	(void)IOInst;
+	(void)UniqueCoreElfId;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
+AieRC XAie_ControlCodeIO_LoadCoresCPEnd(void *IOInst)
+{
+	/* no-op */
+	(void)IOInst;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
 #endif /* __AIECONTROLCODE__ */
 
 static AieRC XAie_ControlCodeIO_CmdWrite(void *IOInst, u8 Col, u8 Row, u8 Command,
@@ -4979,6 +5362,8 @@ const XAie_Backend ControlCodeBackend =
 	.Ops.Nop = XAie_ControlCodeIO_Nop,
 	.Ops.LoadCoresStart = XAie_ControlCodeIO_LoadCoresStart,
 	.Ops.LoadCoresEnd = XAie_ControlCodeIO_LoadCoresEnd,
+	.Ops.LoadCoresCPStart = XAie_ControlCodeIO_LoadCoresCPStart,
+	.Ops.LoadCoresCPEnd = XAie_ControlCodeIO_LoadCoresCPEnd,
 	.Ops.SubmitTxn = NULL,
 };
 

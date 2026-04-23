@@ -50,6 +50,7 @@
 #define ISA_OPCODE_SAVE_REGISTER 0x1e
 #define ISA_OPCODE_REL_ACQ_SYNC 0x21
 #define ISA_OPCODE_LOAD_CORES 0x04
+#define ISA_OPCODE_LOAD_CORES_CP 0x20
 
 // Operation sizes
 
@@ -80,6 +81,7 @@
 #define ISA_OPSIZE_SAVE_REGISTER 0x0c
 #define ISA_OPSIZE_REL_ACQ_SYNC 0x0c
 #define ISA_OPSIZE_LOAD_CORES 0x0c
+#define ISA_OPSIZE_LOAD_CORES_CP 0x08
 
 #ifdef CERT_FW
 // Operation implementation forward declarations

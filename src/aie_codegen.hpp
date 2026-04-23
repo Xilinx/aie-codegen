@@ -2614,6 +2614,8 @@ typedef struct XAie_BackendOps {
         AieRC (*Nop) (void *IOInst);
         AieRC (*LoadCoresStart) (void *IOInst, u32 UniqueCoreElfId, const char* Label);
         AieRC (*LoadCoresEnd) (void *IOInst);
+        AieRC (*LoadCoresCPStart) (void *IOInst, u32 UniqueCoreElfId);
+        AieRC (*LoadCoresCPEnd) (void *IOInst);
 } XAie_BackendOps;
 
 /* Typedef to capture all backend information */

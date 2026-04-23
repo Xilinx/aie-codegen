@@ -267,5 +267,7 @@ XAIE_AIG_EXPORT AieRC XAie_ControlCodeRelAcqSync(XAie_DevInst *DevInst, const XA
 												 XAie_LocType Loc, XAie_Lock RelLock, XAie_Lock AcqLock);
 XAIE_AIG_EXPORT AieRC XAie_LoadCoresStart(XAie_DevInst *DevInst, u32 UniqueCoreElfId, const char* Label);
 XAIE_AIG_EXPORT AieRC XAie_LoadCoresEnd(XAie_DevInst *DevInst);
+XAIE_AIG_EXPORT AieRC XAie_LoadCoresCPStart(XAie_DevInst *DevInst, u32 UniqueCoreElfId);
+XAIE_AIG_EXPORT AieRC XAie_LoadCoresCPEnd(XAie_DevInst *DevInst);
 #endif		/* end of protection macro */
 /** @} */

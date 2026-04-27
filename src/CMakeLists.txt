@@ -116,6 +116,17 @@ install(
   ${CMAKE_INSTALL_INCLUDEDIR}
   )
 
+# FAL (xaiefal) header-only C++ wrappers
+file(GLOB _XAIEFAL_COMMON  "${CMAKE_CURRENT_SOURCE_DIR}/../fal/src/common/*")
+file(GLOB _XAIEFAL_PROFILE "${CMAKE_CURRENT_SOURCE_DIR}/../fal/src/profile/*")
+file(GLOB _XAIEFAL_RSC     "${CMAKE_CURRENT_SOURCE_DIR}/../fal/src/rsc/*")
+file(GLOB _XAIEFAL_TOP     "${CMAKE_CURRENT_SOURCE_DIR}/../fal/src/*.hpp")
+
+install(FILES ${_XAIEFAL_COMMON}  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xaiefal/common)
+install(FILES ${_XAIEFAL_PROFILE} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xaiefal/profile)
+install(FILES ${_XAIEFAL_RSC}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xaiefal/rsc)
+install(FILES ${_XAIEFAL_TOP}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
 install(
   TARGETS
   ${PROJECT_NAME}

@@ -35,6 +35,7 @@
 #include "isa_stubs.h"
 #include "xaie_locks.h"
 #include "xaie_helper_internal.h"
+#include "xaie_secure_io_internal.h"
 
 #ifdef __AIECONTROLCODE__
 
@@ -44,7 +45,6 @@
 typedef SSIZE_T ssize_t;
 #else
 #include <sys/types.h>
-#include <sys/stat.h>
 #endif
 
 #define TEMP_ASM_FILE1    ".temp_data1.txt"
@@ -4031,15 +4031,12 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	ControlCodeInst->DevInst = DevInst;
 	ControlCodeInst->ScrachpadName = NULL;
 	ControlCodeInst->Mode = (u8)XAIE_INVALID_MODE;
-	/* Restrict file permissions to owner-only (0600) during file creation.
-	 * Note: umask() is process-global, so this is not thread-safe. This is
-	 * acceptable because control code generation is single-threaded. */
-#ifndef _WIN32
-	mode_t old_umask = umask(S_IWGRP | S_IWOTH | S_IRGRP | S_IROTH);
-#endif
-	ControlCodeInst->ControlCodefp      = fopen(FileName, "w");
-	ControlCodeInst->ControlCodedatafp  = fopen(TEMP_ASM_FILE1, "w+");
-	ControlCodeInst->ControlCodedata2fp = fopen(TEMP_ASM_FILE2, "w+");
+	/* All file creations below go through _XAie_SecureFopen() so that newly
+	 * created files have owner-only (0600) permissions without touching the
+	 * process-global umask. See common/xaie_secure_io.c for rationale. */
+	ControlCodeInst->ControlCodefp      = _XAie_SecureFopen(FileName, "w");
+	ControlCodeInst->ControlCodedatafp  = _XAie_SecureFopen(TEMP_ASM_FILE1, "w+");
+	ControlCodeInst->ControlCodedata2fp = _XAie_SecureFopen(TEMP_ASM_FILE2, "w+");
 
 	/* Validate control code file pointers before opening debug ASM files
 	 * to avoid unnecessary resource allocation if control code setup fails */
@@ -4059,9 +4056,6 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 			fclose(ControlCodeInst->ControlCodedata2fp);
 			ControlCodeInst->ControlCodedata2fp = NULL;
 		}
-#ifndef _WIN32
-		umask(old_umask);
-#endif
 		return XAIE_ERR;
 	}
 
@@ -4076,13 +4070,10 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 			XAIE_ERROR("Filename too long to append .DEBUG extension\n");
 		}
 
-		ControlCodeInst->DebugAsmFileData0 = fopen(TEMP_ASM_FILE3, "w+");
-		ControlCodeInst->DebugAsmFileData1 = fopen(TEMP_ASM_FILE4, "w+");
-		ControlCodeInst->DebugAsmFile = fopen(FName, "w+");
+		ControlCodeInst->DebugAsmFileData0 = _XAie_SecureFopen(TEMP_ASM_FILE3, "w+");
+		ControlCodeInst->DebugAsmFileData1 = _XAie_SecureFopen(TEMP_ASM_FILE4, "w+");
+		ControlCodeInst->DebugAsmFile = _XAie_SecureFopen(FName, "w+");
 	}
-#ifndef _WIN32
-	umask(old_umask);
-#endif
 
 	ControlCodeInst->PageSizeMax = PageSize;
 	ControlCodeInst->TotalLabelsAllocated = MAX_LABELS_PER_ASM_FILE;

@@ -44,6 +44,7 @@
 #define XAIEGBL_H /* by using protection macros */
 
 /***************************** Include Files *********************************/
+#include <stddef.h>
 #include "xaiegbl_defs.h"
 #include "xaiegbl_dynlink.h"
 #include "xaie_feature_config.h"
@@ -197,6 +198,20 @@ typedef struct {
 	u32 HostddrBuff_SMID;
 	u32 HostddrBuff_AxUSER;
 } XAie_DevInst;
+
+/*
+ * Pin the layout of XAie_DevInst. The duplicate definition in
+ * src/aie_codegen.hpp (used by downstream C++ consumers) must agree with this
+ * one.
+ */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+_Static_assert(sizeof(XAie_DevInst) == 160,
+    "XAie_DevInst size changed; update src/aie_codegen.hpp to match.");
+_Static_assert(offsetof(XAie_DevInst, DisableDebugAsm) == 128,
+    "XAie_DevInst.DisableDebugAsm offset changed; update src/aie_codegen.hpp.");
+_Static_assert(offsetof(XAie_DevInst, HostddrBuff_AxUSER) == 156,
+    "XAie_DevInst trailing fields shifted; update src/aie_codegen.hpp.");
+#endif
 
 /* enum to capture cache property of allocate memory */
 typedef enum {

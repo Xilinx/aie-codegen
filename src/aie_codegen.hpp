@@ -264,13 +264,28 @@ typedef struct {
 	u32 InitialTxnCmdArraySize; /* TXN command array max size to begin with */
 	void *InstBufPriv; /* XDP per-device instruction buffer container; NULL if unused */
 	XAie_List PartitionList;
-	
+
+	u8 DisableDebugAsm;  /* Set to 1 before XAie_OpenControlCodeFile() to skip .DEBUG file generation */
+
 	/*use to clear A2S buffer (work-around for data leak)*/
 	u64 HostddrBuffAddr;
 	size_t HostddrBuffSize;
 	u32 HostddrBuff_SMID;
 	u32 HostddrBuff_AxUSER;
 } XAie_DevInst;
+
+/*
+ * Pin the layout of XAie_DevInst. xaiegbl.h holds the canonical definition
+ * used by the C library; this header must mirror it exactly.
+ * Keep the values below in sync with xaiegbl.h.
+ */
+static_assert(sizeof(XAie_DevInst) == 160,
+    "XAie_DevInst size diverged from src/global/xaiegbl.h; a field was added "
+    "or reordered there but not mirrored here.");
+static_assert(offsetof(XAie_DevInst, DisableDebugAsm) == 128,
+    "XAie_DevInst.DisableDebugAsm offset diverged from xaiegbl.h.");
+static_assert(offsetof(XAie_DevInst, HostddrBuff_AxUSER) == 156,
+    "XAie_DevInst trailing fields shifted relative to xaiegbl.h.");
 
 /* enum to capture cache property of allocate memory */
 typedef enum class XAie_MemCacheProp{

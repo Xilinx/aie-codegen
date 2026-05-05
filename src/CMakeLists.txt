@@ -91,13 +91,47 @@ endif (DEBUG_BACKEND)
 list(APPEND IO_BACKEND -D__AIECONTROLCODE__)
 
 if(MSVC)
+  option(AIE_CODEGEN_MSVC_RELEASE_PDB
+    "MSVC Release: /Zi and /DEBUG for BinSkim / compliance tooling" ON)
+
+  # /Wall + /WX; BinSkim-friendly compile/link; /wd* silences SDK / third-party noise under /WX
   target_compile_options(${PROJECT_NAME} PRIVATE
-   /wd4018 /wd4024 /wd4047 /wd4061 /wd4100 /wd4200 /wd4206 /wd4242 /wd4244 /wd4267 /wd4388 /wd4389 /wd4431 /wd4668 /wd4701 /wd4710 /wd4711 /wd4716
-   /wd4820 /wd4996 /wd5045 /wd5105
-   )
-  target_compile_options(${PROJECT_NAME} PRIVATE /Wall -DXAIE_FEATURE_MSVC ${IO_BACKEND})
+    /Wall
+    /WX
+    /sdl
+    /GS
+    /guard:cf
+    /permissive-
+    /EHsc
+    /wd4820
+    /wd4206
+    /wd5045
+    /wd4668
+    /wd4242
+    /wd4061
+    /wd5105
+    -DXAIE_FEATURE_MSVC
+    ${IO_BACKEND}
+  )
+
+  set(_msvc_link /DYNAMICBASE /guard:cf /LARGEADDRESSAWARE)
+  string(TOUPPER "${CMAKE_GENERATOR_PLATFORM}" _vs_plat)
+  if(NOT _vs_plat STREQUAL "ARM64")
+    list(APPEND _msvc_link /CETCOMPAT)
+  endif()
+  target_link_options(${PROJECT_NAME} PRIVATE ${_msvc_link})
+
+  if(AIE_CODEGEN_MSVC_RELEASE_PDB)
+    target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/Zi>)
+    target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/DEBUG>)
+  endif()
 else()
-  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra ${IO_BACKEND})
+  target_compile_options(${PROJECT_NAME} PRIVATE
+    -Wall
+    -Wextra
+    -Werror
+    ${IO_BACKEND}
+  )
 endif()
 
 include(GNUInstallDirs)

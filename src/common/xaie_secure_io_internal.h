@@ -35,7 +35,7 @@
 *
 * `Mode` accepts the same primary characters as fopen(3): "r", "w", "a",
 * optionally followed by "+", "b", "t". Pure read opens ("r" / "rb") cannot
-* create a file and are forwarded to fopen() unchanged.
+* create a file and are forwarded to fopen() (fopen_s on Windows) unchanged.
 *
 * On Linux the file is opened with O_NOFOLLOW (refuses pre-placed symlinks
 * at `Path`) and O_CLOEXEC (the fd is not inherited by exec'd children).

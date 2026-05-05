@@ -246,7 +246,7 @@ AieRC _XAie2PS_SetColumnClk(XAie_DevInst *DevInst, XAie_BackendColumnReq *Args)
 
 	/*Enable the clock control register for shims*/
 	for(u32 C = Args->StartCol; C < (Args->StartCol + Args->NumCols); C++) {
-		XAie_LocType TileLoc = XAie_TileLoc(C, 1);
+		XAie_LocType TileLoc = XAie_TileLoc((u8)C, 1U);
 
 		RC = _XAie2PS_PmSetColumnClockBuffer(DevInst, TileLoc,
 				Args->Enable);
@@ -264,7 +264,8 @@ AieRC _XAie2PS_SetColumnClk(XAie_DevInst *DevInst, XAie_BackendColumnReq *Args)
 		}
 	}
 
-	TileStatus = _XAie_GetTileBitPosFromLoc(DevInst, XAie_TileLoc(Args->StartCol, 1));
+	TileStatus = _XAie_GetTileBitPosFromLoc(DevInst,
+			XAie_TileLoc((u8)Args->StartCol, 1U));
 	NumTiles =(u32)((DevInst->NumRows - 1U) * (Args->NumCols));
 
 	if(Args->Enable) {

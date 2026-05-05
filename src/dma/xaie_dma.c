@@ -996,7 +996,7 @@ AieRC XAie_DmaSetNextBd(XAie_DmaDesc *DmaDesc, u16 NextBd, u8 EnableNextBd)
 		return XAIE_INVALID_BD_NUM;
 	}
 
-	DmaDesc->BdEnDesc.NxtBd = NextBd;
+	DmaDesc->BdEnDesc.NxtBd = (u8)NextBd;
 	DmaDesc->BdEnDesc.UseNxtBd = EnableNextBd;
 
 	return XAIE_OK;
@@ -1043,7 +1043,7 @@ AieRC XAie_DmaSetNextBdPvtBuffPool(XAie_DmaDesc *DmaDesc, u8 ChNum, XAie_DmaDire
 		return XAIE_INVALID_BD_NUM;
 	}
 
-	DmaDesc->BdEnDesc.NxtBd = NextBd;
+	DmaDesc->BdEnDesc.NxtBd = (u8)NextBd;
 	DmaDesc->BdEnDesc.UseNxtBd = EnableNextBd;
 
 	return XAIE_OK;

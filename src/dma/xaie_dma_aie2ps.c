@@ -112,8 +112,8 @@ static AieRC _XAie2PS_DmaMemTileCheckPaddingConfig(XAie_DmaDesc *DmaDesc)
 	XAie_PadDesc *PDesc = DmaDesc->PadDesc;
 
 	for(u8 Dim = 0U; Dim < XAIE2PS_DMA_PAD_NUM_DIMS; Dim++) {
-		u8 Before = DmaDesc->PadDesc[Dim].Before;
-		u8 After = DmaDesc->PadDesc[Dim].After;
+		u16 Before = DmaDesc->PadDesc[Dim].Before;
+		u16 After = DmaDesc->PadDesc[Dim].After;
 
 		/*
 		 * Check for before and after padding values overflow.
@@ -505,50 +505,50 @@ AieRC _XAie2PS_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 	DmaDesc->AddrDesc.Address |= (u64)XAie_GetField(BdWord[2U],
 				BdProp->Buffer->ShimDmaBuff.AddrHigh.Lsb,
 				BdProp->Buffer->ShimDmaBuff.AddrHigh.Mask) << 32U;
-	DmaDesc->PktDesc.PktEn = XAie_GetField(BdWord[2U],
+	DmaDesc->PktDesc.PktEn = (u8)XAie_GetField(BdWord[2U],
 				BdProp->Pkt->EnPkt.Lsb,
 				BdProp->Pkt->EnPkt.Mask);
-	DmaDesc->PktDesc.PktType = XAie_GetField(BdWord[2U],
+	DmaDesc->PktDesc.PktType = (u8)XAie_GetField(BdWord[2U],
 				BdProp->Pkt->PktType.Lsb,
 				BdProp->Pkt->PktType.Mask);
-	DmaDesc->PktDesc.PktId = XAie_GetField(BdWord[2U],
+	DmaDesc->PktDesc.PktId = (u8)XAie_GetField(BdWord[2U],
 				BdProp->Pkt->PktId.Lsb,
 				BdProp->Pkt->PktId.Mask);
-	DmaDesc->BdEnDesc.OutofOrderBdId = XAie_GetField(BdWord[2U],
+	DmaDesc->BdEnDesc.OutofOrderBdId = (u8)XAie_GetField(BdWord[2U],
 				BdProp->BdEn->OutofOrderBdId.Lsb,
 				BdProp->BdEn->OutofOrderBdId.Mask);
 
 	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[0U].Wrap =
-			XAie_GetField(BdWord[3U],
+			(u16)XAie_GetField(BdWord[3U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[0U].Wrap.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[0U].Wrap.Mask);
 	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[0U].StepSize = 1U +
 			XAie_GetField(BdWord[3U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[0U].StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[0U].StepSize.Mask);
-	DmaDesc->AxiDesc.SecureAccess = XAie_GetField(BdWord[3U],
+	DmaDesc->AxiDesc.SecureAccess = (u8)XAie_GetField(BdWord[3U],
 				BdProp->SysProp->SecureAccess.Lsb,
 				BdProp->SysProp->SecureAccess.Mask);
 
 	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[1U].Wrap =
-			XAie_GetField(BdWord[4U],
+			(u16)XAie_GetField(BdWord[4U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[1U].Wrap.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[1U].Wrap.Mask);
 	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[1U].StepSize = 1U +
 			XAie_GetField(BdWord[4U],
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[1U].StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[1U].StepSize.Mask);
-	DmaDesc->AxiDesc.BurstLen = XAie_GetField(BdWord[4U],
+	DmaDesc->AxiDesc.BurstLen = (u8)XAie_GetField(BdWord[4U],
 				BdProp->SysProp->BurstLen.Lsb,
 				BdProp->SysProp->BurstLen.Mask);
 
-	DmaDesc->AxiDesc.SMID = XAie_GetField(BdWord[5U],
+	DmaDesc->AxiDesc.SMID = (u8)XAie_GetField(BdWord[5U],
 				BdProp->SysProp->SMID.Lsb,
 				BdProp->SysProp->SMID.Mask);
-	DmaDesc->AxiDesc.AxQos = XAie_GetField(BdWord[5U],
+	DmaDesc->AxiDesc.AxQos = (u8)XAie_GetField(BdWord[5U],
 				BdProp->SysProp->AxQos.Lsb,
 				BdProp->SysProp->AxQos.Mask);
-	DmaDesc->AxiDesc.AxCache = XAie_GetField(BdWord[5U],
+	DmaDesc->AxiDesc.AxCache = (u8)XAie_GetField(BdWord[5U],
 				BdProp->SysProp->AxCache.Lsb,
 				BdProp->SysProp->AxCache.Mask);
 	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.DimDesc[2U].StepSize = 1U +
@@ -557,43 +557,43 @@ AieRC _XAie2PS_ShimDmaReadBd(XAie_DevInst *DevInst , XAie_DmaDesc *DmaDesc,
 				BdProp->AddrMode->AieMlMultiDimAddr.DmaDimProp[2U].StepSize.Mask);
 
 	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterCurr =
-			XAie_GetField(BdWord[6U],
+			(u8)XAie_GetField(BdWord[6U],
 				BdProp->AddrMode->AieMlMultiDimAddr.IterCurr.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.IterCurr.Mask);
-	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterDesc.Wrap = 1U +
+	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterDesc.Wrap = (u16)(1U +
 			XAie_GetField(BdWord[6U],
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.Wrap.Lsb,
-				BdProp->AddrMode->AieMlMultiDimAddr.Iter.Wrap.Mask);
+				BdProp->AddrMode->AieMlMultiDimAddr.Iter.Wrap.Mask));
 	DmaDesc->MultiDimDesc.AieMlMultiDimDesc.IterDesc.StepSize = 1U +
 			XAie_GetField(BdWord[6U],
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.StepSize.Lsb,
 				BdProp->AddrMode->AieMlMultiDimAddr.Iter.StepSize.Mask);
 
-	DmaDesc->BdEnDesc.ValidBd = XAie_GetField(BdWord[7U],
+	DmaDesc->BdEnDesc.ValidBd = (u8)XAie_GetField(BdWord[7U],
 				BdProp->BdEn->ValidBd.Lsb,
 				BdProp->BdEn->ValidBd.Mask);
-	DmaDesc->LockDesc.LockRelVal = XAie_GetField(BdWord[7U],
+	DmaDesc->LockDesc.LockRelVal = (s8)XAie_GetField(BdWord[7U],
 				BdProp->Lock->AieMlDmaLock.LckRelVal.Lsb,
 				BdProp->Lock->AieMlDmaLock.LckRelVal.Mask);
-	DmaDesc->LockDesc.LockRelId = XAie_GetField(BdWord[7U],
+	DmaDesc->LockDesc.LockRelId = (u16)XAie_GetField(BdWord[7U],
 				BdProp->Lock->AieMlDmaLock.LckRelId.Lsb,
 				BdProp->Lock->AieMlDmaLock.LckRelId.Mask);
-	DmaDesc->LockDesc.LockAcqId = XAie_GetField(BdWord[7U],
+	DmaDesc->LockDesc.LockAcqId = (u16)XAie_GetField(BdWord[7U],
 				BdProp->Lock->AieMlDmaLock.LckAcqId.Lsb,
 				BdProp->Lock->AieMlDmaLock.LckAcqId.Mask);
-	DmaDesc->LockDesc.LockAcqVal = XAie_GetField(BdWord[7U],
+	DmaDesc->LockDesc.LockAcqVal = (s8)XAie_GetField(BdWord[7U],
 				BdProp->Lock->AieMlDmaLock.LckAcqVal.Lsb,
 				BdProp->Lock->AieMlDmaLock.LckAcqVal.Mask);
-	DmaDesc->LockDesc.LockAcqEn = XAie_GetField(BdWord[7U],
+	DmaDesc->LockDesc.LockAcqEn = (u8)XAie_GetField(BdWord[7U],
 				BdProp->Lock->AieMlDmaLock.LckAcqEn.Lsb,
 				BdProp->Lock->AieMlDmaLock.LckAcqEn.Mask);
-	DmaDesc->BdEnDesc.UseNxtBd = XAie_GetField(BdWord[7U],
+	DmaDesc->BdEnDesc.UseNxtBd = (u8)XAie_GetField(BdWord[7U],
 				BdProp->BdEn->UseNxtBd.Lsb,
 				BdProp->BdEn->UseNxtBd.Mask);
-	DmaDesc->BdEnDesc.NxtBd = XAie_GetField(BdWord[7U],
+	DmaDesc->BdEnDesc.NxtBd = (u8)XAie_GetField(BdWord[7U],
 				BdProp->BdEn->NxtBd.Lsb,
 				BdProp->BdEn->NxtBd.Mask);
-	DmaDesc->TlastSuppress = XAie_GetField(BdWord[7U],
+	DmaDesc->TlastSuppress = (u8)XAie_GetField(BdWord[7U],
 				BdProp->BdEn->TlastSuppress.Lsb,
 				BdProp->BdEn->TlastSuppress.Mask);
 

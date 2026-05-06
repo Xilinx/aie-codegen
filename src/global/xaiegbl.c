@@ -369,7 +369,7 @@ AieRC XAie_SoftPartitionInitialize(XAie_DevInst *DevInst, XAie_PartInitOpts *Opt
 				XAie_LocType Loc;
 				u32 ColClockStatus;
 
-				Loc = XAie_TileLoc((u8)C, 1U);
+				Loc = XAie_TileLoc(C, 1);
 				ColClockStatus = _XAie_GetTileBitPosFromLoc(DevInst, Loc);
 				_XAie_SetBitInBitmap(DevInst->DevOps->TilesInUse,
 					       ColClockStatus, DevInst->NumRows - 1);
@@ -392,7 +392,7 @@ AieRC XAie_SoftPartitionInitialize(XAie_DevInst *DevInst, XAie_PartInitOpts *Opt
 				XAie_LocType Loc;
 				u32 ColClockStatus;
 
-				Loc = XAie_TileLoc((u8)C, 1U);
+				Loc = XAie_TileLoc(C, 1);
 				ColClockStatus = _XAie_GetTileBitPosFromLoc(DevInst, Loc);
 				_XAie_ClrBitInBitmap(DevInst->DevOps->TilesInUse,
 					       ColClockStatus, DevInst->NumRows - 1);

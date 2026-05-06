@@ -286,13 +286,13 @@ AieRC XAie_SetTimerResetEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	/* check if the event passed as input is corresponding to the module */
-	if((u32)Event < EvntMod->EventMin || (u32)Event > EvntMod->EventMax) {
+	if(Event < EvntMod->EventMin || Event > EvntMod->EventMax) {
 		XAIE_ERROR("Invalid Event id\n");
 		return XAIE_INVALID_ARGS;
 	}
 
 	/* Subtract the module offset from event number */
-	Event = (XAie_Events)((u32)Event - EvntMod->EventMin);
+	Event -= EvntMod->EventMin;
 
 	/* Getting the true event number from the enum to array mapping */
 	IntEvent = EvntMod->XAie_EventNumber[Event];

@@ -95,12 +95,12 @@ AieRC XAie_TraceEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
-	if((u32)Event < EvntMod->EventMin || (u32)Event > EvntMod->EventMax) {
+	if(Event < EvntMod->EventMin || Event > EvntMod->EventMax) {
 		XAIE_ERROR("Invalid event ID\n");
 		return XAIE_INVALID_ARGS;
 	}
 
-	Event = (XAie_Events)((u32)Event - EvntMod->EventMin);
+	Event -= EvntMod->EventMin;
 
 	MappedEvent = EvntMod->XAie_EventNumber[Event];
 	if(MappedEvent == XAIE_EVENT_INVALID) {
@@ -195,12 +195,12 @@ AieRC XAie_TraceStartEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
-	if((u32)StartEvent < EvntMod->EventMin || (u32)StartEvent > EvntMod->EventMax) {
+	if(StartEvent < EvntMod->EventMin || StartEvent > EvntMod->EventMax) {
 		XAIE_ERROR("Invalid event ID\n");
 		return XAIE_INVALID_ARGS;
 	}
 
-	StartEvent = (XAie_Events)((u32)StartEvent - EvntMod->EventMin);
+	StartEvent -= EvntMod->EventMin;
 
 	MappedEvent = EvntMod->XAie_EventNumber[StartEvent];
 	if(MappedEvent == XAIE_EVENT_INVALID) {
@@ -281,12 +281,12 @@ AieRC XAie_TraceStopEvent(XAie_DevInst *DevInst, XAie_LocType Loc,
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
-	if((u32)StopEvent < EvntMod->EventMin || (u32)StopEvent > EvntMod->EventMax) {
+	if(StopEvent < EvntMod->EventMin || StopEvent > EvntMod->EventMax) {
 		XAIE_ERROR("Invalid event ID\n");
 		return XAIE_INVALID_ARGS;
 	}
 
-	StopEvent = (XAie_Events)((u32)StopEvent - EvntMod->EventMin);
+	StopEvent -= EvntMod->EventMin;
 
 	MappedEvent = EvntMod->XAie_EventNumber[StopEvent];
 	if(MappedEvent == XAIE_EVENT_INVALID) {
@@ -674,15 +674,15 @@ AieRC XAie_TraceControlConfig(XAie_DevInst *DevInst, XAie_LocType Loc,
 		EvntMod = &DevInst->DevProp.DevMod[TileType].EvntMod[Module];
 	}
 
-	if(((u32)StopEvent < EvntMod->EventMin || (u32)StopEvent > EvntMod->EventMax) ||
-			((u32)StartEvent < EvntMod->EventMin ||
-			 (u32)StartEvent > EvntMod->EventMax)) {
+	if((StopEvent < EvntMod->EventMin || StopEvent > EvntMod->EventMax) ||
+			(StartEvent < EvntMod->EventMin ||
+			 StartEvent > EvntMod->EventMax)) {
 		XAIE_ERROR("Invalid event ID\n");
 		return XAIE_INVALID_ARGS;
 	}
 
-	StartEvent = (XAie_Events)((u32)StartEvent - EvntMod->EventMin);
-	StopEvent = (XAie_Events)((u32)StopEvent - EvntMod->EventMin);
+	StartEvent -= EvntMod->EventMin;
+	StopEvent -= EvntMod->EventMin;
 	MappedStartEvent = EvntMod->XAie_EventNumber[StartEvent];
 	MappedStopEvent = EvntMod->XAie_EventNumber[StopEvent];
 

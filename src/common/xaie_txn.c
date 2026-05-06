@@ -2004,9 +2004,9 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 
 			if((LoadSeqCount != 0) && (LoadSeqCountPtr != NULL))
 			{
-				*LoadSeqCountPtr = (u8)(LoadSeqCount & 0xFFU);
-				*(LoadSeqCountPtr + 1) = (u8)((LoadSeqCount & 0xFF00U) >> 8);
-				*(LoadSeqCountPtr + 2) = (u8)((LoadSeqCount & 0xFF0000U) >> 16);
+				*LoadSeqCountPtr = LoadSeqCount & 0xFF;
+				*(LoadSeqCountPtr + 1) = (LoadSeqCount & 0xFF00) >> 8;
+				*(LoadSeqCountPtr + 2) = (LoadSeqCount & 0xFF0000) >> 16;
 			}
 			else if (LoadSeqCountPtr == NULL)
 			{
@@ -2705,9 +2705,9 @@ u8* _XAie_TxnExportSerialized_opt(XAie_DevInst *DevInst, u8 NumConsumers,
 
 			if ((LoadSeqCount != 0) && (LoadSeqCountPtr != NULL))
 			{
-				*LoadSeqCountPtr = (u8)(LoadSeqCount & 0xFFU);
-				*(LoadSeqCountPtr + 1) = (u8)((LoadSeqCount & 0xFF00U) >> 8);
-				*(LoadSeqCountPtr + 2) = (u8)((LoadSeqCount & 0xFF0000U) >> 16);
+				*LoadSeqCountPtr = LoadSeqCount & 0xFF;
+				*(LoadSeqCountPtr + 1) = (LoadSeqCount & 0xFF00) >> 8;
+				*(LoadSeqCountPtr + 2) = (LoadSeqCount & 0xFF0000) >> 16;
 			}
 			else if (LoadSeqCountPtr == NULL)
 			{

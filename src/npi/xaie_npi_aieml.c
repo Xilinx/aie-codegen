@@ -87,8 +87,7 @@ static AieRC _XAieMl_NpiSetProtectedRegField(XAie_DevInst *DevInst,
 {
 	u32 CFirst, CLast, NumCols;
 
-	if ((Req->StartCol + Req->NumCols) >
-		    ((u32)DevInst->StartCol + (u32)DevInst->NumCols) ||
+	if ((Req->StartCol + Req->NumCols) > (DevInst->StartCol + DevInst->NumCols) ||
 	    (Req->StartCol != 0U  && Req->NumCols == 0U)) {
 		XAIE_ERROR("Invalid columns (%u, %u) for protected regs.\n",
 				Req->StartCol, Req->NumCols);

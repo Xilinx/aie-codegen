@@ -427,14 +427,14 @@ static AieRC _XAie_SetInterLeavingMode(XAie_DevInst *DevInst,
 static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enable)
 {
 	AieRC RC = XAIE_OK;
-	u64 RegAddr = 0ULL;
+	u64 RegAddr;
 	const XAie_MemCtrlMod *MCtrlMod = XAIE_NULL;
 	u8 C, R;
 
 	for(C = 0; C < DevInst->NumCols; C++) {
 		/* Issue #5462: Use u32 for loop variable to match comparison type */
 		for(u32 R_idx = DevInst->MemTileRowStart;
-		    R_idx < (u32)DevInst->MemTileRowStart + (u32)DevInst->MemTileNumRows;
+		    R_idx < (DevInst->MemTileRowStart + DevInst->MemTileNumRows);
 		    R_idx++) {
 			R = (u8)R_idx;
 			if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
@@ -474,7 +474,7 @@ static AieRC _XAie_PrivilegeConfigMemInterleaving(XAie_DevInst *DevInst, u8 Enab
 
 			/* Issue #5463: Use u32 for loop variable to match comparison type */
 			for (u32 R_idx2 = DevInst->AieTileRowStart;
-			     R_idx2 < (u32)DevInst->AieTileRowStart + (u32)DevInst->AieTileNumRows;
+			     R_idx2 < (DevInst->AieTileRowStart + DevInst->AieTileNumRows);
 			     R_idx2++) {
 				R = (u8)R_idx2;
 				MCtrlMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_AIETILE].MemCtrlInterLvMod;
@@ -792,11 +792,11 @@ AieRC _XAie_PrivilegeInitPart(XAie_DevInst *DevInst, XAie_PartInitOpts *Opts)
 			_XAie_PrivilegeSetPartProtectedRegs(DevInst, XAIE_DISABLE);
 			return RC;
 		}
-		for(u8 C = 0; C < DevInst->NumCols; C++) {
+		for(u32 C = 0; C < DevInst->NumCols; C++) {
 			XAie_LocType Loc;
 			u32 ColClockStatus;
 
-			Loc = XAie_TileLoc(C, 1U);
+			Loc = XAie_TileLoc(C, 1);
 			ColClockStatus = _XAie_GetTileBitPosFromLoc(DevInst, Loc);
 			_XAie_ClrBitInBitmap(DevInst->DevOps->TilesInUse,
 					ColClockStatus, DevInst->NumRows - 1);

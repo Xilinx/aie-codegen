@@ -1167,7 +1167,7 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 
 			char *data = buf->Data;
 			size_t size = buf->Size;
-			ssize_t Position = (ssize_t)size - (ssize_t)1;
+			long Position = size - 1;
 			int Count = 0;
 
 			while (Position >= 0) {
@@ -1178,25 +1178,24 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 					char new_ending[64];
 					snprintf(new_ending, sizeof(new_ending), " 0x%x, 0, 0\n", Datalength);
 
-					size_t newline_pos = (size_t)Position + 1U;
+					size_t newline_pos = Position + 1;
 					while (newline_pos < size && data[newline_pos] != '\n') {
 						newline_pos++;
 					}
 
 					if (newline_pos < size) {
-						size_t new_size = (size_t)Position + 1U + strlen(new_ending);
+						size_t new_size = Position + 1 + strlen(new_ending);
 						data[Position + 1] = '\0';
 
 						if (new_size <= buf->Capacity) {
-							memcpy(data + Position + 1, new_ending,
-							       strlen(new_ending) + 1U);
+							strcpy(data + Position + 1, new_ending);
 							buf->Size = new_size;
 						}
 					}
 					break;
 				}
 
-				if (data[Position] == '\n' && Position != ((ssize_t)size - (ssize_t)1))
+				if (data[Position] == '\n' && Position != (long)(size - 1))
 					break;
 
 				Position--;
@@ -1212,7 +1211,7 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 		if (ControlCodeInst->ControlCodeDataBuf && ControlCodeInst->ControlCodeDataBuf->Data) {
 			char *data = ControlCodeInst->ControlCodeDataBuf->Data;
 			size_t size = ControlCodeInst->ControlCodeDataBuf->Size;
-			ssize_t Position = (ssize_t)size - (ssize_t)1;
+			long Position = size - 1;
 			int Count = 0;
 
 			/* Search backwards for the 3rd comma from the end */
@@ -1226,27 +1225,26 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 					snprintf(new_ending, sizeof(new_ending), " 0x%x, 0, 0\n", Datalength);
 
 					/* Find the newline after this position */
-					size_t newline_pos = (size_t)Position + 1U;
+					size_t newline_pos = Position + 1;
 					while (newline_pos < size && data[newline_pos] != '\n') {
 						newline_pos++;
 					}
 
 					if (newline_pos < size) {
 						/* Update the buffer - keep everything up to Position+1, replace with new ending */
-						size_t new_size = (size_t)Position + 1U + strlen(new_ending);
+						size_t new_size = Position + 1 + strlen(new_ending);
 						data[Position + 1] = '\0'; /* Temporarily terminate */
 
 						/* Ensure we have enough capacity */
 						if (new_size <= ControlCodeInst->ControlCodeDataBuf->Capacity) {
-							memcpy(data + Position + 1, new_ending,
-							       strlen(new_ending) + 1U);
+							strcpy(data + Position + 1, new_ending);
 							ControlCodeInst->ControlCodeDataBuf->Size = new_size;
 						}
 					}
 					break;
 				}
 
-				if (data[Position] == '\n' && Position != ((ssize_t)size - (ssize_t)1))
+				if (data[Position] == '\n' && Position != (long)(size - 1))
 					break;
 
 				Position--;
@@ -1257,7 +1255,7 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 		if (ControlCodeInst->DebugAsmDataBuf0 && ControlCodeInst->DebugAsmDataBuf0->Data) {
 			char *data = ControlCodeInst->DebugAsmDataBuf0->Data;
 			size_t size = ControlCodeInst->DebugAsmDataBuf0->Size;
-			ssize_t Position = (ssize_t)size - (ssize_t)1;
+			long Position = size - 1;
 			int Count = 0;
 
 			/* Search backwards for the 3rd comma from the end */
@@ -1271,27 +1269,26 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 					snprintf(new_ending, sizeof(new_ending), " 0x%x, 0, 0\n", Datalength);
 
 					/* Find the newline after this position */
-					size_t newline_pos = (size_t)Position + 1U;
+					size_t newline_pos = Position + 1;
 					while (newline_pos < size && data[newline_pos] != '\n') {
 						newline_pos++;
 					}
 
 					if (newline_pos < size) {
 						/* Update the buffer - keep everything up to Position+1, replace with new ending */
-						size_t new_size = (size_t)Position + 1U + strlen(new_ending);
+						size_t new_size = Position + 1 + strlen(new_ending);
 						data[Position + 1] = '\0'; /* Temporarily terminate */
 
 						/* Ensure we have enough capacity */
 						if (new_size <= ControlCodeInst->DebugAsmDataBuf0->Capacity) {
-							memcpy(data + Position + 1, new_ending,
-							       strlen(new_ending) + 1U);
+							strcpy(data + Position + 1, new_ending);
 							ControlCodeInst->DebugAsmDataBuf0->Size = new_size;
 						}
 					}
 					break;
 				}
 
-				if (data[Position] == '\n' && Position != ((ssize_t)size - (ssize_t)1))
+				if (data[Position] == '\n' && Position != (long)(size - 1))
 					break;
 
 				Position--;
@@ -1300,66 +1297,60 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 	}
 	/* Handle file mode (works in both file-only and dual mode) */
 	if (ControlCodeInst->ControlCodedatafp) {
+		long FileSize = ftell(ControlCodeInst->ControlCodedatafp);
+		long Position = FileSize - 1;
 		int Count = 0;
 		int Data;
 
-		long file_len = ftell(ControlCodeInst->ControlCodedatafp);
 		SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, 0, SEEK_END);
 
-		if (file_len >= 0L) {
-			ssize_t Position = (ssize_t)file_len - (ssize_t)1;
+		while (Position >= 0U) {
+			SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, Position, SEEK_SET);
+			Data = fgetc(ControlCodeInst->ControlCodedatafp);
 
-			while (Position >= 0) {
-				SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, (long)Position, SEEK_SET);
-				Data = fgetc(ControlCodeInst->ControlCodedatafp);
+			if (Data == ',')
+				Count++;
 
-				if (Data == ',')
-					Count++;
-
-				if (Count == 3) {
-					SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, (long)(Position + 1), SEEK_SET);
-					fprintf(ControlCodeInst->ControlCodedatafp, " 0x%x, 0, 0\n", Datalength);
-					break;
-				}
-
-				if (Data == '\n' && Position != ((ssize_t)file_len - (ssize_t)1))
-					break;
-
-				Position--;
+			if (Count == 3U) {
+				SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, Position + 1, SEEK_SET);
+				fprintf(ControlCodeInst->ControlCodedatafp, " 0x%x, 0, 0\n", Datalength);
+				break;
 			}
+
+			if (Data == '\n' && Position != FileSize - 1)
+				break;
+
+			Position--;
 		}
 
 		SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, 0, SEEK_END);
 	}
 
 	if (!ControlCodeInst->DisableDebugAsm && ControlCodeInst->DebugAsmFileData0) {
+		long FileSize = ftell(ControlCodeInst->DebugAsmFileData0);
+		long Position = FileSize - 1;
 		int Count = 0;
-		int Data;
+		char Data;
 
-		long file_len = ftell(ControlCodeInst->DebugAsmFileData0);
 		SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, 0, SEEK_END);
 
-		if (file_len >= 0L) {
-			ssize_t Position = (ssize_t)file_len - (ssize_t)1;
+		while (Position >= 0U) {
+			SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, Position, SEEK_SET);
+			Data = fgetc(ControlCodeInst->DebugAsmFileData0);
 
-			while (Position >= 0) {
-				SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, (long)Position, SEEK_SET);
-				Data = fgetc(ControlCodeInst->DebugAsmFileData0);
+			if (Data == ',')
+				Count++;
 
-				if (Data == ',')
-					Count++;
-
-				if (Count == 3) {
-					SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, (long)(Position + 1), SEEK_SET);
-					fprintf(ControlCodeInst->DebugAsmFileData0, " 0x%x, 0, 0\n", Datalength);
-					break;
-				}
-
-				if (Data == '\n' && Position != ((ssize_t)file_len - (ssize_t)1))
-					break;
-
-				Position--;
+			if (Count == 3U) {
+				SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, Position + 1, SEEK_SET);
+				fprintf(ControlCodeInst->DebugAsmFileData0, " 0x%x, 0, 0\n", Datalength);
+				break;
 			}
+
+			if (Data == '\n' && Position != FileSize - 1)
+				break;
+
+			Position--;
 		}
 
 		SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, 0, SEEK_END);
@@ -2119,7 +2110,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 	u32 IterationSize;
 	u32 TempItrSize = 0;
 	u32 OpSize;
-	u32 NewPagePayloadSize = 0U;
+	u32 NewPagePayloadSize;
 	u64 AdjustedOff = 0;
 	u64 NewPageRegOff = 0;
 	u64 CumilativeRegOff = 0;
@@ -3152,15 +3143,13 @@ AieRC XAie_ControlCodeRelAcqSync(XAie_DevInst *DevInst, const XAie_LockMod *Lock
 }
 
 static inline AieRC _XAie_SetLoadCoresLabel(XAie_ControlCodeIO *ControlCodeInst, const char* Label) {
-	size_t label_len = strlen(Label) + 1U;
-
 	free(ControlCodeInst->LoadCoresLabel);
-	ControlCodeInst->LoadCoresLabel = (char *)calloc(label_len, sizeof(char));
+	ControlCodeInst->LoadCoresLabel = (char *)calloc(strlen(Label) + 1, sizeof(char));
 	if (ControlCodeInst->LoadCoresLabel == NULL) {
 		XAIE_ERROR("Memory allocation failed\n");
 		return XAIE_ERR;
 	}
-	memcpy(ControlCodeInst->LoadCoresLabel, Label, label_len);
+	strcpy(ControlCodeInst->LoadCoresLabel, Label);
 	return XAIE_OK;
 }
 
@@ -3367,14 +3356,12 @@ static inline AieRC _XAie_LoadCoresCacheAdd(XAie_LoadCoresCache *Cache, u32 Uniq
 		Cache->Capacity = newCapacity;
 	}
 	Cache->Entries[Cache->Count].UniqueCoreElfId = UniqueCoreElfId;
-	size_t label_len = strlen(Label) + 1U;
-
-	Cache->Entries[Cache->Count].Label = (char *)calloc(label_len, sizeof(char));
+	Cache->Entries[Cache->Count].Label = (char *)calloc(strlen(Label) + 1, sizeof(char));
 	if (Cache->Entries[Cache->Count].Label == NULL) {
 		XAIE_ERROR("Memory allocation failed for LoadCores cache label\n");
 		return XAIE_ERR;
 	}
-	memcpy(Cache->Entries[Cache->Count].Label, Label, label_len);
+	strcpy(Cache->Entries[Cache->Count].Label, Label);
 	Cache->Count++;
 	return XAIE_OK;
 }

@@ -1767,7 +1767,7 @@ void _XAie_ResetInUseBitMaps(XAie_DevInst *DevInst)
 	// Calculate the start bit position for each column and reset the bits in
 	// the global bitmaps.
 	for (int col = startCol; col < (startCol + numCols); col++) {
-		XAie_LocType ColStartLoc = { 0U, (u8)col };
+		XAie_LocType ColStartLoc = { 0, col };
 		u32 ColStartBitPos = _XAie_GetTileBitPosFromLoc(DevInst, ColStartLoc);
 		_XAie_ClrBitInBitmap(DevInst->DevOps->TilesInUse, ColStartBitPos, \
 			DevInst->NumRows);

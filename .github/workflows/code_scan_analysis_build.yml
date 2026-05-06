@@ -1,0 +1,75 @@
+name: Code Scan Build Analysis PR Check
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  code_scan_analysis_build:
+    runs-on: [self-hosted, linux, x64, jenkins-linux-runner]
+    # Note: Verify that a runner with all four labels is registered.
+    # Otherwise the job will sit in the queue forever with no error.
+    concurrency:
+      group: code-scan-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    env:
+      JENKINS_URL: "http://172.23.155.96:8080/"
+      JENKINS_USER: "ips-lab"
+
+    steps:
+      - name: Run code scan build analysis.
+        run: |
+          set -euo pipefail
+          jenkinsUrl="${{ env.JENKINS_URL }}"
+          user="${{ env.JENKINS_USER }}"
+          token=$(jq -r '.jenkins_token' /proj/xresults_dcs7/kishorer/my_work/config_files/jenkins_config.json)
+          auth="$user:$token"
+          base64AuthInfo=$(printf '%s' "$auth" | base64 -w 0)
+          headers="Authorization: Basic $base64AuthInfo"
+
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          REPO="${{ github.repository }}"
+          aiert_branch="${{ github.base_ref }}"
+          params="AIE_RT_BRANCH_NAME=$aiert_branch&PATCH_NUM=$PR_NUMBER"
+
+          # Trigger Jenkins job
+          response=$(curl -sS -i -X POST "$jenkinsUrl/job/code_analysis_scan_build/buildWithParameters?$params" -H "$headers")
+          http_code=$(printf '%s' "$response" | awk 'NR==1{print $2}')
+          [ "$http_code" = "201" ] || { echo "Jenkins trigger failed with HTTP $http_code" >&2; exit 1; }
+
+          queueUrl=$(printf '%s' "$response" | awk 'BEGIN{IGNORECASE=1} /^Location:/ {print $2}' | tr -d '\r')
+          [ -n "$queueUrl" ] || { echo "Failed to extract queue URL from Jenkins response"; exit 1; }
+
+          # Poll for build URL (max 60 iterations * 5s = 5 minutes)
+          for i in $(seq 1 60); do
+            buildInfo=$(curl -s "$queueUrl/api/json" -H "$headers")
+            buildUrl=$(echo "$buildInfo" | jq -r '.executable.url // empty')
+            if [ -n "$buildUrl" ]; then
+              break
+            fi
+            echo "Waiting for job at $queueUrl to start..."
+            sleep 5
+          done
+          [ -n "$buildUrl" ] || { echo "Timed out waiting for Jenkins job to start" >&2; exit 1; }
+
+          # Wait for job to complete (max 360 iterations * 10s = 1 hour)
+          for i in $(seq 1 360); do
+            status=$(curl -s "$buildUrl/api/json" -H "$headers")
+            building=$(echo "$status" | jq -r '.building')
+            result=$(echo "$status" | jq -r '.result')
+            if [ "$building" = "false" ]; then
+              echo "Job completed with result: $result"
+              break
+            fi
+            echo "Waiting for job at $buildUrl to complete..."
+            sleep 10
+          done
+          [ "$building" = "false" ] || { echo "Timed out waiting for Jenkins job to complete" >&2; exit 1; }
+
+
+          if [ "$result" = "SUCCESS" ]; then
+            echo "✅ Code scan build analysis completed. PR is ready to merge."
+          else
+            echo "❌ Code scan build analysis failed (result: $result). PR will not be merged." >&2
+            exit 1
+          fi
+          

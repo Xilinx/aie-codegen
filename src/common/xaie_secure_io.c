@@ -74,7 +74,18 @@ FILE *_XAie_SecureFopen(const char *Path, const char *Mode)
 
 	/* Pure read opens ("r" / "rb") never create the file. */
 	if (Mode[0] == 'r' && strchr(Mode, '+') == NULL) {
+#ifdef _WIN32
+		FILE *Rf = NULL;
+		errno_t Rc = fopen_s(&Rf, Path, Mode);
+
+		if (Rc != 0) {
+			errno = (int)Rc;
+			return NULL;
+		}
+		return Rf;
+#else
 		return fopen(Path, Mode);
+#endif
 	}
 
 	int Update = (strchr(Mode, '+') != NULL);
@@ -114,7 +125,11 @@ FILE *_XAie_SecureFopen(const char *Path, const char *Mode)
 	}
 #endif
 
+#ifdef _WIN32
+	FILE *Fp = _fdopen(Fd, Mode);
+#else
 	FILE *Fp = fdopen(Fd, Mode);
+#endif
 	if (Fp == NULL) {
 		int Saved = errno;
 #ifdef _WIN32

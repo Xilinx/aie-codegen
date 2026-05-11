@@ -52,6 +52,18 @@ typedef SSIZE_T ssize_t;
 #define TEMP_ASM_FILE3    ".temp_data3.txt"
 #define TEMP_ASM_FILE4    ".temp_data4.txt"
 #define PAGE_SIZE_MAX	  8192
+
+/* Per-slice overhead pre-charged to UcPageSize / UcPageTextSize during PCJ
+ * buffering. Each slice will eventually be emitted as a START_COND_JOB_PREEMPT
+ * job on its own page, so it consumes page-header + EOF + START_JOB + END_JOB
+ * bytes on top of its content. Pre-charging makes the standard page-overflow
+ * checks correctly trigger a slice split. The text variant excludes the page
+ * header (which is not a text-section byte). */
+#define PCJ_SLICE_OVERHEAD_TOTAL \
+	(PAGE_HEADER_SIZE + ISA_OPSIZE_EOF + ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB)
+#define PCJ_SLICE_OVERHEAD_TEXT \
+	(ISA_OPSIZE_EOF + ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB)
+#define PCJ_SPLIT_INITIAL_CAPACITY 4U
 #define SHIM_BD_NUM_REGS  9
 #define MAX_LABELS_PER_ASM_FILE 1000
 #define FNAME_SIZE 100
@@ -264,23 +276,35 @@ typedef struct {
 } XAie_SavedPageState;
 
 /**
- * XAie_LoadCoresContext - Buffers for capturing LoadCores/LoadCoresCP content
+ * XAie_DeferredEmitContext - Buffers for deferring asm emission
  *
- * When a LoadCores label is active (first use, not reused) or LoadCoresCP is
- * active, all instructions and data are captured in these buffers instead of
- * going to the main/global files. On LoadCoresEnd/LoadCoresCPEnd, the buffered
- * content is emitted in the correct order.
+ * Used by features that need to capture some span of generated code (and
+ * optionally its data sections) in memory and emit it later, after a
+ * decision based on the captured size or label uniqueness. Today three
+ * features share this container:
+ *   - LoadCores: buffers a full label (multiple inner jobs allowed) so the
+ *     outer page can be split around it.
+ *   - LoadCoresCP: buffers a single LOAD_CORES_CP job so its size can be
+ *     checked against the page limit before emit.
+ *   - Preemption Conditional Job: buffers a PCJ body so it can be emitted
+ *     in-place / on a fresh page / split across N back-to-back PCJs at
+ *     page boundaries (AIESW-32036).
+ *
+ * Not every consumer uses every buffer slot — LoadCoresCP and PCJ pass
+ * data targets through to the global sections and only redirect the
+ * instruction (and debug-instruction) buffers. UniqueCoreElfId is only
+ * meaningful for LoadCores / LoadCoresCP.
  */
 typedef struct {
-	XAie_MemBuffer *InstructionBuffer;      /* Instructions within the label (CONTROLCODE) */
-	XAie_MemBuffer *DataBuffer;             /* Data section for the label (CONTROLCODEDATA) */
-	XAie_MemBuffer *DataBuffer2;            /* Data section 2 for the label (CONTROLCODEDATA2) */
+	XAie_MemBuffer *InstructionBuffer;      /* Instructions (CONTROLCODE) */
+	XAie_MemBuffer *DataBuffer;             /* Data section (CONTROLCODEDATA) */
+	XAie_MemBuffer *DataBuffer2;            /* Data section 2 (CONTROLCODEDATA2) */
 	XAie_MemBuffer *DebugInstructionBuffer; /* Debug asm instructions (DEBUGASM) */
 	XAie_MemBuffer *DebugDataBuffer0;       /* Debug asm data 0 (DEBUGASMDATA0) */
 	XAie_MemBuffer *DebugDataBuffer1;       /* Debug asm data 1 (DEBUGASMDATA1) */
 	XAie_SavedPageState SavedState;         /* Outer page state snapshot */
 	u32 UniqueCoreElfId;
-} XAie_LoadCoresContext;
+} XAie_DeferredEmitContext;
 
 typedef struct {
 	XAie_DevInst *DevInst;
@@ -337,9 +361,29 @@ typedef struct {
 	u8 IsLoadCoresActive;          /* 1 when between LoadCoresStart/LoadCoresEnd, 0 otherwise */
 	u8 IsLoadCoresReused;          /* 1 when current LoadCores block is a label reuse (no body allowed) */
 	XAie_LoadCoresCache* LoadCoresCache; /* Cache of seen (UniqueCoreElfId, Label) pairs for label reuse */
-	XAie_LoadCoresContext* LoadCoresContext; /* Buffers for capturing LoadCores label content */
+	XAie_DeferredEmitContext* LoadCoresContext; /* Buffers for capturing LoadCores label content */
 	u8 IsLoadCoresCPActive;        /* 1 when between LoadCoresCPStart/LoadCoresCPEnd, 0 otherwise */
-	XAie_LoadCoresContext* LoadCoresCPContext; /* Buffers for capturing LoadCoresCP job content */
+	XAie_DeferredEmitContext* LoadCoresCPContext; /* Buffers for capturing LoadCoresCP job content */
+
+	/* Preemption Conditional Job (PCJ) buffering state. When the user starts
+	 * a job with XAIE_START_COND_JOB_PREEMPT, all instructions are captured
+	 * in CondJobPreemptContext->InstructionBuffer / DebugInstructionBuffer
+	 * (data passes through to the global data sections). On EndJob the
+	 * buffered content is sliced and emitted as one or more back-to-back
+	 * START_COND_JOB_PREEMPT jobs so that no .eop ever lands inside a PCJ. */
+	u8 IsCondJobPreemptActive;
+	XAie_DeferredEmitContext* CondJobPreemptContext;
+	/* Split points recorded whenever a page-overflow would have fired during
+	 * PCJ buffering. Each entry captures the InstructionBuffer offset, the
+	 * parallel DebugInstructionBuffer offset, and the slice's accumulated
+	 * (text, total) sizes — enough to emit each slice with correct page
+	 * accounting in _XAie_EmitBufferedCondJobPreempt. */
+	size_t* CondJobPreemptSplitInstrOffsets;
+	size_t* CondJobPreemptSplitDebugOffsets;
+	u32*    CondJobPreemptSplitTextSizes;
+	u32*    CondJobPreemptSplitTotalSizes;
+	u32     CondJobPreemptSplitCount;
+	u32     CondJobPreemptSplitCapacity;
 } XAie_ControlCodeIO;
 
 /************************** Function Definitions *****************************/
@@ -354,6 +398,13 @@ static inline void _XAie_LoadCoresContextFree(XAie_ControlCodeIO *ControlCodeIns
 static inline AieRC _XAie_EmitLoadCoresBuffer(XAie_ControlCodeIO *ControlCodeInst,
 		XAie_MemBuffer *SrcBuffer, FILE *TargetFile, XAie_MemBuffer *TargetMemBuf,
 		const char *ErrorMsg);
+static inline AieRC _XAie_EmitLoadCoresBufferSlice(XAie_ControlCodeIO *ControlCodeInst,
+		const char *SrcData, size_t SrcSize, FILE *TargetFile,
+		XAie_MemBuffer *TargetMemBuf, const char *ErrorMsg);
+static inline AieRC _XAie_PCJContextInit(XAie_ControlCodeIO *ControlCodeInst);
+static inline void  _XAie_PCJStateFree(XAie_ControlCodeIO *ControlCodeInst);
+static inline AieRC _XAie_PCJRecordSplitPoint(XAie_ControlCodeIO *ControlCodeInst);
+static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeInst);
 
 /*****************************************************************************/
 /**
@@ -630,7 +681,7 @@ static AieRC _XAie_LabelMapTeardown(XAie_LabelMap *Map)
 *
 *******************************************************************************/
 static inline XAie_MemBuffer* _XAie_GetContextBuffer(
-		XAie_LoadCoresContext *ctx, XAie_FileTarget FileTarget) {
+		XAie_DeferredEmitContext *ctx, XAie_FileTarget FileTarget) {
 	switch(FileTarget) {
 		case XAIE_FILE_TARGET_CONTROLCODE:      return ctx->InstructionBuffer;
 		case XAIE_FILE_TARGET_CONTROLCODEDATA:  return ctx->DataBuffer;
@@ -659,7 +710,7 @@ static inline XAie_MemBuffer* _XAie_GetContextBuffer(
 *
 *******************************************************************************/
 static inline XAie_MemBuffer* _XAie_GetContextInstructionBuffer(
-		XAie_LoadCoresContext *ctx, XAie_FileTarget FileTarget) {
+		XAie_DeferredEmitContext *ctx, XAie_FileTarget FileTarget) {
 	switch(FileTarget) {
 		case XAIE_FILE_TARGET_CONTROLCODE: return ctx->InstructionBuffer;
 		case XAIE_FILE_TARGET_DEBUGASM:    return ctx->DebugInstructionBuffer;
@@ -685,16 +736,21 @@ static int _XAie_ControlCodePrintf(XAie_ControlCodeIO *ControlCodeInst, XAie_Fil
 
 	va_start(args, fmt);
 
-	/* Redirect to LoadCores/LoadCoresCP context buffers if active.
+	/* Redirect to LoadCores/LoadCoresCP/PCJ context buffers if active.
 	 * LoadCores redirects ALL targets (instructions + data).
-	 * LoadCoresCP redirects only instruction targets; data goes to global sections. */
-	XAie_LoadCoresContext *activeCtx = NULL;
+	 * LoadCoresCP and PCJ redirect only instruction targets; data goes to
+	 * global sections. */
+	XAie_DeferredEmitContext *activeCtx = NULL;
 	int instructionsOnly = 0;
 	if (ControlCodeInst->IsLoadCoresActive && !ControlCodeInst->IsLoadCoresReused &&
 	    ControlCodeInst->LoadCoresContext != NULL) {
 		activeCtx = ControlCodeInst->LoadCoresContext;
 	} else if (ControlCodeInst->IsLoadCoresCPActive && ControlCodeInst->LoadCoresCPContext != NULL) {
 		activeCtx = ControlCodeInst->LoadCoresCPContext;
+		instructionsOnly = 1;
+	} else if (ControlCodeInst->IsCondJobPreemptActive &&
+	           ControlCodeInst->CondJobPreemptContext != NULL) {
+		activeCtx = ControlCodeInst->CondJobPreemptContext;
 		instructionsOnly = 1;
 	}
 
@@ -813,15 +869,20 @@ static int _XAie_ControlCodeSeekAndOverwrite(XAie_ControlCodeIO *ControlCodeInst
 	size_t rep_len = strlen(Replacement);
 	int result = 0;
 
-	/* Redirect to LoadCores/LoadCoresCP context buffers if active.
-	 * LoadCores redirects ALL targets; LoadCoresCP only instruction targets. */
-	XAie_LoadCoresContext *activeCtx = NULL;
+	/* Redirect to LoadCores/LoadCoresCP/PCJ context buffers if active.
+	 * LoadCores redirects ALL targets; LoadCoresCP and PCJ only instruction
+	 * targets. */
+	XAie_DeferredEmitContext *activeCtx = NULL;
 	int instructionsOnly = 0;
 	if (ControlCodeInst->IsLoadCoresActive && !ControlCodeInst->IsLoadCoresReused &&
 	    ControlCodeInst->LoadCoresContext != NULL) {
 		activeCtx = ControlCodeInst->LoadCoresContext;
 	} else if (ControlCodeInst->IsLoadCoresCPActive && ControlCodeInst->LoadCoresCPContext != NULL) {
 		activeCtx = ControlCodeInst->LoadCoresCPContext;
+		instructionsOnly = 1;
+	} else if (ControlCodeInst->IsCondJobPreemptActive &&
+	           ControlCodeInst->CondJobPreemptContext != NULL) {
+		activeCtx = ControlCodeInst->CondJobPreemptContext;
 		instructionsOnly = 1;
 	}
 
@@ -938,11 +999,12 @@ static inline void _XAie_ControlCodePageInfoPrintf(
 		XAie_ControlCodeIO *ControlCodeInst,
 		XAie_FileTarget DebugTarget)
 {
-	/* Suppress page info during LoadCoresCP buffering — the isolated
+	/* Suppress page info during LoadCoresCP/PCJ buffering — the isolated
 	 * counters (starting at 0) would produce misleading comments.
-	 * The correct page info is emitted by LoadCoresCPEnd after the
-	 * outer page state is restored. */
-	if (ControlCodeInst->IsLoadCoresCPActive) return;
+	 * The correct page info is emitted by LoadCoresCPEnd / PCJ EndJob
+	 * after the outer page state is restored. */
+	if (ControlCodeInst->IsLoadCoresCPActive ||
+	    ControlCodeInst->IsCondJobPreemptActive) return;
 
 	_XAie_ControlCodePrintf(ControlCodeInst, DebugTarget,
 		";Page#: %d, PageSize: %d, TextSecSize: %d, DataAligner: %d\n",
@@ -1149,7 +1211,7 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 	 * UseInMemoryBuffers. Handle this case first and return early since file
 	 * pointers are not involved in LoadCores data output.
 	 * Note: LoadCoresCP is NOT handled here — its data goes to global sections. */
-	XAie_LoadCoresContext *activeCtx = NULL;
+	XAie_DeferredEmitContext *activeCtx = NULL;
 	if (ControlCodeInst->IsLoadCoresActive && !ControlCodeInst->IsLoadCoresReused &&
 	    ControlCodeInst->LoadCoresContext != NULL) {
 		activeCtx = ControlCodeInst->LoadCoresContext;
@@ -1492,6 +1554,18 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 		ControlCodeInst->UcbdLabelNum++;
 	}
 
+	/* PCJ trigger point: the user has just called XAie_EndJob to terminate
+	 * the buffered preemption-conditional job. Any pending WAIT_UC_DMA /
+	 * UC_DMA_WRITE_DES_SYNC was already routed into the PCJ buffer above.
+	 * Emit the buffered slices wrapped in START_COND_JOB_PREEMPT/END_JOB
+	 * and free the context. The regular END_JOB tail below is skipped. */
+	if (ControlCodeInst->IsCondJobPreemptActive) {
+		if (_XAie_EmitBufferedCondJobPreempt(ControlCodeInst) != XAIE_OK) {
+			ControlCodeInst->ErrorState = 1;
+		}
+		return;
+	}
+
 	if(ControlCodeInst->IsPageOpen && ControlCodeInst->IsJobOpen) {
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "END_JOB\n\n");
 		XAIE_DBG("Writing END_JOB to DebugAsmFile (fp=%p)\n", (void*)ControlCodeInst->DebugAsmFile);
@@ -1519,6 +1593,21 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 static void _XAie_EndPage(XAie_ControlCodeIO  *ControlCodeInst) {
 
 	if(ControlCodeInst->IsPageOpen) {
+		/* During PCJ buffering, an opcode handler reached the page
+		 * boundary. Don't end the (buffered) job and don't emit `.eop`
+		 * — the buffer must remain a clean stream of opcodes that we
+		 * slice on EndJob. Just record the split point here and reset
+		 * the page tracking so the next slice starts fresh. The actual
+		 * .eop between the emitted slices is written at EndJob time. */
+		if (ControlCodeInst->IsCondJobPreemptActive) {
+			if (_XAie_PCJRecordSplitPoint(ControlCodeInst) != XAIE_OK) {
+				ControlCodeInst->ErrorState = 1;
+			}
+			ControlCodeInst->IsPageOpen = 0;
+			ControlCodeInst->PageId++;
+			return;
+		}
+
 		_XAie_EndJob(ControlCodeInst);
 
 		/* When LoadCoresCP is active, suppress .eop emission — the
@@ -1565,6 +1654,17 @@ static void _XAie_StartNewPage(XAie_ControlCodeIO  *ControlCodeInst) {
 
 	ControlCodeInst->UcPageTextSize	 = ISA_OPSIZE_EOF;
 	ControlCodeInst->UcPageSize 	 = PAGE_HEADER_SIZE + ISA_OPSIZE_EOF;
+
+	/* During PCJ buffering each "page" represents one slice that will
+	 * eventually be wrapped in START_JOB/END_JOB framing at emission time.
+	 * Pre-account for that framing here so the per-opcode page-overflow
+	 * checks (UcPageSize + opSize > PageSizeMax) correctly fire when the
+	 * slice can no longer fit a fresh page. */
+	if (ControlCodeInst->IsCondJobPreemptActive) {
+		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB;
+		ControlCodeInst->UcPageSize     += ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB;
+	}
+
 	ControlCodeInst->CombineCommands = 0;
 	ControlCodeInst->IsPageOpen 	 = 1;
 	ControlCodeInst->LabelMatchFound = 0;
@@ -1590,11 +1690,71 @@ static void _XAie_StartNewJob(XAie_ControlCodeIO  *ControlCodeInst,
 		return;
 	}
 
-	/* When LoadCoresCP is active, suppress job framing — the outer
-	 * LoadCoresCPEnd wraps everything in a single job. Just ensure
-	 * we have a page open, recompute DataAligner, and mark the job
-	 * as open for state tracking. */
-	if (ControlCodeInst->IsLoadCoresCPActive) {
+	/* Preemption Conditional Job (PCJ) buffering. The job body is captured
+	 * in CondJobPreemptContext until EndJob is called, at which point we
+	 * decide where to place it (current page, new page, or split across
+	 * back-to-back jobs at page boundaries). Nothing is emitted here. */
+	if (JobType == XAIE_START_COND_JOB_PREEMPT) {
+		if (ControlCodeInst->IsCondJobPreemptActive) {
+			XAIE_ERROR("StartNewJob(PCJ) called while a previous PCJ is still active\n");
+			ControlCodeInst->ErrorState = 1;
+			return;
+		}
+		if (ControlCodeInst->IsLoadCoresActive ||
+		    ControlCodeInst->IsLoadCoresCPActive) {
+			XAIE_ERROR("StartNewJob(PCJ) is not allowed inside LoadCores/LoadCoresCP\n");
+			ControlCodeInst->ErrorState = 1;
+			return;
+		}
+
+		/* Close any open outer job so the PCJ starts cleanly on a fresh
+		 * job boundary. The closed END_JOB lands in the outer page. */
+		if (ControlCodeInst->IsJobOpen) {
+			_XAie_EndJob(ControlCodeInst);
+		}
+
+		if (_XAie_PCJContextInit(ControlCodeInst) != XAIE_OK) {
+			ControlCodeInst->ErrorState = 1;
+			return;
+		}
+
+		_XAie_SavePageState(ControlCodeInst,
+		                    &ControlCodeInst->CondJobPreemptContext->SavedState);
+
+		/* Reset to clean tracking. UcPageSize/UcPageTextSize are pre-biased
+		 * with one slice's worth of overhead (page header + EOF + START/END_JOB
+		 * framing) so the per-opcode overflow checks correctly detect when
+		 * the slice can no longer fit a fresh page. Slice content recorded
+		 * at split time is (UcPageSize - PCJ_SLICE_OVERHEAD).
+		 * IsPageOpen/IsJobOpen=1 prevents opcode handlers from auto-opening
+		 * a job during the buffered phase. Mirrors LoadCoresCPStart. */
+		ControlCodeInst->UcPageTextSize       = PCJ_SLICE_OVERHEAD_TEXT;
+		ControlCodeInst->UcPageSize           = PCJ_SLICE_OVERHEAD_TOTAL;
+		ControlCodeInst->DataAligner          = 0;
+		ControlCodeInst->NumShimBDsChained    = 0;
+		ControlCodeInst->CombinedMemWriteSize = 0;
+		ControlCodeInst->CalculatedNextRegOff = 0;
+		ControlCodeInst->PrevMemWriteType     = -1;
+		ControlCodeInst->CombineCommands      = 0;
+		ControlCodeInst->IsShimBd             = 0;
+		ControlCodeInst->Mode                 = 0;
+		ControlCodeInst->IsAdjacentMemWrite   = 0;
+		ControlCodeInst->PageBreak            = 0;
+		ControlCodeInst->LabelMatchFound      = 0;
+		ControlCodeInst->IsJobOpen            = 1;
+		ControlCodeInst->IsPageOpen           = 1;
+
+		ControlCodeInst->IsCondJobPreemptActive = 1;
+		return;
+	}
+
+	/* When LoadCoresCP or PCJ is active, suppress framing for any
+	 * non-PCJ StartNewJob — the outer LoadCoresCPEnd / PCJ EndJob wraps
+	 * everything in a single job. Just ensure we have a page open,
+	 * recompute DataAligner, and mark the job as open for state tracking.
+	 * (The PCJ branch above already handled JobType == PCJ.) */
+	if (ControlCodeInst->IsLoadCoresCPActive ||
+	    ControlCodeInst->IsCondJobPreemptActive) {
 		if (!ControlCodeInst->IsPageOpen) {
 			_XAie_StartNewPage(ControlCodeInst);
 		}
@@ -3190,7 +3350,7 @@ static inline AieRC _XAie_LoadCoresContextInit(XAie_ControlCodeIO *ControlCodeIn
 		return XAIE_ERR;
 	}
 
-	ControlCodeInst->LoadCoresContext = (XAie_LoadCoresContext *)calloc(1, sizeof(XAie_LoadCoresContext));
+	ControlCodeInst->LoadCoresContext = (XAie_DeferredEmitContext *)calloc(1, sizeof(XAie_DeferredEmitContext));
 	if (ControlCodeInst->LoadCoresContext == NULL) {
 		XAIE_ERROR("Memory allocation failed for LoadCoresContext\n");
 		return XAIE_ERR;
@@ -3198,7 +3358,7 @@ static inline AieRC _XAie_LoadCoresContextInit(XAie_ControlCodeIO *ControlCodeIn
 
 	/* Allocate all buffers up front; calloc zeroed the struct so any
 	 * NULL members are safe to pass to _XAie_MemBufferFree on cleanup. */
-	XAie_LoadCoresContext *ctx = ControlCodeInst->LoadCoresContext;
+	XAie_DeferredEmitContext *ctx = ControlCodeInst->LoadCoresContext;
 	ctx->InstructionBuffer      = _XAie_MemBufferInit();
 	ctx->DataBuffer             = _XAie_MemBufferInit();
 	ctx->DataBuffer2            = _XAie_MemBufferInit();
@@ -3232,7 +3392,7 @@ static inline AieRC _XAie_LoadCoresContextInit(XAie_ControlCodeIO *ControlCodeIn
 * @note		Internal only.
 *
 *******************************************************************************/
-static inline void _XAie_FreeLoadCoresContext(XAie_LoadCoresContext *Context) {
+static inline void _XAie_FreeDeferredEmitContext(XAie_DeferredEmitContext *Context) {
 	if (Context) {
 		_XAie_MemBufferFree(Context->InstructionBuffer);
 		_XAie_MemBufferFree(Context->DataBuffer);
@@ -3246,7 +3406,7 @@ static inline void _XAie_FreeLoadCoresContext(XAie_LoadCoresContext *Context) {
 
 static inline void _XAie_LoadCoresContextFree(XAie_ControlCodeIO *ControlCodeInst) {
 	if (ControlCodeInst->LoadCoresContext) {
-		_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresContext);
+		_XAie_FreeDeferredEmitContext(ControlCodeInst->LoadCoresContext);
 		ControlCodeInst->LoadCoresContext = NULL;
 	}
 }
@@ -3268,27 +3428,22 @@ static inline void _XAie_LoadCoresContextFree(XAie_ControlCodeIO *ControlCodeIns
 * @note		Internal only.
 *
 *******************************************************************************/
-static inline AieRC _XAie_EmitLoadCoresBuffer(XAie_ControlCodeIO *ControlCodeInst,
-                                               XAie_MemBuffer *SrcBuffer,
-                                               FILE *TargetFile,
-                                               XAie_MemBuffer *TargetMemBuf,
-                                               const char *ErrorMsg) {
-	if (!SrcBuffer || SrcBuffer->Size == 0) {
-		XAIE_ERROR("No instructions for LoadCores\n");
-		return XAIE_ERR;
+static inline AieRC _XAie_EmitLoadCoresBufferSlice(XAie_ControlCodeIO *ControlCodeInst,
+                                                    const char *SrcData,
+                                                    size_t SrcSize,
+                                                    FILE *TargetFile,
+                                                    XAie_MemBuffer *TargetMemBuf,
+                                                    const char *ErrorMsg) {
+	if (!SrcData || SrcSize == 0) {
+		return XAIE_OK;
 	}
 
-	/* Write to file if file pointer exists */
 	if (TargetFile) {
-		fwrite(SrcBuffer->Data, 1, SrcBuffer->Size, TargetFile);
+		fwrite(SrcData, 1, SrcSize, TargetFile);
 	}
 
-	/* Write to in-memory buffer if in-memory mode is active */
 	if (ControlCodeInst->UseInMemoryBuffers && TargetMemBuf) {
-		size_t needed = SrcBuffer->Size;
-
-		/* Grow target buffer if needed */
-		while (TargetMemBuf->Size + needed > TargetMemBuf->Capacity) {
+		while (TargetMemBuf->Size + SrcSize > TargetMemBuf->Capacity) {
 			size_t new_capacity = TargetMemBuf->Capacity * BUFFER_GROWTH_FACTOR;
 			char *new_data = (char*)realloc(TargetMemBuf->Data, new_capacity);
 			if (!new_data) {
@@ -3299,12 +3454,354 @@ static inline AieRC _XAie_EmitLoadCoresBuffer(XAie_ControlCodeIO *ControlCodeIns
 			TargetMemBuf->Capacity = new_capacity;
 		}
 
-		/* Copy data to target buffer */
-		memcpy(TargetMemBuf->Data + TargetMemBuf->Size, SrcBuffer->Data, needed);
-		TargetMemBuf->Size += needed;
+		memcpy(TargetMemBuf->Data + TargetMemBuf->Size, SrcData, SrcSize);
+		TargetMemBuf->Size += SrcSize;
 	}
 
 	return XAIE_OK;
+}
+
+static inline AieRC _XAie_EmitLoadCoresBuffer(XAie_ControlCodeIO *ControlCodeInst,
+                                               XAie_MemBuffer *SrcBuffer,
+                                               FILE *TargetFile,
+                                               XAie_MemBuffer *TargetMemBuf,
+                                               const char *ErrorMsg) {
+	if (!SrcBuffer || SrcBuffer->Size == 0) {
+		XAIE_ERROR("No instructions for LoadCores\n");
+		return XAIE_ERR;
+	}
+	return _XAie_EmitLoadCoresBufferSlice(ControlCodeInst, SrcBuffer->Data,
+	                                       SrcBuffer->Size, TargetFile,
+	                                       TargetMemBuf, ErrorMsg);
+}
+
+/*****************************************************************************/
+/**
+*
+* PCJ (Preemption Conditional Job) buffering helpers.
+*
+* These reuse the existing XAie_DeferredEmitContext type and free helper but
+* keep PCJ-specific allocation localised so that the LoadCores/LoadCoresCP
+* paths are unaffected.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static inline AieRC _XAie_PCJContextInit(XAie_ControlCodeIO *ControlCodeInst) {
+	if (ControlCodeInst->CondJobPreemptContext != NULL) {
+		XAIE_ERROR("CondJobPreemptContext already allocated\n");
+		return XAIE_ERR;
+	}
+
+	XAie_DeferredEmitContext *ctx =
+		(XAie_DeferredEmitContext *)calloc(1, sizeof(XAie_DeferredEmitContext));
+	if (ctx == NULL) {
+		XAIE_ERROR("Memory allocation failed for CondJobPreemptContext\n");
+		return XAIE_ERR;
+	}
+
+	ctx->InstructionBuffer = _XAie_MemBufferInit();
+	if (!ControlCodeInst->DisableDebugAsm) {
+		ctx->DebugInstructionBuffer = _XAie_MemBufferInit();
+	}
+
+	if (!ctx->InstructionBuffer ||
+	    (!ControlCodeInst->DisableDebugAsm && !ctx->DebugInstructionBuffer)) {
+		XAIE_ERROR("Memory allocation failed for CondJobPreemptContext buffers\n");
+		_XAie_FreeDeferredEmitContext(ctx);
+		return XAIE_ERR;
+	}
+
+	ControlCodeInst->CondJobPreemptContext = ctx;
+	return XAIE_OK;
+}
+
+static inline void _XAie_PCJStateFree(XAie_ControlCodeIO *ControlCodeInst) {
+	if (ControlCodeInst->CondJobPreemptContext) {
+		_XAie_FreeDeferredEmitContext(ControlCodeInst->CondJobPreemptContext);
+		ControlCodeInst->CondJobPreemptContext = NULL;
+	}
+	free(ControlCodeInst->CondJobPreemptSplitInstrOffsets);
+	free(ControlCodeInst->CondJobPreemptSplitDebugOffsets);
+	free(ControlCodeInst->CondJobPreemptSplitTextSizes);
+	free(ControlCodeInst->CondJobPreemptSplitTotalSizes);
+	ControlCodeInst->CondJobPreemptSplitInstrOffsets = NULL;
+	ControlCodeInst->CondJobPreemptSplitDebugOffsets = NULL;
+	ControlCodeInst->CondJobPreemptSplitTextSizes    = NULL;
+	ControlCodeInst->CondJobPreemptSplitTotalSizes   = NULL;
+	ControlCodeInst->CondJobPreemptSplitCount    = 0;
+	ControlCodeInst->CondJobPreemptSplitCapacity = 0;
+}
+
+/*
+ * Append one split point to the PCJ split-tracking arrays. Called from
+ * _XAie_EndPage when a page-overflow trigger fires while PCJ is active.
+ *
+ * Records:
+ *   - InstructionBuffer offset where the next slice should begin
+ *   - Parallel DebugInstructionBuffer offset
+ *   - Accumulated text and total size of the slice that just closed
+ *     (these mirror UcPageTextSize / UcPageSize at this moment, since
+ *     _XAie_EndPage has not yet reset them)
+ */
+static inline AieRC _XAie_PCJRecordSplitPoint(XAie_ControlCodeIO *ControlCodeInst) {
+	XAie_DeferredEmitContext *ctx = ControlCodeInst->CondJobPreemptContext;
+	if (ctx == NULL) {
+		XAIE_ERROR("PCJ split recorded with no active context\n");
+		return XAIE_ERR;
+	}
+
+	if (ControlCodeInst->CondJobPreemptSplitCount ==
+	    ControlCodeInst->CondJobPreemptSplitCapacity) {
+		const u32 old_cap = ControlCodeInst->CondJobPreemptSplitCapacity;
+		const u32 new_cap = old_cap == 0
+				? PCJ_SPLIT_INITIAL_CAPACITY
+				: old_cap * BUFFER_GROWTH_FACTOR;
+
+		/* All-or-nothing growth: allocate four fresh arrays first, then
+		 * copy and swap. This avoids the partial-realloc trap where one
+		 * realloc succeeds (and may have moved/freed the old block) while
+		 * another fails — leaving the four arrays at inconsistent
+		 * capacities and the freed pointer dangling. */
+		size_t *new_instr = (size_t*)malloc(new_cap * sizeof(size_t));
+		size_t *new_debug = (size_t*)malloc(new_cap * sizeof(size_t));
+		u32    *new_text  = (u32*)   malloc(new_cap * sizeof(u32));
+		u32    *new_total = (u32*)   malloc(new_cap * sizeof(u32));
+		if (!new_instr || !new_debug || !new_text || !new_total) {
+			free(new_instr); free(new_debug);
+			free(new_text);  free(new_total);
+			XAIE_ERROR("Failed to grow PCJ split arrays\n");
+			return XAIE_ERR;
+		}
+
+		if (old_cap > 0) {
+			memcpy(new_instr,
+			       ControlCodeInst->CondJobPreemptSplitInstrOffsets,
+			       ControlCodeInst->CondJobPreemptSplitCount * sizeof(size_t));
+			memcpy(new_debug,
+			       ControlCodeInst->CondJobPreemptSplitDebugOffsets,
+			       ControlCodeInst->CondJobPreemptSplitCount * sizeof(size_t));
+			memcpy(new_text,
+			       ControlCodeInst->CondJobPreemptSplitTextSizes,
+			       ControlCodeInst->CondJobPreemptSplitCount * sizeof(u32));
+			memcpy(new_total,
+			       ControlCodeInst->CondJobPreemptSplitTotalSizes,
+			       ControlCodeInst->CondJobPreemptSplitCount * sizeof(u32));
+		}
+
+		free(ControlCodeInst->CondJobPreemptSplitInstrOffsets);
+		free(ControlCodeInst->CondJobPreemptSplitDebugOffsets);
+		free(ControlCodeInst->CondJobPreemptSplitTextSizes);
+		free(ControlCodeInst->CondJobPreemptSplitTotalSizes);
+		ControlCodeInst->CondJobPreemptSplitInstrOffsets = new_instr;
+		ControlCodeInst->CondJobPreemptSplitDebugOffsets = new_debug;
+		ControlCodeInst->CondJobPreemptSplitTextSizes    = new_text;
+		ControlCodeInst->CondJobPreemptSplitTotalSizes   = new_total;
+		ControlCodeInst->CondJobPreemptSplitCapacity     = new_cap;
+	}
+
+	u32 idx = ControlCodeInst->CondJobPreemptSplitCount;
+	ControlCodeInst->CondJobPreemptSplitInstrOffsets[idx] =
+		ctx->InstructionBuffer ? ctx->InstructionBuffer->Size : 0;
+	ControlCodeInst->CondJobPreemptSplitDebugOffsets[idx] =
+		ctx->DebugInstructionBuffer ? ctx->DebugInstructionBuffer->Size : 0;
+	ControlCodeInst->CondJobPreemptSplitTextSizes[idx]  = ControlCodeInst->UcPageTextSize;
+	ControlCodeInst->CondJobPreemptSplitTotalSizes[idx] = ControlCodeInst->UcPageSize;
+	ControlCodeInst->CondJobPreemptSplitCount++;
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
+* Emit the buffered Preemption Conditional Job at user-EndJob time. Decides
+* between the three supported cases:
+*   1. Whole job fits in the current page → emit on current page.
+*   2. Whole job doesn't fit on current page → close current page (.eop) and
+*      emit on a fresh page. No regular jobs are ever inserted between the
+*      preceding work and the PCJ.
+*   3. Job exceeds page size → emit as N back-to-back PCJs at page boundaries
+*      using the split-points recorded during buffering. Each split is its
+*      own START_COND_JOB_PREEMPT job.
+*
+* @param	ControlCodeInst: ControlCode instance pointer
+*
+* @return	XAIE_OK on success, XAIE_ERR on failure
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeInst) {
+	XAie_DeferredEmitContext *captured = ControlCodeInst->CondJobPreemptContext;
+	if (captured == NULL) {
+		XAIE_ERROR("EmitBufferedCondJobPreempt: NULL context\n");
+		return XAIE_ERR;
+	}
+
+	/* Snapshot last-slice content sizes (subtract the per-slice overhead
+	 * pre-charged by StartNewJob/StartNewPage during buffering). */
+	const u32 lastSliceTextContent  =
+		ControlCodeInst->UcPageTextSize > PCJ_SLICE_OVERHEAD_TEXT
+			? ControlCodeInst->UcPageTextSize  - PCJ_SLICE_OVERHEAD_TEXT
+			: 0U;
+	const u32 lastSliceTotalContent =
+		ControlCodeInst->UcPageSize > PCJ_SLICE_OVERHEAD_TOTAL
+			? ControlCodeInst->UcPageSize - PCJ_SLICE_OVERHEAD_TOTAL
+			: 0U;
+	const u32 splitCount = ControlCodeInst->CondJobPreemptSplitCount;
+
+	/* Preserve monotonic counters that were incremented while data labels
+	 * were emitted to the global data sections during buffering. The plain
+	 * RestorePageState would roll them back and cause label collisions on
+	 * subsequent allocations. CompareLabelUpto / CompareLabelUptoWrite are
+	 * derived from the data label counters at end-of-page time and are used
+	 * by the label-reuse optimisation; if we restore them to pre-PCJ values
+	 * they'll be stale relative to the labels we just emitted. */
+	const u32 preservedUcbdLabelNum            = ControlCodeInst->UcbdLabelNum;
+	const u32 preservedUcbdDataNum             = ControlCodeInst->UcbdDataNum;
+	const u32 preservedUcDmaDataNum            = ControlCodeInst->UcDmaDataNum;
+	const u64 preservedTotalLabelsAllocated    = ControlCodeInst->TotalLabelsAllocated;
+	const u64 preservedTotalLabelsAllocatedW   = ControlCodeInst->TotalLabelsAllocatedWrite;
+	const u64 preservedBarrierId               = ControlCodeInst->BarrierId;
+	const u32 preservedHintMapId               = ControlCodeInst->HintMapId;
+	const u32 preservedCurrentDataLabel        = ControlCodeInst->CurrentDataLabel;
+	const u32 preservedCurrentDataBWLabel      = ControlCodeInst->CurrentDataBWLabel;
+	const int preservedCompareLabelUpto        = ControlCodeInst->CompareLabelUpto;
+	const int preservedCompareLabelUptoWrite   = ControlCodeInst->CompareLabelUptoWrite;
+
+	/* Deactivate PCJ so subsequent emits target the global output, then
+	 * restore the outer page/job state and reapply the preserved counters. */
+	ControlCodeInst->IsCondJobPreemptActive = 0;
+	const XAie_SavedPageState saved = captured->SavedState;
+	_XAie_RestorePageState(ControlCodeInst, &saved);
+	ControlCodeInst->UcbdLabelNum            = preservedUcbdLabelNum;
+	ControlCodeInst->UcbdDataNum             = preservedUcbdDataNum;
+	ControlCodeInst->UcDmaDataNum            = preservedUcDmaDataNum;
+	ControlCodeInst->TotalLabelsAllocated    = preservedTotalLabelsAllocated;
+	ControlCodeInst->TotalLabelsAllocatedWrite = preservedTotalLabelsAllocatedW;
+	ControlCodeInst->BarrierId               = preservedBarrierId;
+	ControlCodeInst->HintMapId               = preservedHintMapId;
+	ControlCodeInst->CurrentDataLabel        = preservedCurrentDataLabel;
+	ControlCodeInst->CurrentDataBWLabel      = preservedCurrentDataBWLabel;
+	ControlCodeInst->CompareLabelUpto        = preservedCompareLabelUpto;
+	ControlCodeInst->CompareLabelUptoWrite   = preservedCompareLabelUptoWrite;
+
+	AieRC RC = XAIE_OK;
+
+	for (u32 i = 0; i <= splitCount; i++) {
+		const size_t sliceStartOffset      = (i == 0)
+			? 0U
+			: ControlCodeInst->CondJobPreemptSplitInstrOffsets[i-1];
+		const size_t sliceStartDebugOffset = (i == 0)
+			? 0U
+			: ControlCodeInst->CondJobPreemptSplitDebugOffsets[i-1];
+		const size_t sliceEndOffset        = (i < splitCount)
+			? ControlCodeInst->CondJobPreemptSplitInstrOffsets[i]
+			: (captured->InstructionBuffer
+				? captured->InstructionBuffer->Size : 0U);
+		const size_t sliceEndDebugOffset   = (i < splitCount)
+			? ControlCodeInst->CondJobPreemptSplitDebugOffsets[i]
+			: (captured->DebugInstructionBuffer
+				? captured->DebugInstructionBuffer->Size : 0U);
+		const size_t sliceInstrLen      = sliceEndOffset - sliceStartOffset;
+		const size_t sliceDebugInstrLen = sliceEndDebugOffset - sliceStartDebugOffset;
+
+		/* Defensive underflow guard: by construction the recorded sizes
+		 * are >= the per-slice overhead (UcPageTextSize / UcPageSize are
+		 * pre-charged to those values at slice start and only grow), but
+		 * mirror the lastSlice* guards above so any future invariant
+		 * regression can't silently wrap to a huge value. */
+		const u32 sliceTextContent  = (i < splitCount)
+			? (ControlCodeInst->CondJobPreemptSplitTextSizes[i]  > PCJ_SLICE_OVERHEAD_TEXT
+				? ControlCodeInst->CondJobPreemptSplitTextSizes[i]  - PCJ_SLICE_OVERHEAD_TEXT
+				: 0U)
+			: lastSliceTextContent;
+		const u32 sliceTotalContent = (i < splitCount)
+			? (ControlCodeInst->CondJobPreemptSplitTotalSizes[i] > PCJ_SLICE_OVERHEAD_TOTAL
+				? ControlCodeInst->CondJobPreemptSplitTotalSizes[i] - PCJ_SLICE_OVERHEAD_TOTAL
+				: 0U)
+			: lastSliceTotalContent;
+
+		/* Skip an empty continuation slice. This can occur if a forced
+		 * page split lands at the very end of the buffered stream — the
+		 * trailing slice would otherwise emit a stub PCJ with no body. */
+		if (i > 0 && sliceInstrLen == 0 && sliceTotalContent == 0) {
+			continue;
+		}
+
+		const u32 sliceTextFootprint  = ISA_OPSIZE_START_JOB + sliceTextContent  + ISA_OPSIZE_END_JOB;
+		_XAie_UpdateDataAligner(ControlCodeInst, sliceTextFootprint);
+		const u32 sliceTotalFootprint = ISA_OPSIZE_START_JOB + sliceTotalContent + ISA_OPSIZE_END_JOB
+		                              + ControlCodeInst->DataAligner;
+
+		/* Continuation slices always go on a fresh page so the back-to-back
+		 * PCJs are page-aligned (Case 3). The first slice goes on the current
+		 * page if it fits (Case 1), otherwise on a fresh page (Case 2). */
+		int needNewPage = (i > 0)
+			|| (ControlCodeInst->IsPageOpen &&
+			    ControlCodeInst->UcPageSize + sliceTotalFootprint
+			        > ControlCodeInst->PageSizeMax);
+
+		if (needNewPage || !ControlCodeInst->IsPageOpen) {
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_UpdateDataAligner(ControlCodeInst, sliceTextFootprint);
+		}
+
+		if (ControlCodeInst->IsJobOpen) {
+			_XAie_EndJob(ControlCodeInst);
+		}
+
+		_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
+			"START_COND_JOB_PREEMPT %d\n", ControlCodeInst->UcJobNum);
+		_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
+			"START_COND_JOB_PREEMPT %d\n", ControlCodeInst->UcJobNum);
+		if (ControlCodeInst->ErrorState) { RC = XAIE_ERR; goto cleanup; }
+
+		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB;
+		ControlCodeInst->UcPageSize     += ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB;
+		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		ControlCodeInst->UcJobNum++;
+		ControlCodeInst->IsJobOpen = 1;
+		ControlCodeInst->CombineCommands = 0;
+
+		if (sliceInstrLen > 0 && captured->InstructionBuffer && captured->InstructionBuffer->Data) {
+			RC = _XAie_EmitLoadCoresBufferSlice(ControlCodeInst,
+				captured->InstructionBuffer->Data + sliceStartOffset, sliceInstrLen,
+				ControlCodeInst->ControlCodefp, ControlCodeInst->ControlCodeBuf,
+				"ControlCodeBuf (PCJ slice)");
+			if (RC != XAIE_OK) goto cleanup;
+		}
+		if (!ControlCodeInst->DisableDebugAsm && sliceDebugInstrLen > 0 &&
+		    captured->DebugInstructionBuffer && captured->DebugInstructionBuffer->Data) {
+			RC = _XAie_EmitLoadCoresBufferSlice(ControlCodeInst,
+				captured->DebugInstructionBuffer->Data + sliceStartDebugOffset, sliceDebugInstrLen,
+				ControlCodeInst->DebugAsmFile, ControlCodeInst->DebugAsmBuf,
+				"DebugAsmBuf (PCJ slice)");
+			if (RC != XAIE_OK) goto cleanup;
+		}
+
+		ControlCodeInst->UcPageTextSize += sliceTextContent;
+		ControlCodeInst->UcPageSize     += sliceTotalContent;
+		/* Skip the post-content PageInfo when the slice is empty — its
+		 * values would duplicate the post-START_COND_JOB_PREEMPT line,
+		 * needlessly bloating the .DEBUG output. */
+		if (sliceTotalContent > 0) {
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		}
+
+		_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "END_JOB\n\n");
+		_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "END_JOB\n\n");
+		if (ControlCodeInst->ErrorState) { RC = XAIE_ERR; goto cleanup; }
+		if (ControlCodeInst->DebugAsmFile) {
+			fflush(ControlCodeInst->DebugAsmFile);
+		}
+		ControlCodeInst->IsJobOpen = 0;
+		ControlCodeInst->CombineCommands = 0;
+	}
+
+cleanup:
+	_XAie_PCJStateFree(ControlCodeInst);
+	return RC;
 }
 
 static inline AieRC _XAie_LoadCoresCacheInit(XAie_ControlCodeIO *ControlCodeInst) {
@@ -3431,6 +3928,11 @@ AieRC XAie_ControlCodeIO_LoadCoresStart(void *IOInst, u32 UniqueCoreElfId, const
 
 	if(ControlCodeInst->IsLoadCoresCPActive) {
 		XAIE_ERROR("LoadCoresStart called while LoadCoresCPStart is still active\n");
+		return XAIE_ERR;
+	}
+
+	if (ControlCodeInst->IsCondJobPreemptActive) {
+		XAIE_ERROR("LoadCoresStart called inside an active Preemption Conditional Job\n");
 		return XAIE_ERR;
 	}
 
@@ -3666,6 +4168,11 @@ AieRC XAie_ControlCodeIO_LoadCoresCPStart(void *IOInst, u32 UniqueCoreElfId)
 		return XAIE_ERR;
 	}
 
+	if (ControlCodeInst->IsCondJobPreemptActive) {
+		XAIE_ERROR("LoadCoresCPStart called inside an active Preemption Conditional Job\n");
+		return XAIE_ERR;
+	}
+
 	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		/* Initialize LoadCoresCP context to capture instructions and data */
 		AieRC RC = _XAie_LoadCoresContextInit(ControlCodeInst);
@@ -3748,7 +4255,7 @@ AieRC XAie_ControlCodeIO_LoadCoresCPEnd(void *IOInst) {
 		XAIE_ERROR("LoadCoresCPEnd: aborting due to previous critical error\n");
 		ControlCodeInst->IsLoadCoresCPActive = 0;
 		_XAie_RestorePageState(ControlCodeInst, &ControlCodeInst->LoadCoresCPContext->SavedState);
-		_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+		_XAie_FreeDeferredEmitContext(ControlCodeInst->LoadCoresCPContext);
 		ControlCodeInst->LoadCoresCPContext = NULL;
 		return XAIE_ERR;
 	}
@@ -3764,7 +4271,7 @@ AieRC XAie_ControlCodeIO_LoadCoresCPEnd(void *IOInst) {
 		ControlCodeInst->IsLoadCoresCPActive = 0;
 		_XAie_RestorePageState(ControlCodeInst,
 		                       &ControlCodeInst->LoadCoresCPContext->SavedState);
-		_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+		_XAie_FreeDeferredEmitContext(ControlCodeInst->LoadCoresCPContext);
 		ControlCodeInst->LoadCoresCPContext = NULL;
 		return XAIE_ERR;
 	}
@@ -3867,7 +4374,7 @@ AieRC XAie_ControlCodeIO_LoadCoresCPEnd(void *IOInst) {
 	_XAie_EndJob(ControlCodeInst);
 
 cleanup:
-	_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+	_XAie_FreeDeferredEmitContext(ControlCodeInst->LoadCoresCPContext);
 	ControlCodeInst->LoadCoresCPContext = NULL;
 
 	return RC;
@@ -4787,14 +5294,20 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 		if (ControlCodeInst->IsLoadCoresCPActive) {
 			XAIE_WARN("LoadCoresCPStart called but not ended with LoadCoresCPEnd\n");
 		}
+		/* Warn if a Preemption Conditional Job is still open at close time. */
+		if (ControlCodeInst->IsCondJobPreemptActive) {
+			XAIE_WARN("StartNewJob(PCJ) called but not ended with EndJob — discarding buffered content\n");
+			ControlCodeInst->IsCondJobPreemptActive = 0;
+		}
 		/* Clean up any lingering LoadCoresContext (shouldn't happen in normal flow) */
 		if (ControlCodeInst->LoadCoresContext != NULL) {
 			_XAie_LoadCoresContextFree(ControlCodeInst);
 		}
 		if (ControlCodeInst->LoadCoresCPContext != NULL) {
-			_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+			_XAie_FreeDeferredEmitContext(ControlCodeInst->LoadCoresCPContext);
 			ControlCodeInst->LoadCoresCPContext = NULL;
 		}
+		_XAie_PCJStateFree(ControlCodeInst);
 
 		_XAie_EndPage(ControlCodeInst);
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "EOF\n\n");
@@ -4871,8 +5384,13 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 			ControlCodeInst->IsLoadCoresCPActive = 0;
 		}
 		if (ControlCodeInst->LoadCoresCPContext != NULL) {
-			_XAie_FreeLoadCoresContext(ControlCodeInst->LoadCoresCPContext);
+			_XAie_FreeDeferredEmitContext(ControlCodeInst->LoadCoresCPContext);
 			ControlCodeInst->LoadCoresCPContext = NULL;
+		}
+		if (ControlCodeInst->IsCondJobPreemptActive ||
+		    ControlCodeInst->CondJobPreemptContext) {
+			ControlCodeInst->IsCondJobPreemptActive = 0;
+			_XAie_PCJStateFree(ControlCodeInst);
 		}
 		if(ControlCodeInst->LoadCoresLabel) {
 			free(ControlCodeInst->LoadCoresLabel);

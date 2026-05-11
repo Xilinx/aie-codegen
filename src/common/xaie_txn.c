@@ -713,6 +713,7 @@ static inline void _XAie_AppendMaskPollBusy32(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL_BUSY;
 }
 
+__attribute__((unused))
 static inline void _XAie_AppendBlockWrite32(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u8 *Payload = TxnPtr + sizeof(XAie_BlockWrite32Hdr);
@@ -922,6 +923,8 @@ static inline void _XAie_AppendMaskPollBusy32_opt(XAie_TxnCmd *Cmd, uint8_t *Txn
 	Hdr->Value = Cmd->Value;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL_BUSY;
 }
+
+__attribute__((unused))
 static inline void _XAie_AppendBlockWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u32 *Payload = (void*)(TxnPtr + sizeof(XAie_BlockWrite32Hdr_opt));

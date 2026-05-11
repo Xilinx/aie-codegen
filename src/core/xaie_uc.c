@@ -238,12 +238,7 @@ static AieRC _XAie_WriteProgramSection(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return _XAie_LoadProgMemSection(DevInst, Loc, ProgSec, Phdr);
 	}
 
-	if((Phdr->p_filesz == 0U) || (Phdr->p_filesz != 0U)) {
-		return _XAie_LoadDataMemSection(DevInst, Loc, ProgSec, Phdr);
-	} else  {
-		XAIE_WARN("Mismatch in program header to data memory loadable section. Skipping this program section.\n");
-		return XAIE_OK;
-	}
+	return _XAie_LoadDataMemSection(DevInst, Loc, ProgSec, Phdr);
 }
 
 /*****************************************************************************/

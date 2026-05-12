@@ -713,27 +713,6 @@ static inline void _XAie_AppendMaskPollBusy32(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL_BUSY;
 }
 
-static inline void _XAie_AppendBlockWrite32(XAie_TxnCmd *Cmd, u8 *TxnPtr)
-{
-	u8 *Payload = TxnPtr + sizeof(XAie_BlockWrite32Hdr);
-	XAie_BlockWrite32Hdr *Hdr = (XAie_BlockWrite32Hdr*)(uintptr_t)TxnPtr;
-
-	u32 RegOff = Cmd->RegOff & UINT_MAX;
-	Hdr->RegOff = RegOff;
-	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
-	Hdr->OpHdr.Col = 0;
-	Hdr->OpHdr.Row = 0;
-	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
-#if UINTPTR_MAX == U64_MAX  // 64-bit system
-    if (Cmd->DataPtr > UINTPTR_MAX) {
-    	XAIE_ERROR("DataPtr cannot be represented in 64bit system\n");
-    	return;
-    }
-#endif
-	memcpy((void *)Payload, (void const *)(uintptr_t)Cmd->DataPtr,
-			Cmd->Size * sizeof(u32));
-}
-
 static inline void _XAie_AppendBlockSet32(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
 	u8 *Payload = TxnPtr + sizeof(XAie_BlockWrite32Hdr);
@@ -921,25 +900,6 @@ static inline void _XAie_AppendMaskPollBusy32_opt(XAie_TxnCmd *Cmd, uint8_t *Txn
 	Hdr->Mask = Cmd->Mask;
 	Hdr->Value = Cmd->Value;
 	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL_BUSY;
-}
-static inline void _XAie_AppendBlockWrite32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)
-{
-	u32 *Payload = (void*)(TxnPtr + sizeof(XAie_BlockWrite32Hdr_opt));
-	XAie_BlockWrite32Hdr_opt *Hdr = (XAie_BlockWrite32Hdr_opt*)(uintptr_t)TxnPtr;
-
-	u32 RegOff = Cmd->RegOff & UINT_MAX;
-	Hdr->RegOff = RegOff;
-	Hdr->Size = (u32)sizeof(*Hdr) + Cmd->Size * (u32)sizeof(u32);
-	Hdr->OpHdr.Op = (u8)XAIE_IO_BLOCKWRITE;
-
-#if UINTPTR_MAX == U64_MAX // 64-bit system
-    if (Cmd->DataPtr > UINTPTR_MAX) {
-    	XAIE_ERROR("DataPtr cannot be represented in 64bit system\n");
-    	return;
-    }
-#endif
-	memcpy((void *)Payload, (void const *)(uintptr_t)Cmd->DataPtr,
-			Cmd->Size * sizeof(u32));
 }
 
 static inline void _XAie_AppendBlockSet32_opt(XAie_TxnCmd *Cmd, u8 *TxnPtr)

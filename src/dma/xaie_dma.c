@@ -267,13 +267,13 @@ static AieRC _XAie_DmaLockConfig(XAie_DmaDesc *DmaDesc, XAie_Lock Acq,
 {
 	const XAie_DmaMod *DmaMod;
 
-	DmaMod = DmaDesc->DmaMod;
-
 	if((DmaDesc == XAIE_NULL) ||
 			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Arguments\n");
 		return XAIE_INVALID_ARGS;
 	}
+
+	DmaMod = DmaDesc->DmaMod;
 
 	return DmaMod->SetLock(DmaDesc, Acq, Rel, AcqEn, RelEn);
 }

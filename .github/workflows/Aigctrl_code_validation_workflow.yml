@@ -1,0 +1,322 @@
+name: Aig ControlCode Validation PR Check
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  checks: write        # required by dorny/test-reporter to post Check Run results
+  pull-requests: write # required to post the test summary comment on the PR
+
+jobs:
+  Aig_ControlCode_Validation_Suite:
+    runs-on: [self-hosted, linux, x64, jenkins-linux-runner]
+    concurrency:
+      group: aigctrl-code-validation-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    env:
+      AIGCTRL_REPO: https://gitenterprise.xilinx.com/ai-engine/AigCtrlCodeValidationSuite.git
+      AIE_CODEGEN_REPO: https://gitenterprise.xilinx.com/ai-engine/aie-codegen.git
+      AIE_CODEGEN_BASE_BRANCH: ${{ github.base_ref }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
+    steps:
+      - name: Set runtime paths and validate required tools
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Derive unique per-run paths from $RUNNER_TEMP (always set by the
+          # Actions runner; runner.temp is unavailable in job-level env: blocks).
+          RUN_SLUG="aigctrl-code-validation-${{ github.run_id }}-${{ github.run_attempt }}"
+          _WORK_ROOT="${RUNNER_TEMP}/${RUN_SLUG}"
+          _LOG_DIR="${RUNNER_TEMP}/${RUN_SLUG}-logs"
+
+          # Prepend devkit paths — must be done here because env context and
+          # runner context are unavailable in the job-level env: block.
+          CMAKE_BIN=/tools/batonroot/rodin/devkits/lnx64/cmake-4.0.1/bin
+          CMAKE_LIB=/tools/batonroot/rodin/devkits/lnx64/cmake-4.0.1/lib
+          echo "PATH=${CMAKE_BIN}:${PATH}"                         >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=${CMAKE_LIB}:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+
+          # Single log directory — one env var, no per-file dynamic references.
+          # All log files written here are uploaded as one artifact.
+          mkdir -p "${_LOG_DIR}"
+          echo "WORK_ROOT=${_WORK_ROOT}" >> "$GITHUB_ENV"
+          echo "LOG_DIR=${_LOG_DIR}"     >> "$GITHUB_ENV"
+
+          echo "Preparing workspace at: ${_WORK_ROOT}"
+          rm -rf "${_WORK_ROOT}"
+          mkdir -p "${_WORK_ROOT}"
+
+          for cmd in git cmake; do
+            if ! command -v "$cmd" >/dev/null 2>&1; then
+              echo "❌ ERROR: Required command '$cmd' not found in PATH." >&2
+              exit 1
+            fi
+          done
+
+          echo "✅ Tool checks passed."
+
+      # -------------------------------------------------------
+      # Resolve AigCtrlCodeValidationSuite repo + branch
+      # -------------------------------------------------------
+      # PR authors can pin a fork/branch in the PR description to
+      # unblock CI while a bug fix is in-flight on the main suite.
+      #
+      # Syntax (anywhere in the PR body):
+      #   AigCtrlCodeValidationSuite-repo: git@gitenterprise.xilinx.com:JOHNDOE/AigCtrlCodeValidationSuite.git
+      #   AigCtrlCodeValidationSuite-branch: my-fix-branch
+      #
+      # Rules:
+      #  - Both keys are optional and independent.
+      #  - Omitting repo   → canonical https://gitenterprise.xilinx.com/ai-engine/AigCtrlCodeValidationSuite.git
+      #  - Omitting branch → main
+      #  - SSH override URLs (git@...) are used as-is; the PAT is NOT injected.
+      # -------------------------------------------------------
+      - name: Resolve AigCtrlCodeValidationSuite repo and branch from PR body
+        shell: bash
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          # Write PR body to a temp file to safely handle special characters,
+          # newlines, and quotes without any shell interpolation risk.
+          PR_BODY_FILE="${RUNNER_TEMP}/pr_body_${{ github.run_id }}.txt"
+          printf '%s' "${PR_BODY}" > "$PR_BODY_FILE"
+
+          # Extract optional override keys (case-sensitive, leading spaces allowed).
+          OVERRIDE_REPO=$(grep -m1 '^\s*AigCtrlCodeValidationSuite-repo:' "$PR_BODY_FILE" \
+            | sed 's/^\s*AigCtrlCodeValidationSuite-repo:\s*//' | tr -d '\r' || true)
+          OVERRIDE_BRANCH=$(grep -m1 '^\s*AigCtrlCodeValidationSuite-branch:' "$PR_BODY_FILE" \
+            | sed 's/^\s*AigCtrlCodeValidationSuite-branch:\s*//' | tr -d '\r' || true)
+
+          # Apply defaults for anything not specified.
+          FINAL_REPO="${OVERRIDE_REPO:-${AIGCTRL_REPO}}"
+          FINAL_BRANCH="${OVERRIDE_BRANCH:-main}"
+
+          # Validate: repo must not be empty after resolution.
+          if [ -z "$FINAL_REPO" ]; then
+            echo "❌ ERROR: Could not resolve AigCtrlCodeValidationSuite repo URL." >&2
+            exit 1
+          fi
+
+          # Validate branch name — reject characters that could inject shell commands.
+          if ! echo "$FINAL_BRANCH" | grep -qE '^[a-zA-Z0-9._/\-]+$'; then
+            echo "❌ ERROR: Branch name '${FINAL_BRANCH}' contains invalid characters." >&2
+            exit 1
+          fi
+
+          if [ -n "${OVERRIDE_REPO}" ] || [ -n "${OVERRIDE_BRANCH}" ]; then
+            echo "⚠️  PR override detected in PR body:"
+            [ -n "${OVERRIDE_REPO}"   ] && echo "   repo   → ${FINAL_REPO}"
+            [ -n "${OVERRIDE_BRANCH}" ] && echo "   branch → ${FINAL_BRANCH}"
+          else
+            echo "ℹ️  No PR override — using canonical repo + main branch."
+            echo "   repo   → ${FINAL_REPO}"
+            echo "   branch → ${FINAL_BRANCH}"
+          fi
+
+          # Export for use by all subsequent steps.
+          echo "AIGCTRL_FINAL_REPO=${FINAL_REPO}"     >> "$GITHUB_ENV"
+          echo "AIGCTRL_FINAL_BRANCH=${FINAL_BRANCH}" >> "$GITHUB_ENV"
+
+          rm -f "$PR_BODY_FILE"
+
+      - name: Clone required repositories and fetch PR branch
+        shell: bash
+        env:
+          GIT_ENTERPRISE_PAT: ${{ secrets.GIT_ENTERPRISE_PAT }}
+        run: |
+          set -euo pipefail
+
+          retry_clone() {
+            local url="$1"
+            local dir="$2"
+            local branch="$3"
+            local tries=3
+            local wait_s=5
+            local i=1
+
+            while [ "$i" -le "$tries" ]; do
+              echo "Clone attempt $i/$tries: $dir"
+              rm -rf "$dir"
+              if [ -n "$branch" ]; then
+                if git clone --depth 1 --branch "$branch" "$url" "$dir"; then
+                  return 0
+                fi
+              else
+                if git clone --depth 1 "$url" "$dir"; then
+                  return 0
+                fi
+              fi
+              echo "Clone failed for $dir; retrying in ${wait_s}s..."
+              sleep "$wait_s"
+              i=$((i + 1))
+            done
+
+            echo "❌ ERROR: Failed to clone '$dir' after $tries attempts." >&2
+            return 1
+          }
+
+          cd "$WORK_ROOT"
+
+          # Allowlist: only permit repos on the internal gitenterprise host.
+          # Prevents a malicious PR body from exfiltrating GIT_ENTERPRISE_PAT
+          # to an external host via an override repo URL.
+          case "$AIGCTRL_FINAL_REPO" in
+            https://gitenterprise.xilinx.com/*) ;;  # HTTPS on canonical host — PAT injection OK
+            git@gitenterprise.xilinx.com:*)     ;;  # SSH — PAT not injected anyway
+            *)
+              echo "❌ ERROR: Override repo host is not on the allowed list: $AIGCTRL_FINAL_REPO" >&2
+              echo "   Only https://gitenterprise.xilinx.com/* and git@gitenterprise.xilinx.com:* are permitted." >&2
+              exit 1
+              ;;
+          esac
+
+          # Use the resolved repo/branch (canonical defaults or PR-body overrides).
+          # For HTTPS URLs inject the PAT when available; SSH URLs are used as-is.
+          AIGCTRL_CLONE_URL="$AIGCTRL_FINAL_REPO"
+          if [ -n "${GIT_ENTERPRISE_PAT:-}" ] && \
+             echo "$AIGCTRL_FINAL_REPO" | grep -q '^https://'; then
+            # Inject PAT only into HTTPS URLs — never into SSH git@ URLs.
+            HOST=$(echo "$AIGCTRL_FINAL_REPO" | sed 's|https://||' | cut -d/ -f1)
+            REST=$(echo "$AIGCTRL_FINAL_REPO" | sed "s|https://${HOST}/||")
+            AIGCTRL_CLONE_URL="https://oauth2:${GIT_ENTERPRISE_PAT}@${HOST}/${REST}"
+          fi
+
+          echo "Cloning AigCtrlCodeValidationSuite from: $(echo "$AIGCTRL_CLONE_URL" | sed 's|oauth2:[^@]*@|oauth2:***@|')"
+          echo "Branch: ${AIGCTRL_FINAL_BRANCH}"
+          retry_clone "$AIGCTRL_CLONE_URL" "AigCtrlCodeValidationSuite" "$AIGCTRL_FINAL_BRANCH"
+          cd AigCtrlCodeValidationSuite
+
+          # -------------------------------------------------------
+          # Step 1: Clone the canonical aie-codegen repo on the
+          #         branch that is the target of this PR (base_ref).
+          # -------------------------------------------------------
+          AIE_CODEGEN_CLONE_URL="$AIE_CODEGEN_REPO"
+          if [ -n "${GIT_ENTERPRISE_PAT:-}" ]; then
+            AIE_CODEGEN_CLONE_URL="https://oauth2:${GIT_ENTERPRISE_PAT}@gitenterprise.xilinx.com/ai-engine/aie-codegen.git"
+          fi
+
+          retry_clone "$AIE_CODEGEN_CLONE_URL" "aie-codegen" "$AIE_CODEGEN_BASE_BRANCH"
+          cd aie-codegen
+
+          # -------------------------------------------------------
+          # Step 2: Fetch the PR head ref (refs/pull/<PR>/head) and
+          #         merge it in — this is where the PR changes land.
+          # -------------------------------------------------------
+          echo "Fetching PR #${PR_NUMBER} changes (refs/pull/${PR_NUMBER}/head)..."
+          if ! git fetch origin "+refs/pull/${PR_NUMBER}/head:refs/pr/${PR_NUMBER}/head"; then
+            echo "❌ ERROR: Failed to fetch PR #${PR_NUMBER} ref from origin." >&2
+            exit 1
+          fi
+
+          echo "Merging PR #${PR_NUMBER} head into base branch '$AIE_CODEGEN_BASE_BRANCH'..."
+          if ! git merge --no-edit "refs/pr/${PR_NUMBER}/head"; then
+            echo "❌ ERROR: Merge of PR #${PR_NUMBER} failed — likely a merge conflict." >&2
+            exit 1
+          fi
+
+          git submodule update --init --recursive
+
+      - name: Configure and build with CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd "$WORK_ROOT/AigCtrlCodeValidationSuite"
+
+          cmake -S . -B build -DAIE_CODEGEN_LOCAL_PATH=aie-codegen
+          cmake --build build --parallel
+
+      - name: Run unit tests and produce JUnit XML results
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd "$WORK_ROOT/AigCtrlCodeValidationSuite/build"
+
+          if [ ! -x "./tests/aie-codegen-utests" ]; then
+            echo "❌ ERROR: Test binary not found: ./tests/aie-codegen-utests" >&2
+            exit 1
+          fi
+
+          # --gtest_output=xml writes a JUnit-compatible XML file that GitHub CI
+          # and Jenkins can parse to display per-test results without log digging.
+          # stdout is still tee'd to tests.log for human-readable output.
+          XML_RESULTS="$LOG_DIR/test-results.xml"
+          set +e
+          ./tests/aie-codegen-utests \
+            --gtest_output="xml:${XML_RESULTS}"
+          test_rc=$?
+          set -e
+
+          # Primary signal: non-zero exit means at least one test failed.
+          if [ "$test_rc" -ne 0 ]; then
+            echo "❌ ERROR: Unit tests exited with code $test_rc" >&2
+          fi
+
+          # Secondary signal: parse the XML failures/errors attributes so we
+          # catch edge cases where the binary exits 0 but the XML says otherwise.
+          if [ -f "$XML_RESULTS" ]; then
+            xml_failures=$(grep -o 'failures="[0-9]*"' "$XML_RESULTS" | head -1 | grep -o '[0-9]*')
+            xml_errors=$(grep -o 'errors="[0-9]*"'   "$XML_RESULTS" | head -1 | grep -o '[0-9]*')
+            xml_failures="${xml_failures:-0}"
+            xml_errors="${xml_errors:-0}"
+
+            echo "XML report  →  failures=${xml_failures}  errors=${xml_errors}"
+
+            if [ "$xml_failures" -gt 0 ] || [ "$xml_errors" -gt 0 ]; then
+              echo "❌ ERROR: JUnit XML reports ${xml_failures} failure(s) and ${xml_errors} error(s)." >&2
+              exit 1
+            fi
+          else
+            # XML was not produced — fall back to exit-code only and warn.
+            echo "⚠️  WARNING: JUnit XML not found at ${XML_RESULTS}; relying on exit code only."
+            if [ "$test_rc" -ne 0 ]; then
+              exit "$test_rc"
+            fi
+          fi
+
+          if [ "$test_rc" -ne 0 ]; then
+            exit "$test_rc"
+          fi
+
+          echo "✅ All tests passed. aie-codegen PR changes are stable."
+
+      - name: Copy test results to workspace for publisher
+        # EnricoMi-publish-unit-test-result-action runs in Docker and only has
+        # $GITHUB_WORKSPACE mounted. Copy the XML out of $RUNNER_TEMP so the
+        # action can find it via a relative path.
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/test-results"
+          if [ -f "${LOG_DIR}/test-results.xml" ]; then
+            cp "${LOG_DIR}/test-results.xml" "${GITHUB_WORKSPACE}/test-results/test-results.xml"
+          else
+            echo "⚠️  WARNING: test-results.xml not found; publisher will report no results."
+          fi
+
+      - name: Publish JUnit test results
+        # Posts a Check Run on the PR with per-test pass/fail breakdown.
+        # Produces the inline summary: "77 tests  77 ✅  0 ❌" visible directly
+        # in the PR checks UI — no need to open logs.
+        # Runs even on failure so results are always visible.
+        if: always()
+        uses: actions-ext/EnricoMi-publish-unit-test-result-action@v2
+        with:
+          # Relative path inside $GITHUB_WORKSPACE — the only directory mounted
+          # into the Docker container that runs this action.
+          files: test-results/test-results.xml
+          check_name: AigCtrl Code Validation Results
+
+      - name: Upload full validation logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: aigctrl-code-validation-logs-pr-${{ github.event.pull_request.number }}
+          if-no-files-found: warn
+          path: ${{ env.LOG_DIR }}

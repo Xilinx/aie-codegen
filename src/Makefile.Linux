@@ -4,9 +4,20 @@
 #
 ###############################################################################
 
-APP = aiengine
+NAME := aie_codegen
+MAJOR = 3
+MINOR = 5
+VERSION = $(MAJOR).$(MINOR)
 
+# Compiler selection
 CC ?= gcc
+
+# Build targets
+.PHONY: all build include externalInclude clean doc-generate doc-clean swigSocketInclude swigControlCodeInclude
+
+# Default target uses gcc (override CC for clang: make CC=clang)
+all: build
+
 CP = cp
 LIBSOURCES = $(wildcard ./*/*.c) $(wildcard ./*/*/*.c)
 CFLAGS += -Werror -Wall -Wextra --std=c11
@@ -29,11 +40,6 @@ SWIG_SOCKET_INCLUDEFILES = ./io_backend/swig/swig_socket_interface.h ./*/xaiegbl
 SWIG_CONTROLCODE_INCLUDEFILES = ./io_backend/swig/swig_controlcode_interface.h ./*/xaiegbl.h ./io_backend/ext/isa_stubs.h ./io_backend/ext/xaie_controlcode.c ./io_backend/swig/swig_controlcode.c ./io_backend/ext/main_rts.h ./*/xaie_clock.h ./*/xaie_dma.h ./*/xaie_events.h ./*/xaie_feature_config.h ./*/xaie_helper.h ./*/xaie_io.h  ./io_backend/xaie_io_internal.h  ./io_backend/privilege/xaie_io_privilege.h ./io_backend/swig/swig_controlcode_backend_interface.i ./global/xaiegbl.c ./*/xaiegbl_defs.h ./*/xaiegbl_dynlink.h ./*/xaiegbl_regdef.h ./*/xaie_locks.h ./io_backend/ext/xaie_io_common.h ./*/xaie_helper_internal.h ./npi/xaie_npi.h ./*/xaie_txn.h
 SWIG_INCLUDEDIR = ../swigInclude
 
-NAME := aie_codegen
-MAJOR = 3
-MINOR = 5
-VERSION = $(MAJOR).$(MINOR)
-
 ifdef D__SWIGINTERFACE__
   BACKEND_TARGET = swig
   EXTRA_CFLAGS += -D__SWIGINTERFACE__
@@ -41,11 +47,8 @@ ifdef D__SWIGINTERFACE__
   INCLUDEFILES += $(SWIG_CONTROLCODE_INCLUDEFILES)
 endif
 
-.PHONY: all include externalInclude clean doc-generate doc-clean swigSocketInclude swigControlCodeInclude
-
-all: include lib$(NAME).so $(BACKEND_TARGET)
-swig_socket: include lib$(NAME).so $(BACKEND_TARGET) swigSocketInclude
-swig_controlcode: include lib$(NAME).so $(BACKEND_TARGET) swigControlCodeInclude
+swig_socket: build swigSocketInclude
+swig_controlcode: build swigControlCodeInclude
 
 swigSocketInclude:
 	mkdir $(SWIG_INCLUDEDIR)/ -p
@@ -55,11 +58,14 @@ swigControlCodeInclude:
 	mkdir $(SWIG_INCLUDEDIR)/ -p
 	$(CP) $(SWIG_CONTROLCODE_INCLUDEFILES) $(SWIG_INCLUDEDIR)/
 
+# Main build target
+build: include lib$(NAME).so $(BACKEND_TARGET)
+
 externalInclude:
 	mkdir $(EXTERNAL_INCLUDEDIR)/aie_codegen_inc -p
 	$(CP) aie_codegen.h $(EXTERNAL_INCLUDEDIR)
 	$(CP) $(EXTERNAL_INCLUDEFILES) $(EXTERNAL_INCLUDEDIR)/aie_codegen_inc
-	
+
 include:
 	mkdir $(INCLUDEDIR)/aie_codegen_inc -p
 	mkdir $(INTERNALDIR)/aie_codegen_inc -p

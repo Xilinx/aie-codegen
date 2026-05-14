@@ -144,6 +144,27 @@ The build will produce `libaie_codegen.so` (shared library by default) in the `b
   cmake -DDEBUG_BACKEND=ON ../src/
   ```
 
+### Compiler Selection
+
+To build with a specific compiler, override the `CC` variable when invoking make. For example:
+
+- **GCC (default):**
+  ```bash
+  make -f Makefile.Linux
+  ```
+- **Clang:**
+  ```bash
+  make -f Makefile.Linux CC=clang
+  ```
+
+### CMake Compiler Selection
+
+To build with a specific compiler using CMake, set the compiler directly:
+
+```bash
+cmake -DCMAKE_C_COMPILER=clang ../src
+```
+
 ### CodeQL Static Analysis
 
 The CMake build includes targets for running [CodeQL](https://codeql.github.com/) security analysis. CodeQL CLI must be installed and available in your `PATH`.

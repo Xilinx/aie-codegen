@@ -1677,7 +1677,7 @@ static AieRC _XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 TileType, const
 
 			// To skip MasterPort southX and SlavePort NorthX in AIE4 only
 			if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen) && (TileType == XAIEGBL_TILE_TYPE_AIETILE)) {
-				if ((DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE)) {
+				if (DevInst->AppMode == XAIE_DEVICE_SINGLE_APP_MODE) {
 					if (((PortIntf == XAIE_STRMSW_MASTER) && (PortType == SOUTH)) ||
 						((PortIntf == XAIE_STRMSW_SLAVE) && (PortType == NORTH))) {
 						RegAddr = 0;

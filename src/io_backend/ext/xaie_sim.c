@@ -676,6 +676,9 @@ void XAie_SimDumpDevMem(XAie_DevInst *DevInst)
 		i++;
 	}
 	XAIE_DBG("Total Free: 0x%llx, total use: 0x%llx\n", Free, use);
+	(void)Free;
+	(void)use;
+	(void)i;
 	return;
 }
 

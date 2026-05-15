@@ -63,7 +63,15 @@ static AieRC _XAie_LoadProgMemSection(XAie_DevInst *DevInst, XAie_LocType Loc,
 
 	UcMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_SHIMNOC].UcMod;
 
-	/* Write to Program Memory */
+	/* Sanity checks before loading a PT_LOAD segment into uC program memory */
+	if(Phdr->p_filesz > Phdr->p_memsz) {
+		XAIE_ERROR("Invalid ELF: p_filesz exceeds p_memsz for program segment\n");
+		return XAIE_INVALID_ELF;
+	}
+	if((Phdr->p_paddr + Phdr->p_memsz) < Phdr->p_paddr) {
+		XAIE_ERROR("Invalid ELF: p_paddr + p_memsz overflows\n");
+		return XAIE_INVALID_ELF;
+	}
 	if((Phdr->p_paddr + Phdr->p_memsz) > UcMod->ProgMemSize) {
 		XAIE_ERROR("Overflow of program memory\n");
 		return XAIE_INVALID_ELF;
@@ -238,7 +246,17 @@ static AieRC _XAie_WriteProgramSection(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return _XAie_LoadProgMemSection(DevInst, Loc, ProgSec, Phdr);
 	}
 
-	// TODO: add some sanity check before loading data memory section
+	/* Sanity checks before loading a PT_LOAD segment into uC data memory */
+	if(Phdr->p_filesz > Phdr->p_memsz) {
+		XAIE_ERROR("Invalid ELF: p_filesz exceeds p_memsz for data segment\n");
+		return XAIE_INVALID_ELF;
+	}
+
+       if((Phdr->p_paddr + Phdr->p_memsz) < Phdr->p_paddr) {
+	       XAIE_ERROR("Invalid ELF: p_paddr + p_memsz overflows\n");
+	       return XAIE_INVALID_ELF;
+       }
+
 	return _XAie_LoadDataMemSection(DevInst, Loc, ProgSec, Phdr);
 }
 

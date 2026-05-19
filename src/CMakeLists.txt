@@ -92,7 +92,9 @@ list(APPEND IO_BACKEND -D__AIECONTROLCODE__)
 
 if(MSVC)
   option(AIE_CODEGEN_MSVC_RELEASE_PDB
-    "MSVC Release: /Zi and /DEBUG for BinSkim / compliance tooling" ON)
+    "MSVC: /Zi program database for BinSkim / compliance tooling (all configs)" ON)
+  option(AIE_CODEGEN_ENABLE_SOURCELINK
+    "Embed Source Link in PDB via /SOURCELINK (BinSkim BA2027)" ON)
 
   # /Wall + /WX; BinSkim-friendly compile/link; /wd* silences SDK / third-party noise under /WX
   target_compile_options(${PROJECT_NAME} PRIVATE
@@ -100,6 +102,7 @@ if(MSVC)
     /WX
     /sdl
     /GS
+    /GF
     /guard:cf
     /Qspectre
     /permissive-
@@ -118,15 +121,44 @@ if(MSVC)
     ${IO_BACKEND}
   )
 
-  set(_msvc_link /DYNAMICBASE /guard:cf /LARGEADDRESSAWARE /DEBUG)
+  # BinSkim MSVC target properties (BA2024, BA6001).
+  # Spectre-mitigated libs require VS component "MSVC v143 - VS 2022 C++ x64/x86 Spectre-mitigated libs".
+  # Note: INTERPROCEDURAL_OPTIMIZATION (/GL) is not used — it breaks CMake __create_def when
+  # CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS is enabled. BA6006 is satisfied via link-only /LTCG below.
+  set_target_properties(${PROJECT_NAME} PROPERTIES
+    VS_GLOBAL_SpectreMitigation "Spectre"
+    LINK_INCREMENTAL_RELEASE OFF
+    LINK_INCREMENTAL_RELWITHDEBINFO OFF
+    LINK_INCREMENTAL_MINSIZEREL OFF
+  )
+
+  set(_msvc_link
+    /DYNAMICBASE
+    /guard:cf
+    /LARGEADDRESSAWARE
+    /DEBUG
+    /OPT:REF
+    /INCREMENTAL:NO
+  )
   string(TOUPPER "${CMAKE_GENERATOR_PLATFORM}" _vs_plat)
   if(NOT _vs_plat STREQUAL "ARM64")
     list(APPEND _msvc_link /CETCOMPAT)
   endif()
   target_link_options(${PROJECT_NAME} PRIVATE ${_msvc_link})
 
+  # BinSkim BA6004 / BA6006: Release-like link opts (not Debug — avoids ICF-in-Debug warning).
+  target_link_options(${PROJECT_NAME} PRIVATE
+    "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:/OPT:ICF>"
+    "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:/LTCG>"
+  )
+
   if(AIE_CODEGEN_MSVC_RELEASE_PDB)
-    target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/Zi>)
+    target_compile_options(${PROJECT_NAME} PRIVATE /Zi)
+  endif()
+
+  if(AIE_CODEGEN_ENABLE_SOURCELINK)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/AieCodegenSourceLink.cmake)
+    aie_codegen_enable_sourcelink(${PROJECT_NAME})
   endif()
 else()
   target_compile_options(${PROJECT_NAME} PRIVATE

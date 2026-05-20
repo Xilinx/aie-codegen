@@ -1,0 +1,375 @@
+name: Windows BinSkim Security Analysis PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  security-events: write  # required by github/codeql-action/upload-sarif to post to Security tab
+
+jobs:
+  windows_binskim_analysis:
+    runs-on: [self-hosted, X64, Windows, github-ws-runner]
+    concurrency:
+      group: windows-binskim-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    env:
+      AIE_CODEGEN_REPO: https://gitenterprise.xilinx.com/ai-engine/aie-codegen.git
+      AIE_CODEGEN_BASE_BRANCH: ${{ github.base_ref }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      # Fixed paths on the Windows runner host for shared tooling scripts.
+      BINSKIM_SCRIPTS_DIR: C:\workspace\binskim_scripts
+      WORK_ROOT: ${{ github.workspace }}\binskim-run-${{ github.run_id }}-${{ github.run_attempt }}
+
+    defaults:
+      run:
+        shell: pwsh   # All steps use PowerShell unless explicitly overridden.
+
+    steps:
+      # -------------------------------------------------------
+      # Step 0: Validate required tools before doing any work.
+      # -------------------------------------------------------
+      - name: Validate required tools
+        run: |
+          $missing = @()
+          foreach ($tool in @('cmake', 'python', 'binskim')) {
+            if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
+              $missing += $tool
+            }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Error "❌ ERROR: Required tools not found in PATH: $($missing -join ', ')"
+            exit 1
+          }
+
+          foreach ($path in @($env:BINSKIM_SCRIPTS_DIR)) {
+            if (-not (Test-Path $path)) {
+              Write-Error "❌ ERROR: Required scripts directory not found: $path"
+              exit 1
+            }
+          }
+          Write-Host "✅ Tool checks passed."
+
+      # -------------------------------------------------------
+      # Step 1: Clone aie-codegen on the base branch and apply
+      #         the PR head ref so the exact PR diff is built.
+      # -------------------------------------------------------
+      - name: Clone aie-codegen and apply PR changes
+        env:
+          GIT_ENTERPRISE_PAT: ${{ secrets.GIT_ENTERPRISE_PAT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # Create an isolated work directory for this run.
+          if (Test-Path $env:WORK_ROOT) { Remove-Item -Recurse -Force $env:WORK_ROOT }
+          New-Item -ItemType Directory -Path $env:WORK_ROOT | Out-Null
+          Set-Location $env:WORK_ROOT
+
+          # Build authenticated clone URL if PAT is available.
+          $cloneUrl = $env:AIE_CODEGEN_REPO
+          if ($env:GIT_ENTERPRISE_PAT) {
+            $cloneUrl = "https://oauth2:$($env:GIT_ENTERPRISE_PAT)@gitenterprise.xilinx.com/ai-engine/aie-codegen.git"
+          }
+
+          $maxTries = 3
+          $cloned = $false
+          for ($i = 1; $i -le $maxTries; $i++) {
+            Write-Host "Clone attempt $i/$maxTries..."
+            git clone --depth 1 --branch $env:AIE_CODEGEN_BASE_BRANCH $cloneUrl aie-codegen
+            if ($LASTEXITCODE -eq 0) { $cloned = $true; break }
+            Write-Host "⚠️ Clone failed, retrying in 5s..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $cloned) {
+            Write-Error "❌ ERROR: Failed to clone aie-codegen after $maxTries attempts."
+            exit 1
+          }
+
+          Set-Location aie-codegen
+
+          # Fetch the PR head ref (refs/pull/<PR>/head) — this is where PR changes land.
+          Write-Host "Fetching PR #$($env:PR_NUMBER) changes..."
+          git fetch origin "+refs/pull/$($env:PR_NUMBER)/head:refs/pr/$($env:PR_NUMBER)/head"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ ERROR: Failed to fetch PR #$($env:PR_NUMBER) ref from origin."
+            exit 1
+          }
+
+          # Merge PR changes on top of the base branch.
+          Write-Host "Merging PR #$($env:PR_NUMBER) into base branch '$($env:AIE_CODEGEN_BASE_BRANCH)'..."
+          git merge --no-edit "refs/pr/$($env:PR_NUMBER)/head"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ ERROR: Merge of PR #$($env:PR_NUMBER) failed — likely a merge conflict."
+            exit 1
+          }
+
+          git submodule update --init --recursive
+          Write-Host "✅ Repository ready with PR #$($env:PR_NUMBER) changes applied."
+
+      # -------------------------------------------------------
+      # Step 2: Build aie_codegen.dll using CMake.
+      # -------------------------------------------------------
+      - name: Build aie_codegen.dll with CMake
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-Location "$env:WORK_ROOT\aie-codegen"
+
+          Write-Host "Configuring CMake (shared library build)..."
+          cmake -S ./src -B build -DAIE_CODEGEN_BUILD_SHARED=on
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ ERROR: CMake configuration failed (exit code $LASTEXITCODE)."
+            exit 1
+          }
+
+          Write-Host "Building..."
+          cmake --build build --parallel
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ ERROR: CMake build failed (exit code $LASTEXITCODE)."
+            exit 1
+          }
+
+          $dll = "$env:WORK_ROOT\aie-codegen\build\Debug\aie_codegen.dll"
+          if (-not (Test-Path $dll)) {
+            Write-Error "❌ ERROR: Expected DLL not found after build: $dll"
+            exit 1
+          }
+          Write-Host "✅ Build succeeded. DLL: $dll"
+
+      # -------------------------------------------------------
+      # Step 3: Run BinSkim security analysis on the DLL.
+      #         Produces a SARIF report covering Pass/Fail/N-A.
+      # -------------------------------------------------------
+      - name: Run BinSkim analysis
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dll    = "$env:WORK_ROOT\aie-codegen\build\Debug\aie_codegen.dll"
+          $sarif  = "$env:WORK_ROOT\binskim-results.sarif"
+
+          Write-Host "Running BinSkim on: $dll"
+          binskim analyze $dll `
+            --recurse true `
+            --ignorePdbLoadError `
+            --kind "Fail;Pass;NotApplicable" `
+            --log ForceOverwrite `
+            --output $sarif
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "⚠️ BinSkim exited with code $LASTEXITCODE — review the SARIF for details."
+          }
+
+          if (-not (Test-Path $sarif)) {
+            Write-Error "❌ ERROR: BinSkim SARIF output not found: $sarif"
+            exit 1
+          }
+          Write-Host "✅ BinSkim analysis complete. SARIF: $sarif"
+
+      # -------------------------------------------------------
+      # Step 4a: Reformat the SARIF using the shared PS script.
+      # -------------------------------------------------------
+      - name: Reformat BinSkim SARIF
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $srcSarif = "$env:WORK_ROOT\binskim-results.sarif"
+          $fmtSarif = "$env:WORK_ROOT\binskim-results_reformatted.sarif"
+          $script   = "$env:BINSKIM_SCRIPTS_DIR\reformat-sariff.ps1"
+
+          if (-not (Test-Path $script)) {
+            Write-Error "❌ ERROR: Reformat script not found: $script"
+            exit 1
+          }
+
+          Write-Host "Reformatting SARIF..."
+          # Use pwsh -File so the script runs as a native subprocess and
+          # $LASTEXITCODE is populated reliably (& invokes in-process and
+          # leaves $LASTEXITCODE from the previous native command instead).
+          pwsh -File $script -sourceFile $srcSarif -targetFile $fmtSarif
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ ERROR: SARIF reformat script failed (exit code $LASTEXITCODE)."
+            exit 1
+          }
+
+          if (-not (Test-Path $fmtSarif)) {
+            Write-Error "❌ ERROR: Reformatted SARIF not produced: $fmtSarif"
+            exit 1
+          }
+          Write-Host "✅ SARIF reformatted: $fmtSarif"
+
+      # -------------------------------------------------------
+      # Step 4b: Convert reformatted SARIF to Excel report.
+      # -------------------------------------------------------
+      - name: Convert SARIF to Excel report
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fmtSarif  = "$env:WORK_ROOT\binskim-results_reformatted.sarif"
+          $pyScript  = "$env:BINSKIM_SCRIPTS_DIR\binskim_to_exel.py"
+          $outputDir = $env:WORK_ROOT
+          $platform  = "winlt64"
+
+          if (-not (Test-Path $pyScript)) {
+            Write-Error "❌ ERROR: Python conversion script not found: $pyScript"
+            exit 1
+          }
+
+          Write-Host "Converting SARIF to Excel..."
+          python $pyScript $fmtSarif $outputDir $platform
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ ERROR: Excel conversion script failed (exit code $LASTEXITCODE)."
+            exit 1
+          }
+
+          # Locate the produced Excel file. The Python script appends
+          # _XMC_<platform>.xlsx directly to the outputDir path string
+          # (no separator), and prefixes the BINSKIM copy with the dir
+          # basename. Try both known patterns before giving up.
+          #
+          # Pattern 1 (BINSKIM subdir copy): <outputDir>\BINSKIM\*_XMC_<platform>.xlsx
+          $xlsx = Get-ChildItem "$outputDir\BINSKIM" -Filter "*_XMC_${platform}.xlsx" `
+                    -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $xlsx) {
+            # Pattern 2 (primary output): <outputDir>_XMC_<platform>.xlsx
+            # (script appends to outputDir string directly — no backslash)
+            $xlsx = Get-Item "${outputDir}_XMC_${platform}.xlsx" -ErrorAction SilentlyContinue
+          }
+          if (-not $xlsx) {
+            Write-Error "❌ ERROR: Expected Excel report not found. Searched:`n  $outputDir\BINSKIM\*_XMC_${platform}.xlsx`n  ${outputDir}_XMC_${platform}.xlsx"
+            exit 1
+          }
+
+          # Copy the Excel to a fixed known path so the artifact upload step
+          # can reference it via env.WORK_ROOT without needing the steps or
+          # runtime env contexts, which are invalid in action with: blocks.
+          $reportDest = "$env:WORK_ROOT\binskim-report.xlsx"
+          Copy-Item $xlsx.FullName $reportDest
+          Write-Host "✅ Excel report: $reportDest"
+
+      # -------------------------------------------------------
+      # Step 5: Parse the Excel report for Fail / Unknown rows.
+      #         The Excel "Result" column contains the human-readable
+      #         status ("Fail", "Unknown", "Pass") written by the Python
+      #         conversion script — more reliable than mapping SARIF kind
+      #         values which vary across BinSkim/reformatter versions.
+      #         Python script is written line-by-line via a PS array to
+      #         avoid PowerShell here-strings (their "@ closing delimiter
+      #         must be at column 0, which breaks YAML block-scalar parsing).
+      # -------------------------------------------------------
+      - name: Check BinSkim results for failures
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $xlsxPath = "$env:WORK_ROOT\binskim-report.xlsx"
+
+          if (-not (Test-Path $xlsxPath)) {
+            Write-Error "❌ ERROR: Excel report not found at: $xlsxPath"
+            exit 1
+          }
+
+          Write-Host "Analysing BinSkim Excel report: $xlsxPath"
+
+          # Build the Python checker line-by-line into a PS array and write
+          # to a temp file with Set-Content. No here-string needed, so no
+          # YAML block-scalar indentation conflict.
+          $pyLines = @(
+            'import sys, openpyxl',
+            'wb = openpyxl.load_workbook(sys.argv[1])',
+            'failures = []',
+            'unknowns = []',
+            'for ws in wb.worksheets:',
+            '    for row in ws.iter_rows(min_row=2, values_only=True):',
+            '        row_str = " ".join(str(c) for c in row if c is not None)',
+            '        row_lower = row_str.lower()',
+            '        if "fail" in row_lower:',
+            '            failures.append(row_str)',
+            '        elif "unknown" in row_lower:',
+            '            unknowns.append(row_str)',
+            'if failures:',
+            '    print("FAIL_COUNT=" + str(len(failures)))',
+            '    [print("  FAIL: " + r) for r in failures]',
+            'if unknowns:',
+            '    print("UNKNOWN_COUNT=" + str(len(unknowns)))',
+            '    [print("  UNKNOWN: " + r) for r in unknowns]',
+            'if failures or unknowns:',
+            '    sys.exit(1)',
+            'else:',
+            '    print("ALL_PASS")'
+          )
+          $pyScript = "$env:RUNNER_TEMP\check_binskim_excel.py"
+          Set-Content -Path $pyScript -Value ($pyLines -join "`n") -Encoding utf8
+
+          $output = python $pyScript $xlsxPath
+          Write-Host $output
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ BinSkim Excel report contains Fail or Unknown entries. See details above."
+            exit 1
+          }
+
+          Write-Host "✅ BinSkim analysis passed. No Fail or Unknown entries in Excel report."
+
+      # -------------------------------------------------------
+      # Copy SARIF results to $GITHUB_WORKSPACE so the SARIF
+      # upload action can locate them via a relative path.
+      # github/codeql-action/upload-sarif runs in a container
+      # that only has $GITHUB_WORKSPACE mounted — identical
+      # constraint to the EnricoMi JUnit publisher on Linux.
+      # -------------------------------------------------------
+      - name: Copy SARIF results to workspace for publisher
+        if: always()
+        run: |
+          $targetDir = Join-Path $env:GITHUB_WORKSPACE 'binskim-results'
+          New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+
+          $files = @(
+            "$env:WORK_ROOT\binskim-results.sarif",
+            "$env:WORK_ROOT\binskim-results_reformatted.sarif"
+          )
+          $copied = 0
+          foreach ($f in $files) {
+            if (Test-Path $f) {
+              Copy-Item $f $targetDir
+              $copied++
+              Write-Host "Copied: $(Split-Path $f -Leaf)"
+            } else {
+              Write-Warning "⚠️  WARNING: $f not found; publisher may report no results."
+            }
+          }
+          if ($copied -eq 0) {
+            Write-Warning "⚠️  WARNING: No SARIF files were copied to workspace."
+          }
+
+      # -------------------------------------------------------
+      # Publish the reformatted SARIF to the GitHub Security tab
+      # as an inline PR check — equivalent to the EnricoMi JUnit
+      # publisher used on the Linux workflow. Runs even on failure
+      # so results are always visible in the PR checks UI.
+      # -------------------------------------------------------
+      - name: Publish BinSkim SARIF results
+        # Posts findings to the PR's Security / Code-scanning tab.
+        # Displays ✅/❌ per rule inline in the PR diff view.
+        # Runs even on failure so results are always visible.
+        # continue-on-error: GitHub Advanced Security (GHAS) must be enabled
+        # on the GHE instance for upload-sarif to succeed. This step is
+        # best-effort — the workflow does not fail if GHAS is unavailable.
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          # Relative path inside $GITHUB_WORKSPACE — the only directory
+          # mounted into the container that runs this action.
+          sarif_file: binskim-results/binskim-results_reformatted.sarif
+          category: binskim-winlt64
+
+      # -------------------------------------------------------
+      # Always upload SARIF + Excel as artifacts for audit trail.
+      # -------------------------------------------------------
+      - name: Upload BinSkim artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: binskim-results-pr-${{ github.event.pull_request.number }}
+          if-no-files-found: warn
+          path: |
+            ${{ env.WORK_ROOT }}\binskim-results.sarif
+            ${{ env.WORK_ROOT }}\binskim-results_reformatted.sarif
+            ${{ env.WORK_ROOT }}\binskim-report.xlsx

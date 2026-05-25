@@ -866,7 +866,7 @@ AieRC XAie_DmaGetNumBds(XAie_DevInst *DevInst, XAie_LocType Loc, u8 *NumBds)
 	const XAie_DmaMod *DmaMod;
 	u8 TileType;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (NumBds == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid arguments\n");
 		return XAIE_INVALID_ARGS;
@@ -912,7 +912,7 @@ AieRC XAie_DmaGetNumBdsPvtBuffPool(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u8 TileType;
 	(void)ChNum;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (NumBds == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid arguments\n");
 		return XAIE_INVALID_ARGS;
@@ -952,6 +952,13 @@ AieRC XAie_DmaGetNumBdsGeneric(XAie_DevInst *DevInst, XAie_LocType Loc,
 			u8 ChNum, XAie_DmaDirection Dir, u8 *NumBds)
 {
 	u8 TileType;
+
+	if((DevInst == XAIE_NULL) || (NumBds == NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 		
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DevInst->DevProp.DevGen, TileType, Dir))
@@ -1067,7 +1074,13 @@ AieRC XAie_DmaSetNextBdPvtBuffPool(XAie_DmaDesc *DmaDesc, u8 ChNum, XAie_DmaDire
 *****************************************************************************/
 AieRC XAie_DmaSetNextBdGeneric(XAie_DmaDesc *DmaDesc, u8 ChNum, XAie_DmaDirection Dir,
 					u16 NextBd, u8 EnableNextBd)
-{		
+{
+	if((DmaDesc == XAIE_NULL) ||
+			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DmaDesc->DevGen, DmaDesc->TileType, Dir))
 		return XAie_DmaSetNextBd(DmaDesc, NextBd, EnableNextBd);
 	else
@@ -1377,7 +1390,8 @@ AieRC XAie_DmaWriteBdPvtBuffPool(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc, X
 	const XAie_DmaMod *DmaMod;
 	u8 MaxNumChannels, MaxNumBds;
 
-	if((DmaDesc == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (DmaDesc == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY) ||
 			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Arguments\n");
 		return XAIE_INVALID_ARGS;
@@ -1429,6 +1443,14 @@ AieRC XAie_DmaWriteBdGeneric(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc, XAie_
 			u8 ChNum, XAie_DmaDirection Dir, u16 BdNum)
 {
 	u8 TileType;
+
+	if((DevInst == XAIE_NULL) || (DmaDesc == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY) ||
+			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 		
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DevInst->DevProp.DevGen, TileType, Dir))
@@ -1513,6 +1535,12 @@ AieRC XAie_DmaReadBdPvtBuffPool(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc, XA
 AieRC XAie_DmaReadBdGeneric(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc, XAie_LocType Loc,
 			u8 ChNum, XAie_DmaDirection Dir, u16 BdNum)
 {
+	if((DevInst == XAIE_NULL) || (DmaDesc == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DmaDesc->DevGen, DmaDesc->TileType, Dir))
 		 return XAie_DmaReadBd(DevInst, DmaDesc, Loc, BdNum);
 	else
@@ -1966,6 +1994,12 @@ static AieRC _XAie_DmaChannelControl(XAie_DevInst *DevInst, XAie_LocType Loc,
 AieRC XAie_DmaChannelEnable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		XAie_DmaDirection Dir)
 {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))
 		return XAIE_NOT_SUPPORTED;
 	else
@@ -1990,6 +2024,12 @@ AieRC XAie_DmaChannelEnable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 AieRC XAie_DmaChannelDisable(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 		XAie_DmaDirection Dir)
 {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen))
 		return XAIE_NOT_SUPPORTED;
 	else
@@ -2021,7 +2061,7 @@ AieRC XAie_DmaGetPendingBdCount(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u8 MaxNumChannels;
 	const XAie_DmaMod *DmaMod;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (PendingBd == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
@@ -2071,7 +2111,7 @@ AieRC XAie_DmaGetChannelStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u8 MaxNumChannels;
 	const XAie_DmaMod *DmaMod;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (Status == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;

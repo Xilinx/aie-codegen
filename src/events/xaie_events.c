@@ -1958,7 +1958,7 @@ AieRC XAie_EventLogicalToPhysicalConv(XAie_DevInst *DevInst, XAie_LocType Loc,
 	const XAie_EvntMod *EvntMod;
 
 	EventVal = (u32)Event;
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (HwEvent == NULL) ||
 		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
@@ -2028,7 +2028,7 @@ AieRC XAie_EventPhysicalToLogicalConv(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u8 TileType;
 	const XAie_EvntMod *EvntMod;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (EnumEvent == NULL) ||
 		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;

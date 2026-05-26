@@ -57,11 +57,19 @@ AieRC XAie_DataMemWrWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u32 Addr, u32 Data)
 {
 	u64 RegAddr;
+	u8 TileType;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if((TileType != XAIEGBL_TILE_TYPE_AIETILE) &&
+			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
+		XAIE_ERROR("Tile type mismatch\n");
+		return XAIE_INVALID_TILE;
 	}
 
 	RegAddr = (u64)(Addr) +
@@ -90,11 +98,19 @@ AieRC XAie_DataMemRdWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u32 Addr, u32 *Data)
 {
 	u64 RegAddr;
+	u8 TileType;
 
 	if((DevInst == XAIE_NULL) || (Data == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if((TileType != XAIEGBL_TILE_TYPE_AIETILE) &&
+			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
+		XAIE_ERROR("Tile type mismatch\n");
+		return XAIE_INVALID_TILE;
 	}
 
 	RegAddr = (u64)(Addr) +
@@ -210,6 +226,7 @@ AieRC XAie_DataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 		const void *Src, u32 Size)
 {
 	AieRC RC;
+	u8 TileType;
 	const unsigned char *CharSrc = (const unsigned char *)Src;
 
 	if((DevInst == XAIE_NULL) ||
@@ -217,6 +234,13 @@ AieRC XAie_DataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 	{
 		XAIE_ERROR("Invalid device instance or source pointer\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if((TileType != XAIEGBL_TILE_TYPE_AIETILE) &&
+			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
+		XAIE_ERROR("Tile type mismatch\n");
+		return XAIE_INVALID_TILE;
 	}
 
 	RC = _XAie_DataMemoryBlockWrite(DevInst, Loc, Addr, CharSrc,
@@ -252,6 +276,7 @@ AieRC XAie_SharedDataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 A
 	u32 BytePtr = 0;
 	u32 RemBytes = Size;
 	u32 TempWord;
+	u8 TileType;
 	u8 FirstReadOffset = (u8)Addr & XAIE_MEM_WORD_ALIGN_MASK;
 	unsigned char *CharDst = (unsigned char *)Dst;
 
@@ -260,6 +285,13 @@ AieRC XAie_SharedDataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 A
 	{
 		XAIE_ERROR("Invalid device instance or destination pointer\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if((TileType != XAIEGBL_TILE_TYPE_AIETILE) &&
+			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
+		XAIE_ERROR("Tile type mismatch\n");
+		return XAIE_INVALID_TILE;
 	}
 
 	/* Absolute 4-byte aligned AXI-MM address to write */
@@ -337,6 +369,7 @@ AieRC XAie_SharedDataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc,
                 u32 Addr, const void *Src, u32 Size)
 {
         AieRC RC;
+        u8 TileType;
         unsigned char *CharSrc = (unsigned char *)Src;
 
         if((DevInst == XAIE_NULL) ||
@@ -346,6 +379,12 @@ AieRC XAie_SharedDataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc,
                 return XAIE_INVALID_ARGS;
         }
 
+        TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+        if((TileType != XAIEGBL_TILE_TYPE_AIETILE) &&
+                        (TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
+                XAIE_ERROR("Tile type mismatch\n");
+                return XAIE_INVALID_TILE;
+        }
 
         RC = _XAie_DataMemoryBlockWrite(DevInst, Loc, Addr, CharSrc,
                                         Size);
@@ -380,6 +419,7 @@ AieRC XAie_DataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 	u32 BytePtr = 0;
 	u32 RemBytes = Size;
 	u32 TempWord;
+	u8 TileType;
 
 	u8 FirstReadOffset = (u8)(Addr & XAIE_MEM_WORD_LAST_BYTE_MASK) & XAIE_MEM_WORD_ALIGN_MASK;
 	unsigned char *CharDst = (unsigned char *)Dst;
@@ -389,6 +429,13 @@ AieRC XAie_DataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 	{
 		XAIE_ERROR("Invalid device instance or destination pointer\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	if((TileType != XAIEGBL_TILE_TYPE_AIETILE) &&
+			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
+		XAIE_ERROR("Tile type mismatch\n");
+		return XAIE_INVALID_TILE;
 	}
 
 	/* Absolute 4-byte aligned AXI-MM address to write */

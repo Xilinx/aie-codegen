@@ -339,7 +339,7 @@ AieRC XAie_LockGetValue(XAie_DevInst *DevInst, XAie_LocType Loc, XAie_Lock Lock,
 	const XAie_LockMod *LockMod;
     u16 MaxLocKId;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (LockValue == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;

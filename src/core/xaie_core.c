@@ -569,7 +569,7 @@ AieRC XAie_CoreGetDebugHaltStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	const XAie_CoreMod *CoreMod;
 	const XAie_RegCoreDebugStatus *DbgStat;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (DebugStatus == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
@@ -624,7 +624,7 @@ AieRC XAie_CoreGetPCValue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	const XAie_CoreMod *CoreMod;
 	const XAie_CoreIntMod *CoreIntMod;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (PCValue == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
@@ -673,7 +673,7 @@ AieRC XAie_CoreGetSPValue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	const XAie_CoreMod *CoreMod;
 	const XAie_CoreIntMod *CoreIntMod;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (SPValue == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
@@ -722,7 +722,7 @@ AieRC XAie_CoreGetLRValue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	const XAie_CoreMod *CoreMod;
 	const XAie_CoreIntMod *CoreIntMod;
 
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (LRValue == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
@@ -1374,7 +1374,8 @@ AieRC XAie_CoreUcWakeUp(XAie_DevInst *DevInst, XAie_LocType Loc)
 	u8 TType;
 	const struct XAie_UcMod *UcMod;
 
-	if(DevInst == XAIE_NULL) {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
 	}
@@ -1407,7 +1408,8 @@ AieRC XAie_CoreUcSleep(XAie_DevInst *DevInst, XAie_LocType Loc)
 	u8 TType;
 	const struct XAie_UcMod *UcMod;
 
-	if(DevInst == XAIE_NULL) {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
 	}

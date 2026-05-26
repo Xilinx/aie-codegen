@@ -1751,6 +1751,12 @@ AieRC XAie_MdmPerfCounterSet(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u8 TileType, Index;
 	const XAie_UcMdm *UcMdm;
 
+	if((DevInst == XAIE_NULL) || (CounterVal == NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 	if(XAie_IsUcModulePresent(DevInst, TileType) == 0U) {
 		XAIE_ERROR("Tile does not have uC module\n");

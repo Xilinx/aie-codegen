@@ -1810,7 +1810,8 @@ AieRC XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 Col, u8 Row)
 	
 	//XAIE_DBG("\n\n*************Col = %d, Row = %d*******************\n", Col, Row);
 
-	if(DevInst == XAIE_NULL) {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
 	}

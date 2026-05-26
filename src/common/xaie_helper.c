@@ -70,6 +70,12 @@ u8 XAie_GetTileTypefromLoc(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 ColType;
 
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIEGBL_TILE_TYPE_MAX;
+	}
+
 	if(Loc.Col >= DevInst->NumCols) {
 		XAIE_ERROR("Invalid column: %d\n", Loc.Col);
 		return XAIEGBL_TILE_TYPE_MAX;
@@ -507,7 +513,15 @@ void _XAie_ClrBitInBitmap(u32 *Bitmap, u32 StartBit, u32 NumBit)
 
 AieRC XAie_Write32(XAie_DevInst *DevInst, u64 RegOff, u32 Value)
 {
-	const XAie_Backend *Backend = DevInst->Backend;
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
 		return XAie_Txn_Write32(DevInst, RegOff, Value);
@@ -526,7 +540,15 @@ AieRC XAie_Write32(XAie_DevInst *DevInst, u64 RegOff, u32 Value)
 
 AieRC XAie_Read32(XAie_DevInst *DevInst, u64 RegOff, u32 *Data)
 {
-	const XAie_Backend *Backend = DevInst->Backend;
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) || (Data == NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
 		return XAie_Txn_Read32(DevInst, RegOff, Data);
@@ -545,7 +567,15 @@ AieRC XAie_Read32(XAie_DevInst *DevInst, u64 RegOff, u32 *Data)
 
 AieRC XAie_MaskWrite32(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value)
 {
-	const XAie_Backend *Backend = DevInst->Backend;
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
 		return XAie_Txn_MaskWrite32(DevInst, RegOff, Mask, Value);
@@ -566,7 +596,15 @@ AieRC XAie_MaskWrite32(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value)
 AieRC XAie_MaskPoll(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 		u32 TimeOutUs)
 {
-	const XAie_Backend *Backend = DevInst->Backend;
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
 		return XAie_Txn_MaskPoll(DevInst, RegOff, Mask, Value, TimeOutUs);
@@ -582,7 +620,15 @@ AieRC XAie_MaskPoll(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 AieRC XAie_MaskPollBusy(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 		u32 TimeOutUs)
 {
-	const XAie_Backend *Backend = DevInst->Backend;
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
 		return XAie_Txn_MaskPollBusy(DevInst, RegOff, Mask, Value, TimeOutUs);
@@ -596,7 +642,15 @@ AieRC XAie_MaskPollBusy(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 
 AieRC XAie_BlockWrite32(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data, u32 Size)
 {
-	const XAie_Backend *Backend = DevInst->Backend;
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) || (Data == NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
 		return XAie_Txn_BlockWrite32(DevInst, RegOff, Data, Size);
@@ -611,7 +665,15 @@ AieRC XAie_BlockWrite32(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data, u32 
 
 AieRC XAie_BlockSet32(XAie_DevInst *DevInst, u64 RegOff, u32 Data, u32 Size)
 {
-	const XAie_Backend *Backend = DevInst->Backend;
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
 		return XAie_Txn_BlockSet32(DevInst, RegOff, Data, Size);
@@ -627,7 +689,15 @@ AieRC XAie_BlockSet32(XAie_DevInst *DevInst, u64 RegOff, u32 Data, u32 Size)
 AieRC XAie_CmdWrite(XAie_DevInst *DevInst, u8 Col, u8 Row, u8 Command,
 		u32 CmdWd0, u32 CmdWd1, const char *CmdStr)
 {
-	const XAie_Backend *Backend = DevInst->Backend;
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
 		/**
@@ -647,7 +717,15 @@ AieRC XAie_CmdWrite(XAie_DevInst *DevInst, u8 Col, u8 Row, u8 Command,
 AieRC XAie_RunOp(XAie_DevInst *DevInst, XAie_BackendOpCode Op, void *Arg)
 {
 	AieRC RC;
-	const XAie_Backend *Backend = DevInst->Backend;
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
 		RC = XAie_Txn_RunOp(DevInst, (u8)Op == XAIE_BACKEND_OP_CONFIG_SHIMDMABD, Arg);
@@ -1253,14 +1331,20 @@ static AieRC _XAie_EventStatusDump(XAie_DevInst *DevInst,
 AieRC XAie_StatusDump(XAie_DevInst *DevInst, XAie_ColStatus *Status)
 {
 	AieRC RC = XAIE_OK;
-	u8 StartCol = DevInst->StartCol;
-	u8 NumCols  = DevInst->NumCols;
-	u8 NumRows  = DevInst->NumRows;
+	u8 StartCol;
+	u8 NumCols;
+	u8 NumRows;
 	XAie_LocType Loc;
 
-	if(Status == NULL) {
-		return XAIE_ERR;
+	if((DevInst == XAIE_NULL) || (Status == NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
 	}
+
+	StartCol = DevInst->StartCol;
+	NumCols = DevInst->NumCols;
+	NumRows = DevInst->NumRows;
 
 	/* iterate specified columns */
 	for(u32 Col = StartCol; Col < ((u32)StartCol + NumCols); Col++) {
@@ -1575,6 +1659,13 @@ u8 XAie_GetComboEventsNumber(XAie_DevInst* DevInst, u8 TileType, XAie_ModuleType
 u64 XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C)
 {
 	XAie_LocType Loc = { R, C };
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return 0U;
+	}
+
 	if ((DevInst->DevProp.RowShift > 55) || (DevInst->DevProp.ColShift > 55)){
 		XAIE_ERROR("Invalid shift value pair\n");
 		return XAIE_ERR;
@@ -1636,6 +1727,12 @@ u64 _XAie_GetTileAddr(XAie_DevInst *DevInst, u8 R, u8 C)
 *
 *******************************************************************************/
 u8 XAie_IsUcModulePresent(XAie_DevInst* DevInst, u8 TileType) {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return 0U;
+	}
+
 	if ((_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) &&
 			TileType == XAIEGBL_TILE_TYPE_SHIMNOC) {
 		return 1;

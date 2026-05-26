@@ -217,6 +217,12 @@ static AieRC _XAie_ConfigShimNocDeMux(XAie_DevInst *DevInst, XAie_LocType Loc,
 AieRC XAie_EnableShimDmaToAieStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 PortNum)
 {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	/* In AIE4, there no mux available in Noc module. As each interface
 	have dedicated stream port available */
 	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
@@ -252,6 +258,12 @@ AieRC XAie_EnableShimDmaToAieStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 AieRC XAie_EnableAieToShimDmaStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 PortNum)
 {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	/* In AIE4, there no mux available in Noc module. As each interface
 	have dedicated stream port available */
 	if (_XAie_IsDeviceGenAIE4(DevInst->DevProp.DevGen)) {
@@ -295,6 +307,12 @@ AieRC XAie_EnableAieToShimDmaStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 AieRC XAie_EnableNoCToAieStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 PortNum)
 {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
         /* In AIE4, NOC streams are defeatured, so no need MUX
 	registers are available to configure. So if Device
 	gen is AIE4 or higher, just return with Invalid argument */
@@ -326,6 +344,12 @@ AieRC XAie_EnableNoCToAieStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 AieRC XAie_EnableAieToNoCStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 PortNum)
 {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
         /* In AIE4, NOC streams are defeatured, so no need MUX
 	registers are available to configure. So if Device
 	gen is AIE4 or higher, just return with Invalid argument */
@@ -357,6 +381,12 @@ AieRC XAie_EnableAieToNoCStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 AieRC XAie_EnablePlToAieStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 PortNum)
 {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
         /* In AIE4, NOC streams are defeatured, so no need MUX
 	registers are available to configure. So if Device
 	gen is AIE4 or higher, just return with Invalid argument */
@@ -389,6 +419,12 @@ AieRC XAie_EnablePlToAieStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 AieRC XAie_EnableAieToPlStrmPort(XAie_DevInst *DevInst, XAie_LocType Loc,
 		u8 PortNum)
 {
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
         /* In AIE4, NOC streams are defeatured, so no need MUX
 	registers are available to configure. So if Device
 	gen is AIE4 or higher, just return with Invalid argument */

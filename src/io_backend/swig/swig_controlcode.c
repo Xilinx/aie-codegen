@@ -15,6 +15,7 @@
 
 #ifdef __SWIGINTERFACE__
 #include "swig_controlcode_interface.h"
+#include <string.h>
 #endif
 
 #ifdef __SWIGINTERFACE__
@@ -35,6 +36,46 @@ int XAie_ControlCodeIO_swig_Init(Swig_DevInst *DevInst) {
 	DevInst->Backend = &ControlCodeBackend;
 	RC = XAie_ControlCodeIO_Init((XAie_DevInst *)DevInst);
 	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* Initialize device generation/topology on the SWIG device instance.
+*
+*******************************************************************************/
+int XAie_ControlCodeIO_swig_SetupDevice(Swig_DevInst *DevInst, Swig_Config *Config)
+{
+	XAie_Config Cfg;
+	AieRC RC;
+
+	if (DevInst == NULL || Config == NULL) {
+		return XAIE_INVALID_ARGS;
+	}
+
+	memset(&Cfg, 0, sizeof(Cfg));
+	Cfg.AieGen = Config->AieGen;
+	Cfg.BaseAddr = Config->BaseAddr;
+	Cfg.ColShift = Config->ColShift;
+	Cfg.RowShift = Config->RowShift;
+	Cfg.NumRows = Config->NumRows;
+	Cfg.NumCols = Config->NumCols;
+	Cfg.ShimRowNum = Config->ShimRowNum;
+	Cfg.ShimTileNumRowsNorth = Config->ShimTileNumRowsNorth;
+	Cfg.ShimTileNumRowsSouth = Config->ShimTileNumRowsSouth;
+	Cfg.MemTileRowStart = Config->MemTileRowStart;
+	Cfg.MemTileNumRows = Config->MemTileNumRows;
+	Cfg.AieTileRowStart = Config->AieTileRowStart;
+	Cfg.AieTileNumRows = Config->AieTileNumRows;
+	Cfg.PartProp = Config->PartProp;
+
+	RC = XAie_SetupPartitionConfig((XAie_DevInst *)DevInst, Config->BaseAddr,
+			0, Config->NumCols);
+	if (RC != XAIE_OK) {
+		return RC;
+	}
+
+	return XAie_CfgInitialize((XAie_DevInst *)DevInst, &Cfg);
 }
 
 /*****************************************************************************/
@@ -373,6 +414,48 @@ int XAie_ControlCodeIO_swig_StartNewJob(Swig_DevInst *DevInst)
 {
 	AieRC RC;
 	RC = XAie_StartNewJob((XAie_DevInst *)DevInst, XAIE_START_JOB);
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the public interface swig controlcode IO function to create job
+* cert command in ASM file with caller-selected type.
+*
+* @param	DevInst: Device instance pointer.
+* @param	JobType: XAie_CertStartJobType value.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+*******************************************************************************/
+int XAie_ControlCodeIO_swig_StartNewJobType(Swig_DevInst *DevInst, u8 JobType)
+{
+	AieRC RC;
+	RC = XAie_StartNewJob((XAie_DevInst *)DevInst, (XAie_CertStartJobType)JobType);
+	return RC;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the public interface swig controlcode IO function for PREEMPT
+* cert command emission in ASM file.
+*
+* @param	DevInst: Device instance pointer.
+* @param	PreemptId: Preempt id value.
+* @param	SaveLabel: Save label without '@' prefix.
+* @param	RestoreLabel: Restore label without '@' prefix.
+*
+* @return	XAIE_OK on success, error code on failure.
+*
+*******************************************************************************/
+int XAie_ControlCodeIO_swig_Preempt(Swig_DevInst *DevInst, u32 PreemptId,
+	char *SaveLabel, char *RestoreLabel)
+{
+	AieRC RC;
+	RC = XAie_Preempt((XAie_DevInst *)DevInst, (u16)PreemptId, SaveLabel, RestoreLabel,
+		NULL, 0U);
 	return RC;
 }
 

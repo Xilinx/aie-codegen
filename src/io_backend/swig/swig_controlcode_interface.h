@@ -116,6 +116,7 @@ typedef struct {
  */
 int XAie_ControlCodeIO_swig_Finish(Swig_ControlCodeIO IOInst);
 int XAie_ControlCodeIO_swig_Init(Swig_DevInst *DevInst);
+int XAie_ControlCodeIO_swig_SetupDevice(Swig_DevInst *DevInst, Swig_Config *Config);
 int XAie_ControlCodeIO_swig_ConfigMode(Swig_DevInst *DevInst, XAie_ModeSelect Mode);
 XAie_ModeSelect XAie_ControlCodeIO_swig_GetConfigMode(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_Write32(Swig_DevInst *DevInst, u64 RegOff, u32 Value);
@@ -135,6 +136,8 @@ int XAie_ControlCodeIO_swig_GetControlCodeBuffer(Swig_DevInst *DevInst, const ch
 int XAie_ControlCodeIO_swig_GetDebugAsmBuffer(Swig_DevInst *DevInst, const char **Buffer, size_t *Size);
 void XAie_ControlCodeIO_swig_CloseControlCodeInMemory(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_StartNewJob(Swig_DevInst *DevInst);
+int XAie_ControlCodeIO_swig_StartNewJobType(Swig_DevInst *DevInst, u8 JobType);
+int XAie_ControlCodeIO_swig_Preempt(Swig_DevInst *DevInst, u32 PreemptId, char *SaveLabel, char *RestoreLabel);
 int XAie_ControlCodeIO_swig_EndJob(Swig_DevInst *DevInst);
 int XAie_ControlCodeIO_swig_EndPage(Swig_DevInst *DevInst);
 void XAie_ControlCodeIO_swig_CloseControlCodeFile(Swig_DevInst *DevInst);

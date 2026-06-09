@@ -1,0 +1,379 @@
+name: SimNow EP ResNet50 Sanity PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Cancel in-progress runs for the same PR so stale commits don't
+# consume runner capacity while a newer push is already queued.
+concurrency:
+  group: simnow-ep-resnet50-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+# ---------------------------------------------------------------------------
+# Workflow-level constants.
+# RUN_WORK_DIR is a deterministic per-run path inside EP_WORKSPACE so that all
+# (deliberately NOT named WORK_DIR — that collides with the Makefile's WORK_DIR
+# variable and silently breaks the aiecompiler --workdir flag).
+# jobs (which run as separate shells on the same self-hosted runner) can
+# share the cloned repositories without artifact upload/download overhead.
+# ---------------------------------------------------------------------------
+env:
+  AIE_CODEGEN_REPO: https://gitenterprise.xilinx.com/ai-engine/aie-codegen.git
+  RESNET50_REPO: https://gitenterprise.xilinx.com/muddur/resent50_custom.git
+  RESNET50_BRANCH: Pr-sanity
+  AIE_CODEGEN_BASE_BRANCH: ${{ github.base_ref }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  TARGET: simnow_ep
+  EP_SERVER: xhd-swlab-aisrv103
+  EP_WORKSPACE: /proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+  USE_CUSTOM_LIBAIENGINE: "1"
+  # Unique per-run directory; consistent across all jobs because run_id and
+  # run_attempt are immutable for the lifetime of a workflow run.
+  RUN_WORK_DIR: /proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws/pr-${{ github.event.pull_request.number }}-run-${{ github.run_id }}-${{ github.run_attempt }}
+
+# ---------------------------------------------------------------------------
+# Job 1 — Setup: clone both repos and apply PR changes.
+# All subsequent jobs depend on this job completing successfully.
+# ---------------------------------------------------------------------------
+jobs:
+  setup:
+    name: "Setup: clone repos and apply PR changes"
+    runs-on: [self-hosted, linux, x64, simnow_ep_runner]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # -------------------------------------------------------
+      # Validate required host tools before touching the network.
+      # -------------------------------------------------------
+      - name: Validate required tools
+        run: |
+          set -euo pipefail
+          missing=()
+          for tool in git python3; do
+            if ! command -v "$tool" &>/dev/null; then
+              missing+=("$tool")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "❌ ERROR: Required tools not found in PATH: ${missing[*]}"
+            exit 1
+          fi
+          echo "✅ Tool checks passed."
+
+      # -------------------------------------------------------
+      # Clone aie-codegen on the PR base branch, then fetch and
+      # merge the exact PR head so the changed code is built.
+      # -------------------------------------------------------
+      - name: Clone aie-codegen and apply PR changes
+        env:
+          GIT_ENTERPRISE_PAT: ${{ secrets.GIT_ENTERPRISE_PAT }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUN_WORK_DIR"
+          cd "$RUN_WORK_DIR"
+
+          # Inject PAT into the clone URL when available (HTTPS only).
+          clone_url="$AIE_CODEGEN_REPO"
+          if [ -n "${GIT_ENTERPRISE_PAT:-}" ]; then
+            clone_url="https://oauth2:${GIT_ENTERPRISE_PAT}@gitenterprise.xilinx.com/ai-engine/aie-codegen.git"
+          fi
+
+          # 3-retry clone loop to tolerate transient network issues.
+          for attempt in 1 2 3; do
+            echo "Clone attempt $attempt/3..."
+            if git clone --depth 1 --branch "$AIE_CODEGEN_BASE_BRANCH" "$clone_url" aie-codegen; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ ERROR: Failed to clone aie-codegen after 3 attempts."
+              exit 1
+            fi
+            sleep 5
+          done
+
+          cd aie-codegen
+
+          echo "Fetching PR #${PR_NUMBER} changes..."
+          git fetch origin "+refs/pull/${PR_NUMBER}/head:refs/pr/${PR_NUMBER}/head" || {
+            echo "❌ ERROR: Failed to fetch PR #${PR_NUMBER} ref from origin."
+            exit 1
+          }
+
+          echo "Merging PR #${PR_NUMBER} into base branch '${AIE_CODEGEN_BASE_BRANCH}'..."
+          git merge --no-edit "refs/pr/${PR_NUMBER}/head" || {
+            echo "❌ ERROR: Merge of PR #${PR_NUMBER} failed — likely a merge conflict."
+            exit 1
+          }
+
+          echo "Initialising submodules..."
+          git submodule update --init --recursive || {
+            echo "❌ ERROR: Submodule initialisation failed."
+            exit 1
+          }
+
+          echo "✅ aie-codegen ready at $RUN_WORK_DIR/aie-codegen"
+
+      # -------------------------------------------------------
+      # Clone resnet50_custom on the Pr-sanity branch.
+      # -------------------------------------------------------
+      - name: Clone resnet50_custom repository
+        env:
+          GIT_ENTERPRISE_PAT: ${{ secrets.GIT_ENTERPRISE_PAT }}
+        run: |
+          set -euo pipefail
+          cd "$RUN_WORK_DIR"
+
+          clone_url="$RESNET50_REPO"
+          if [ -n "${GIT_ENTERPRISE_PAT:-}" ]; then
+            clone_url="https://oauth2:${GIT_ENTERPRISE_PAT}@gitenterprise.xilinx.com/muddur/resent50_custom.git"
+          fi
+
+          for attempt in 1 2 3; do
+            echo "Clone attempt $attempt/3..."
+            if git clone --branch "$RESNET50_BRANCH" "$clone_url" resnet50_custom; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ ERROR: Failed to clone resnet50_custom after 3 attempts."
+              exit 1
+            fi
+            sleep 5
+          done
+
+          if [ ! -f "$RUN_WORK_DIR/resnet50_custom/setup_env.sh" ]; then
+            echo "❌ ERROR: setup_env.sh not found in cloned resnet50_custom repo."
+            exit 1
+          fi
+          if [ ! -f "$RUN_WORK_DIR/resnet50_custom/build_and_run.sh" ]; then
+            echo "❌ ERROR: build_and_run.sh not found in cloned resnet50_custom repo."
+            exit 1
+          fi
+
+          echo "✅ resnet50_custom ready at $RUN_WORK_DIR/resnet50_custom"
+
+  # ---------------------------------------------------------------------------
+  # Job 2 — Build: TARGET=simnow_ep ./build_and_run.sh build
+  # ---------------------------------------------------------------------------
+  build:
+    name: "Build: build_and_run.sh build"
+    needs: setup
+    runs-on: simnow_ep_runner
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Run build step
+        run: |
+          set -euo pipefail
+
+          RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
+          AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
+
+          if [ ! -d "$RESNET50_DIR" ]; then
+            echo "❌ ERROR: resnet50_custom not found at $RESNET50_DIR — did the setup job succeed?"
+            exit 1
+          fi
+          if [ ! -d "$AIE_CODEGEN_PATH" ]; then
+            echo "❌ ERROR: aie-codegen not found at $AIE_CODEGEN_PATH — did the setup job succeed?"
+            exit 1
+          fi
+
+          cd "$RESNET50_DIR"
+
+          echo "Sourcing setup_env.sh..."
+          # shellcheck disable=SC1091
+          source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed (exit code $?)."
+            exit 1
+          }
+
+          export TARGET=simnow_ep
+          export EP_SERVER=xhd-swlab-aisrv103
+          export EP_WORKSPACE=/proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+          export USE_CUSTOM_LIBAIENGINE=1
+          export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
+
+          echo "Running: TARGET=simnow_ep ./build_and_run.sh build"
+          TARGET=simnow_ep ./build_and_run.sh build || {
+            echo "❌ ERROR: build step failed (exit code $?)."
+            exit 1
+          }
+
+          echo "✅ Build completed successfully."
+
+  # ---------------------------------------------------------------------------
+  # Job 3 — Package: TARGET=simnow_ep ./build_and_run.sh package
+  #          Produces Work/hw_run/ used by the deploy step.
+  # ---------------------------------------------------------------------------
+  package:
+    name: "Package: build_and_run.sh package"
+    needs: build
+    runs-on: simnow_ep_runner
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Run package step
+        run: |
+          set -euo pipefail
+
+          RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
+          AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
+
+          if [ ! -d "$RESNET50_DIR" ]; then
+            echo "❌ ERROR: resnet50_custom not found at $RESNET50_DIR"
+            exit 1
+          fi
+
+          cd "$RESNET50_DIR"
+
+          echo "Sourcing setup_env.sh..."
+          # shellcheck disable=SC1091
+          source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed (exit code $?)."
+            exit 1
+          }
+
+          export TARGET=simnow_ep
+          export EP_SERVER=xhd-swlab-aisrv103
+          export EP_WORKSPACE=/proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+          export USE_CUSTOM_LIBAIENGINE=1
+          export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
+
+          echo "Running: TARGET=simnow_ep ./build_and_run.sh package"
+          TARGET=simnow_ep ./build_and_run.sh package || {
+            echo "❌ ERROR: package step failed (exit code $?)."
+            exit 1
+          }
+
+          # Verify the expected output directory was produced.
+          if [ ! -d "multi_layer_test/Work/hw_run" ]; then
+            echo "❌ ERROR: Expected multi_layer_test/Work/hw_run/ not found after package step."
+            exit 1
+          fi
+
+          echo "✅ Package completed. multi_layer_test/Work/hw_run/ generated."
+
+  # ---------------------------------------------------------------------------
+  # Job 4 — Deploy: TARGET=simnow_ep ./build_and_run.sh deploy
+  #          SCPs packaged artifacts to the EP guest server.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: "Deploy: build_and_run.sh deploy (SCP to guest)"
+    needs: package
+    runs-on: simnow_ep_runner
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Run deploy step
+        run: |
+          set -euo pipefail
+
+          RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
+          AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
+
+          if [ ! -d "$RESNET50_DIR" ]; then
+            echo "❌ ERROR: resnet50_custom not found at $RESNET50_DIR"
+            exit 1
+          fi
+
+          cd "$RESNET50_DIR"
+
+          echo "Sourcing setup_env.sh..."
+          # shellcheck disable=SC1091
+          source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed (exit code $?)."
+            exit 1
+          }
+
+          export TARGET=simnow_ep
+          export EP_SERVER=xhd-swlab-aisrv103
+          export EP_WORKSPACE=/proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+          export USE_CUSTOM_LIBAIENGINE=1
+          export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
+
+          echo "Running: TARGET=simnow_ep ./build_and_run.sh deploy (SCP to $EP_SERVER)"
+          TARGET=simnow_ep ./build_and_run.sh deploy || {
+            echo "❌ ERROR: deploy step failed (exit code $?)."
+            echo "  Check connectivity to $EP_SERVER and that SCP keys are configured."
+            exit 1
+          }
+
+          echo "✅ Deploy completed. Artifacts SCP'd to $EP_SERVER."
+
+  # ---------------------------------------------------------------------------
+  # Job 5 — Run: TARGET=simnow_ep ./build_and_run.sh run
+  #          Executes xrt_test 8 on the EP guest.
+  # ---------------------------------------------------------------------------
+  run:
+    name: "Run: build_and_run.sh run (xrt_test)"
+    needs: deploy
+    runs-on: simnow_ep_runner
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Run xrt_test step
+        run: |
+          set -euo pipefail
+
+          RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
+          AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
+
+          if [ ! -d "$RESNET50_DIR" ]; then
+            echo "❌ ERROR: resnet50_custom not found at $RESNET50_DIR"
+            exit 1
+          fi
+
+          cd "$RESNET50_DIR"
+
+          echo "Sourcing setup_env.sh..."
+          # shellcheck disable=SC1091
+          source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed (exit code $?)."
+            exit 1
+          }
+
+          export TARGET=simnow_ep
+          export EP_SERVER=xhd-swlab-aisrv103
+          export EP_WORKSPACE=/proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+          export USE_CUSTOM_LIBAIENGINE=1
+          export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
+
+          echo "Running: TARGET=simnow_ep ./build_and_run.sh run"
+          TARGET=simnow_ep ./build_and_run.sh run || {
+            echo "❌ ERROR: xrt_test run failed (exit code $?)."
+            exit 1
+          }
+
+          echo "✅ xrt_test run completed successfully."
+
+  # ---------------------------------------------------------------------------
+  # Job 6 — Cleanup: always remove the run workspace to avoid disk exhaustion.
+  # Runs even if any earlier job fails so the runner stays clean.
+  # ---------------------------------------------------------------------------
+  cleanup:
+    name: "Cleanup: remove run workspace"
+    needs: [setup, build, package, deploy, run]
+    if: always()
+    runs-on: simnow_ep_runner
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Remove run workspace
+        run: |
+          if [ -d "$RUN_WORK_DIR" ]; then
+            rm -rf "$RUN_WORK_DIR"
+            echo "✅ Cleaned up $RUN_WORK_DIR"
+          else
+            echo "⚠️  Workspace not found (may not have been created): $RUN_WORK_DIR"
+          fi

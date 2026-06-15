@@ -517,8 +517,10 @@ again:
 		if (node->data[i])
 			break;
 	}
-	if (i < 0)
+	if (i < 0) {
+		*index = 0;
 		return NULL;
+	}
 	if (!node->child[i]) {
 		*index = i;
 		return node;
@@ -570,6 +572,10 @@ void *btree4_delete(struct btree4 *tree, void *data)
 		 * merge_node here is alway leaf node
 		 */
 		merge_node = btree4_largest(node->child[index], &merge_index);
+		if (merge_node == NULL) {
+			/* Handle empty subtree case */
+			return value;
+		}
 		node->data[index] = merge_node->data[merge_index];
 		merge_node->data[merge_index] = NULL;
 		/* merge_node has at least one data */

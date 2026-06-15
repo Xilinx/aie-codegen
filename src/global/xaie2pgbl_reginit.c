@@ -189,7 +189,7 @@ static const  XAie_CoreMod Aie2PCoreMod =
 	.DataMemShift = 16,
 	.EccEvntRegOff = XAIE2PGBL_CORE_MODULE_ECC_SCRUBBING_EVENT,
 	.CoreModSpareRegOff = XAIE2PGBL_MEMORY_MODULE_SPARE_REG,
-	.CoreModSpareRegMask = 0xFFFFFFFF,
+	.CoreModSpareRegMask = XAIE2PGBL_MEMORY_MODULE_SPARE_REG_MASK,
 	.CorePCOff = XAIE2PGBL_CORE_MODULE_CORE_PC,
 	.CoreSPOff = XAIE2PGBL_CORE_MODULE_CORE_SP,
 	.CoreLROff = XAIE2PGBL_CORE_MODULE_CORE_LR,
@@ -2199,7 +2199,7 @@ static const  XAie_MemMod Aie2PTileMemMod =
 	.MemAddr = XAIE2PGBL_MEMORY_MODULE_DATAMEMORY,
 	.EccEvntRegOff = XAIE2PGBL_MEMORY_MODULE_ECC_SCRUBBING_EVENT,
 	.CoreMemModSpareRegOff = XAIE2PGBL_MEMORY_MODULE_SPARE_REG,
-	.CoreMemModSpareRegMask = 0xFFFFFFFF,
+	.CoreMemModSpareRegMask = XAIE2PGBL_MEMORY_MODULE_SPARE_REG_MASK,
 };
 
 /* Data Memory Module for Mem Tile data memory*/
@@ -2209,7 +2209,7 @@ static const  XAie_MemMod Aie2PMemTileMemMod =
 	.MemAddr = XAIE2PGBL_MEM_TILE_MODULE_DATAMEMORY,
 	.EccEvntRegOff = XAIE2PGBL_MEM_TILE_MODULE_ECC_SCRUBBING_EVENT,
 	.MemTileSpareRegOff = XAIE2PGBL_MEM_TILE_MODULE_SPARE_REG,
-	.MemTileSpareRegMask = 0xFFFFFFFF,
+	.MemTileSpareRegMask = XAIE2PGBL_MEM_TILE_MODULE_SPARE_REG_MASK,
 };
 #endif /* XAIE_FEATURE_DATAMEM_ENABLE */
 
@@ -2341,7 +2341,7 @@ static const  XAie_PlIfMod Aie2PPlIfMod =
 	.DownSzrByPass = Aie2PDownSzrByPass,
 	.ColRst = {0, 0x1},
 	.ShimTileSpareRegOff = XAIE2PGBL_PL_MODULE_SPARE_REG,
-	.ShimTileSpareRegMask = 0xFFFFFFFF,
+	.ShimTileSpareRegMask = XAIE2PGBL_PL_MODULE_SPARE_REG_MASK,
 #ifdef XAIE_FEATURE_PRIVILEGED_ENABLE
 	.ClkBufCntr = &Aie2PShimClkBufCntr,
 	.ShimTileRst = &Aie2PShimTileRst,
@@ -2380,7 +2380,7 @@ static const  XAie_PlIfMod Aie2PShimTilePlIfMod =
 	.DownSzrByPass = Aie2PDownSzrByPass,
 	.ColRst = {0, 0x1},
 	.ShimTileSpareRegOff = XAIE2PGBL_NOC_MODULE_SPARE_REG,
-	.ShimTileSpareRegMask = 0xFFFFFFFF,
+	.ShimTileSpareRegMask = XAIE2PGBL_NOC_MODULE_SPARE_REG_MASK,
 #ifdef XAIE_FEATURE_PRIVILEGED_ENABLE
 	.ClkBufCntr = &Aie2PShimClkBufCntr,
 	.ShimTileRst = &Aie2PShimTileRst,

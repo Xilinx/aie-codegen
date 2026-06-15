@@ -3939,7 +3939,7 @@ static const  XAie_CoreMod Aie4CoreMod =
 	.CoreSPOff = XAIE_FEATURE_UNAVAILABLE,
 	.CoreLROff = XAIE_FEATURE_UNAVAILABLE,
 	.CoreModSpareRegOff = XAIE4GBL_CORE_MODULE_SPARE_REG,
-	.CoreModSpareRegMask = 0xFFFFFFFF,
+	.CoreModSpareRegMask = XAIE4GBL_CORE_MODULE_SPARE_REG_MASK,
 	.CoreCtrl = &Aie4CoreCtrlReg,
 	.CoreDebugStatus = &Aie4CoreDebugStatus,
 	.CoreSts = &Aie4CoreStsReg,
@@ -3975,7 +3975,7 @@ static const  XAie_MemMod Aie4TileMemMod =
         .EccEvntRegOff = XAIE_FEATURE_UNAVAILABLE,
 	.EccScubPeriodRegOff = XAIE4GBL_MEMORY_MODULE_ECC_SCRUBBING_PERIOD_PRIVILEGED,
 	.CoreMemModSpareRegOff = XAIE4GBL_MEMORY_MODULE_SPARE_REG,
-	.CoreMemModSpareRegMask = 0xFFFFFFFF,
+	.CoreMemModSpareRegMask = XAIE4GBL_MEMORY_MODULE_SPARE_REG_MASK,
 };
 
 /* Data Memory Module for Mem Tile data memory*/
@@ -3987,7 +3987,7 @@ static const  XAie_MemMod Aie4MemTileMemMod =
 	.EccScubPeriodRegOff = XAIE4GBL_MEM_TILE_MODULE_ECC_SCRUBBING_PERIOD_PRIVILEGED,
 	.MemTileSpareRegOff = XAIE4GBL_MEM_TILE_MODULE_SPARE_REG_A,
 	.MemTileSpareRegAppBOffset = 0x00040000, /* 256KB offset for APP B */
-	.MemTileSpareRegMask = 0xFFFFFFFF,
+	.MemTileSpareRegMask = XAIE4GBL_MEM_TILE_MODULE_SPARE_REG_A_MASK,
 };
 #endif /* XAIE_FEATURE_DATAMEM_ENABLE */
 
@@ -4012,7 +4012,7 @@ static const  XAie_PlIfMod Aie4ShimTilePlIfMod =
   .ColRst = {0, 0x3},
   .ShimTileSpareRegOff = XAIE4GBL_NOC_MODULE_SPARE_REG_A,
   .MemTileSpareRegAppBOffset = 0x00040000, /* 256KB offset for APP B */
-  .ShimTileSpareRegMask = 0xFFFFFFFF,
+  .ShimTileSpareRegMask = XAIE4GBL_NOC_MODULE_SPARE_REG_A_MASK,
 #ifdef XAIE_FEATURE_PRIVILEGED_ENABLE
 	.ClkBufCntr = &Aie4ShimClkBufCntr,
 	.ShimTileRst = &Aie4ShimTileRst,

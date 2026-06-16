@@ -1,6 +1,8 @@
-# Writes aie_codegen.sourcelink.json for /SOURCELINK (invoked from AieCodegenSourceLink.cmake).
-#
+###############################################################################
+# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
 # SPDX-License-Identifier: MIT
+###############################################################################
+# Writes aie_codegen.sourcelink.json for /SOURCELINK (invoked from AieCodegenSourceLink.cmake).
 
 if(NOT DEFINED OUT_FILE OR NOT DEFINED GIT_EXECUTABLE OR NOT DEFINED SOURCE_DIR)
   message(FATAL_ERROR "GenerateSourceLink.cmake: missing OUT_FILE, GIT_EXECUTABLE, or SOURCE_DIR")

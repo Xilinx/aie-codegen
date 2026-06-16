@@ -1,0 +1,81 @@
+###############################################################################
+# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+# SPDX-License-Identifier: MIT
+###############################################################################
+# Explicit translation units (replaces file(GLOB_RECURSE)).
+
+function(aie_codegen_add_sources target)
+  target_sources(${target} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/xaie_helper.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/xaie_instbuf.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/xaie_secure_io.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/xaie_txn.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/xaie_core.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/xaie_core_aie.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/xaie_core_aieml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/xaie_elfloader.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/xaie_uc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/device/xaie_device_aie.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/device/xaie_device_aie2ipu.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/device/xaie_device_aie2p.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/device/xaie_device_aie2ps.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/device/xaie_device_aie4.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/device/xaie_device_aieml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dma/xaie_dma.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dma/xaie_dma_aie.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dma/xaie_dma_aie2p.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dma/xaie_dma_aie2ps.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dma/xaie_dma_aie4.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/dma/xaie_dma_aieml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/events/xaie_events.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie2ipugbl_reginit.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie2pgbl_reginit.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie2psgbl_reginit.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie4gbl_reginit.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie4medusagbl_reginit.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaiegbl.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaiegbl_reginit.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaiemlgbl_reginit.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/interrupt/xaie_interrupt_aie.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/interrupt/xaie_interrupt_aie2ipu.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/interrupt/xaie_interrupt_aie2ps.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/interrupt/xaie_interrupt_aieml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/interrupt/xaie_interrupt_init.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/ext/btree4.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/ext/xaie_cdo.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/ext/xaie_controlcode.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/ext/xaie_debug.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/ext/xaie_io_common.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/ext/xaie_sim.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/ext/xaie_socket.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/privilege/xaie_io_privilege.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/swig/swig_controlcode.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/swig/swig_socket.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/xaie_io.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/locks/xaie_locks.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/locks/xaie_locks_aie.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/locks/xaie_locks_aie4.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/locks/xaie_locks_aieml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/memory/xaie_mem.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/noc/xaie_noc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/npi/xaie_npi.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/npi/xaie_npi_aie.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/npi/xaie_npi_aieml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/perfcnt/xaie_perfcnt.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/pl/xaie_plif.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/pm/xaie_clock.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/pm/xaie_ecc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/pm/xaie_reset.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/pm/xaie_reset_aie.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/pm/xaie_reset_aieml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/pm/xaie_tilectrl.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/routing/xaie_routing.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/stream_switch/xaie_ss.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/stream_switch/xaie_ss_aie.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/stream_switch/xaie_ss_aie2ps.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/stream_switch/xaie_ss_aie4.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/stream_switch/xaie_ss_aieml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/timer/xaie_timer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/trace/xaie_trace.c
+  )
+endfunction()

@@ -23,27 +23,35 @@ permissions:
 # jobs (which run as separate shells on the same self-hosted runner) can
 # share the cloned repositories without artifact upload/download overhead.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 env:
   AIE_CODEGEN_REPO: https://gitenterprise.xilinx.com/ai-engine/aie-codegen.git
   RESNET50_REPO: https://gitenterprise.xilinx.com/muddur/resent50_custom.git
-  RESNET50_BRANCH: Pr-sanity
+  RESNET50_BRANCH: Pr-stable
   AIE_CODEGEN_BASE_BRANCH: ${{ github.base_ref }}
   PR_NUMBER: ${{ github.event.pull_request.number }}
   TARGET: simnow_ep
+  REMOTE_HOST: xhd-swlab-aisrv103
+  REMOTE_USER: kishorer
   EP_SERVER: xhd-swlab-aisrv103
-  EP_WORKSPACE: /proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+  EP_WORKSPACE: /scratch/kishorer/simnow_ws
   USE_CUSTOM_LIBAIENGINE: "1"
-  # Unique per-run directory; consistent across all jobs because run_id and
-  # run_attempt are immutable for the lifetime of a workflow run.
-  RUN_WORK_DIR: /proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws/pr-${{ github.event.pull_request.number }}-run-${{ github.run_id }}-${{ github.run_attempt }}
+  # Unique per-run directory; consistent across all jobs because run_id is
+  # immutable for the lifetime of a workflow run. run_attempt is intentionally
+  # excluded: it increments when individual jobs are re-run, which would make
+  # later jobs look for a directory that setup never created at that attempt.
+  RUN_WORK_DIR: /proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws/pr-${{ github.event.pull_request.number }}-run-${{ github.run_id }}
 
 # ---------------------------------------------------------------------------
-# Job 1 — Setup: clone both repos and apply PR changes.
-# All subsequent jobs depend on this job completing successfully.
+# Single job — all phases run sequentially as steps in the same shell
+# environment on the same runner, so env vars set in earlier steps are
+# visible to later ones and no shared filesystem path is needed.
+# Cleanup runs in a final step with `if: always()` to guarantee disk
+# recovery even when an earlier step fails.
 # ---------------------------------------------------------------------------
 jobs:
-  setup:
-    name: "Setup: clone repos and apply PR changes"
+  simnow_ep_resnet50_sanity:
+    name: "SimNow EP ResNet50 Sanity (setup → build → package → deploy → run)"
     runs-on: [self-hosted, linux, x64, simnow_ep_runner]
     defaults:
       run:
@@ -155,48 +163,42 @@ jobs:
             echo "❌ ERROR: build_and_run.sh not found in cloned resnet50_custom repo."
             exit 1
           fi
+          if [ ! -f "$RUN_WORK_DIR/resnet50_custom/simnow_ep.conf.template" ]; then
+            echo "❌ ERROR: simnow_ep.conf.template not found in cloned resnet50_custom repo."
+            exit 1
+          fi
+
+          # Copy the conf template so the run scripts can find simnow_ep.conf.
+          cp "$RUN_WORK_DIR/resnet50_custom/simnow_ep.conf.template" \
+             "$RUN_WORK_DIR/resnet50_custom/simnow_ep.conf"
+          echo "✅ simnow_ep.conf created from template."
 
           echo "✅ resnet50_custom ready at $RUN_WORK_DIR/resnet50_custom"
 
-  # ---------------------------------------------------------------------------
-  # Job 2 — Build: TARGET=simnow_ep ./build_and_run.sh build
-  # ---------------------------------------------------------------------------
-  build:
-    name: "Build: build_and_run.sh build"
-    needs: setup
-    runs-on: simnow_ep_runner
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Run build step
+      # -------------------------------------------------------
+      # Build + Package must always run together so that the
+      # driver and QEMU artifacts are consistent. Running package
+      # without a preceding build can leave stale binaries that
+      # cause driver load or QEMU boot failures.
+      # -------------------------------------------------------
+      - name: Build
         run: |
           set -euo pipefail
-
           RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
           AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
 
-          if [ ! -d "$RESNET50_DIR" ]; then
-            echo "❌ ERROR: resnet50_custom not found at $RESNET50_DIR — did the setup job succeed?"
-            exit 1
-          fi
-          if [ ! -d "$AIE_CODEGEN_PATH" ]; then
-            echo "❌ ERROR: aie-codegen not found at $AIE_CODEGEN_PATH — did the setup job succeed?"
-            exit 1
-          fi
-
           cd "$RESNET50_DIR"
-
-          echo "Sourcing setup_env.sh..."
           # shellcheck disable=SC1091
-          source setup_env.sh || {
-            echo "❌ ERROR: setup_env.sh failed (exit code $?)."
+          USE_CUSTOM_LIBAIENGINE=1 source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed."
             exit 1
           }
 
+          export REMOTE_HOST=xhd-swlab-aisrv103
+          export REMOTE_USER=kishorer
           export TARGET=simnow_ep
           export EP_SERVER=xhd-swlab-aisrv103
-          export EP_WORKSPACE=/proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+          export EP_WORKSPACE=/scratch/kishorer/simnow_ws
           export USE_CUSTOM_LIBAIENGINE=1
           export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
 
@@ -205,45 +207,30 @@ jobs:
             echo "❌ ERROR: build step failed (exit code $?)."
             exit 1
           }
-
           echo "✅ Build completed successfully."
 
-  # ---------------------------------------------------------------------------
-  # Job 3 — Package: TARGET=simnow_ep ./build_and_run.sh package
-  #          Produces Work/hw_run/ used by the deploy step.
-  # ---------------------------------------------------------------------------
-  package:
-    name: "Package: build_and_run.sh package"
-    needs: build
-    runs-on: simnow_ep_runner
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Run package step
+      # -------------------------------------------------------
+      # Package: always run immediately after build (see note above).
+      #          Produces multi_layer_test/Work/hw_run/
+      # -------------------------------------------------------
+      - name: Package
         run: |
           set -euo pipefail
-
           RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
           AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
 
-          if [ ! -d "$RESNET50_DIR" ]; then
-            echo "❌ ERROR: resnet50_custom not found at $RESNET50_DIR"
-            exit 1
-          fi
-
           cd "$RESNET50_DIR"
-
-          echo "Sourcing setup_env.sh..."
           # shellcheck disable=SC1091
-          source setup_env.sh || {
-            echo "❌ ERROR: setup_env.sh failed (exit code $?)."
+          USE_CUSTOM_LIBAIENGINE=1 source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed."
             exit 1
           }
 
+          export REMOTE_HOST=xhd-swlab-aisrv103
+          export REMOTE_USER=kishorer
           export TARGET=simnow_ep
           export EP_SERVER=xhd-swlab-aisrv103
-          export EP_WORKSPACE=/proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+          export EP_WORKSPACE=/scratch/kishorer/simnow_ws
           export USE_CUSTOM_LIBAIENGINE=1
           export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
 
@@ -253,98 +240,185 @@ jobs:
             exit 1
           }
 
-          # Verify the expected output directory was produced.
           if [ ! -d "multi_layer_test/Work/hw_run" ]; then
             echo "❌ ERROR: Expected multi_layer_test/Work/hw_run/ not found after package step."
             exit 1
           fi
-
           echo "✅ Package completed. multi_layer_test/Work/hw_run/ generated."
 
-  # ---------------------------------------------------------------------------
-  # Job 4 — Deploy: TARGET=simnow_ep ./build_and_run.sh deploy
-  #          SCPs packaged artifacts to the EP guest server.
-  # ---------------------------------------------------------------------------
-  deploy:
-    name: "Deploy: build_and_run.sh deploy (SCP to guest)"
-    needs: package
-    runs-on: simnow_ep_runner
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Run deploy step
+      # -------------------------------------------------------
+      # Verify EP server reachability only. We deliberately do NOT
+      # probe the QEMU guest's forwarded SSH port here: SimNow's
+      # emulated NIC makes lightweight TCP/SSH probes slow and
+      # unreliable (a bare /dev/tcp or `nc -z` to the guest port
+      # times out even when the guest is healthy). The SimNow EP
+      # setup step boots the guest and the deploy step uses sshpass
+      # over the guest SSH port, surfacing any real guest-
+      # connectivity failure with a clear error.
+      # -------------------------------------------------------
+      - name: Check EP server reachability
         run: |
           set -euo pipefail
+          EP_HOST="xhd-swlab-aisrv103"
 
+          if [ "$(hostname -s)" = "${EP_HOST%%.*}" ] || [ "$(hostname)" = "$EP_HOST" ]; then
+            echo "✅ Runner is on EP host $EP_HOST."
+          else
+            echo "Checking SSH to EP server: $EP_HOST"
+            if ! ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=no \
+                     "$EP_HOST" true 2>&1; then
+              echo "❌ ERROR: Cannot SSH to EP server $EP_HOST."
+              echo "  Ensure the runner SSH key is authorised on $EP_HOST."
+              exit 1
+            fi
+            echo "✅ EP server $EP_HOST is reachable."
+          fi
+          echo "ℹ️  Guest connectivity is validated by the SimNow EP setup and deploy steps."
+
+      # -------------------------------------------------------
+      # SimNow EP setup: boot the SimNow endpoint firmware and the
+      # QEMU guest BEFORE deploy.
+      #
+      # simnow_ep_run.sh setup now BLOCKS until the SimNow firmware
+      # reports "Supervisor started" before launching QEMU. If QEMU
+      # attaches to the cosim bridge before the endpoint firmware is
+      # up, its first MMIO wedges the cosim master channel, every
+      # vCPU blocks on the BQL, and BOTH the firmware boot and the
+      # guest boot deadlock (0 serial bytes, dead monitor). Booting
+      # in this order is what makes the guest reliably come up.
+      #
+      # This step also boots a guest fresh per run and picks a free
+      # forwarded SSH port automatically (GUEST_SSH_PORT_AUTO), so
+      # concurrent users on the shared --net=host EP host don't
+      # collide. The chosen port is persisted to
+      # .simnow_ep_runtime.env and reused by deploy/run.
+      # -------------------------------------------------------
+      # -------------------------------------------------------
+      # SimNow EP setup step 1: boot the SimNow firmware.
+      # Blocks until the endpoint firmware is ready before QEMU
+      # is launched so the cosim bridge does not deadlock.
+      # -------------------------------------------------------
+      - name: SimNow EP setup - boot firmware
+        run: |
+          set -euo pipefail
           RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
           AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
 
-          if [ ! -d "$RESNET50_DIR" ]; then
-            echo "❌ ERROR: resnet50_custom not found at $RESNET50_DIR"
-            exit 1
-          fi
-
           cd "$RESNET50_DIR"
-
-          echo "Sourcing setup_env.sh..."
           # shellcheck disable=SC1091
-          source setup_env.sh || {
-            echo "❌ ERROR: setup_env.sh failed (exit code $?)."
+          USE_CUSTOM_LIBAIENGINE=1 source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed."
             exit 1
           }
 
+          export REMOTE_HOST=xhd-swlab-aisrv103
+          export REMOTE_USER=kishorer
           export TARGET=simnow_ep
           export EP_SERVER=xhd-swlab-aisrv103
-          export EP_WORKSPACE=/proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+          export EP_WORKSPACE=/scratch/kishorer/simnow_ws
+          export USE_CUSTOM_LIBAIENGINE=1
+          export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
+
+          echo "Running: TARGET=simnow_ep bash ./simnow_ep_run.sh setup"
+          TARGET=simnow_ep bash ./simnow_ep_run.sh setup || {
+            echo "❌ ERROR: simnow_ep_run.sh setup failed (exit code $?)."
+            echo "  The SimNow firmware may not have reached 'Supervisor started'"
+            echo "  or the QEMU guest failed to boot within the timeout."
+            exit 1
+          }
+          echo "✅ SimNow EP setup completed (firmware up, QEMU guest booted)."
+
+      # -------------------------------------------------------
+      # SimNow EP setup step 2: load the NPU driver inside the
+      # QEMU guest. Must run after setup so the guest is up.
+      # -------------------------------------------------------
+      - name: SimNow EP setup - load driver
+        run: |
+          set -euo pipefail
+          RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
+          AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
+
+          cd "$RESNET50_DIR"
+          # shellcheck disable=SC1091
+          USE_CUSTOM_LIBAIENGINE=1 source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed."
+            exit 1
+          }
+
+          export REMOTE_HOST=xhd-swlab-aisrv103
+          export REMOTE_USER=kishorer
+          export TARGET=simnow_ep
+          export EP_SERVER=xhd-swlab-aisrv103
+          export EP_WORKSPACE=/scratch/kishorer/simnow_ws
+          export USE_CUSTOM_LIBAIENGINE=1
+          export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
+
+          echo "Running: TARGET=simnow_ep bash ./simnow_ep_run.sh driver"
+          TARGET=simnow_ep bash ./simnow_ep_run.sh driver || {
+            echo "❌ ERROR: simnow_ep_run.sh driver failed (exit code $?)."
+            echo "  The NPU driver may have failed to load inside the QEMU guest."
+            exit 1
+          }
+          echo "✅ NPU driver loaded successfully inside QEMU guest."
+
+      # -------------------------------------------------------
+      # Deploy: TARGET=simnow_ep ./build_and_run.sh deploy
+      #         SCPs packaged artifacts to the EP guest server.
+      # -------------------------------------------------------
+      - name: Deploy (SCP to guest)
+        run: |
+          set -euo pipefail
+          RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
+          AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
+
+          cd "$RESNET50_DIR"
+          # shellcheck disable=SC1091
+          USE_CUSTOM_LIBAIENGINE=1 source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed."
+            exit 1
+          }
+
+          export REMOTE_HOST=xhd-swlab-aisrv103
+          export REMOTE_USER=kishorer
+          export TARGET=simnow_ep
+          export EP_SERVER=xhd-swlab-aisrv103
+          export EP_WORKSPACE=/scratch/kishorer/simnow_ws
           export USE_CUSTOM_LIBAIENGINE=1
           export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
 
           echo "Running: TARGET=simnow_ep ./build_and_run.sh deploy (SCP to $EP_SERVER)"
           TARGET=simnow_ep ./build_and_run.sh deploy || {
-            echo "❌ ERROR: deploy step failed (exit code $?)."
-            echo "  Check connectivity to $EP_SERVER and that SCP keys are configured."
+            rc=$?
+            echo "❌ ERROR: deploy step failed (exit code $rc)."
+            if [ "$rc" -eq 255 ]; then
+              echo "  Exit code 255: SSH/SCP connection refused or timed out."
+              echo "  Check the QEMU guest is still running on $EP_SERVER (see SimNow EP setup steps)."
+            fi
             exit 1
           }
-
           echo "✅ Deploy completed. Artifacts SCP'd to $EP_SERVER."
 
-  # ---------------------------------------------------------------------------
-  # Job 5 — Run: TARGET=simnow_ep ./build_and_run.sh run
-  #          Executes xrt_test 8 on the EP guest.
-  # ---------------------------------------------------------------------------
-  run:
-    name: "Run: build_and_run.sh run (xrt_test)"
-    needs: deploy
-    runs-on: simnow_ep_runner
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Run xrt_test step
+      # -------------------------------------------------------
+      # Run: TARGET=simnow_ep ./build_and_run.sh run (xrt_test)
+      # -------------------------------------------------------
+      - name: Run xrt_test
         run: |
           set -euo pipefail
-
           RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
           AIE_CODEGEN_PATH="$RUN_WORK_DIR/aie-codegen"
 
-          if [ ! -d "$RESNET50_DIR" ]; then
-            echo "❌ ERROR: resnet50_custom not found at $RESNET50_DIR"
-            exit 1
-          fi
-
           cd "$RESNET50_DIR"
-
-          echo "Sourcing setup_env.sh..."
           # shellcheck disable=SC1091
-          source setup_env.sh || {
-            echo "❌ ERROR: setup_env.sh failed (exit code $?)."
+          USE_CUSTOM_LIBAIENGINE=1 source setup_env.sh || {
+            echo "❌ ERROR: setup_env.sh failed."
             exit 1
           }
 
+          export REMOTE_HOST=xhd-swlab-aisrv103
+          export REMOTE_USER=kishorer
           export TARGET=simnow_ep
           export EP_SERVER=xhd-swlab-aisrv103
-          export EP_WORKSPACE=/proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+          export EP_WORKSPACE=/scratch/kishorer/simnow_ws
           export USE_CUSTOM_LIBAIENGINE=1
           export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
 
@@ -353,23 +427,36 @@ jobs:
             echo "❌ ERROR: xrt_test run failed (exit code $?)."
             exit 1
           }
-
           echo "✅ xrt_test run completed successfully."
 
-  # ---------------------------------------------------------------------------
-  # Job 6 — Cleanup: always remove the run workspace to avoid disk exhaustion.
-  # Runs even if any earlier job fails so the runner stays clean.
-  # ---------------------------------------------------------------------------
-  cleanup:
-    name: "Cleanup: remove run workspace"
-    needs: [setup, build, package, deploy, run]
-    if: always()
-    runs-on: simnow_ep_runner
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Remove run workspace
+      # -------------------------------------------------------
+      # Teardown: always stop the SimNow + QEMU containers this run
+      # started, so a fresh guest can boot on the next run and we
+      # don't leak containers / hold the cosim+SSH ports on the
+      # shared host. Runs BEFORE the workspace is removed because it
+      # needs simnow_ep_run.sh from the cloned repo. Best-effort.
+      # -------------------------------------------------------
+      - name: Teardown SimNow EP containers
+        if: always()
+        run: |
+          RESNET50_DIR="$RUN_WORK_DIR/resnet50_custom"
+          if [ -x "$RESNET50_DIR/simnow_ep_run.sh" ]; then
+            export TARGET=simnow_ep
+            export EP_SERVER=xhd-swlab-aisrv103
+            export EP_WORKSPACE=/proj/xresults_dcs7/kishorer/my_work/simnow_ep_ws
+            echo "Running: simnow_ep_run.sh teardown"
+            "$RESNET50_DIR/simnow_ep_run.sh" teardown || \
+              echo "⚠️  Teardown reported an error (continuing to cleanup)."
+          else
+            echo "ℹ️  simnow_ep_run.sh not present; nothing to tear down."
+          fi
+
+      # -------------------------------------------------------
+      # Cleanup: always remove the run workspace to avoid disk
+      # exhaustion even if an earlier step failed.
+      # -------------------------------------------------------
+      - name: Cleanup run workspace
+        if: always()
         run: |
           if [ -d "$RUN_WORK_DIR" ]; then
             rm -rf "$RUN_WORK_DIR"

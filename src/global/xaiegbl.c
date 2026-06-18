@@ -338,6 +338,13 @@ AieRC XAie_SoftPartitionInitialize(XAie_DevInst *DevInst, XAie_PartInitOpts *Opt
 	AieRC RC;
 	u32 OptFlags;
 	u8 IsolationFlags = XAIE_CLEAR_ISOLATION;
+
+	if((DevInst == XAIE_NULL) || (DevPartInfo == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	memset(&SoftPartOpts, 0, sizeof(SoftPartOpts));
 
 	if(Opts != NULL) {
@@ -1288,7 +1295,15 @@ AieRC XAie_GetCtrlPktHndlrStatus(XAie_DevInst *DevInst, XAie_LocType Loc, u32 *S
 	AieRC RC = XAIE_OK;
 	const XAie_CtrlPktHndlrMod *CtrlPktMod;
 	u64 RegAddr;
-	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
+	u8 TileType;
+
+	if((DevInst == XAIE_NULL) || (Status == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 
 	CtrlPktMod = DevInst->DevProp.DevMod[TileType].CtrlPktHndlrMod;
 	if (!CtrlPktMod) {

@@ -224,7 +224,8 @@ AieRC XAie_DmaDescInit(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -873,7 +874,8 @@ AieRC XAie_DmaGetNumBds(XAie_DevInst *DevInst, XAie_LocType Loc, u8 *NumBds)
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -919,9 +921,15 @@ AieRC XAie_DmaGetNumBdsPvtBuffPool(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
+	}
+
+	if(Dir >= DMA_MAX) {
+		XAIE_ERROR("Invalid DMA direction\n");
+		return XAIE_INVALID_ARGS;
 	}
 
 	DmaMod = DevInst->DevProp.DevMod[TileType].DmaMod;
@@ -959,8 +967,18 @@ AieRC XAie_DmaGetNumBdsGeneric(XAie_DevInst *DevInst, XAie_LocType Loc,
 		return XAIE_INVALID_ARGS;
 	}
 
+	if(Dir >= DMA_MAX) {
+		XAIE_ERROR("Invalid DMA direction\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-		
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
+		XAIE_ERROR("Invalid Tile Type\n");
+		return XAIE_INVALID_TILE;
+	}
+
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DevInst->DevProp.DevGen, TileType, Dir))
 		return XAie_DmaGetNumBds(DevInst, Loc, NumBds);		
 	else
@@ -1451,6 +1469,11 @@ AieRC XAie_DmaWriteBdGeneric(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc, XAie_
 		return XAIE_INVALID_ARGS;
 	}
 
+	if(Dir >= DMA_MAX) {
+		XAIE_ERROR("Invalid DMA direction\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 		
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DevInst->DevProp.DevGen, TileType, Dir))
@@ -1541,6 +1564,11 @@ AieRC XAie_DmaReadBdGeneric(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc, XAie_L
 		return XAIE_INVALID_ARGS;
 	}
 
+	if(Dir >= DMA_MAX) {
+		XAIE_ERROR("Invalid DMA direction\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DmaDesc->DevGen, DmaDesc->TileType, Dir))
 		 return XAie_DmaReadBd(DevInst, DmaDesc, Loc, BdNum);
 	else
@@ -1589,7 +1617,8 @@ AieRC XAie_DmaChannelReset(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
 	if((TileType == XAIEGBL_TILE_TYPE_SHIMPL) ||
-			(TileType == XAIEGBL_TILE_TYPE_SHIMNOC)) {
+			(TileType == XAIEGBL_TILE_TYPE_SHIMNOC) ||
+			(TileType == XAIEGBL_TILE_TYPE_MAX)) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1654,7 +1683,8 @@ AieRC XAie_DmaChannelResetAll(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1870,7 +1900,8 @@ AieRC XAie_DmaChannelPushBdToQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -1955,7 +1986,8 @@ static AieRC _XAie_DmaChannelControl(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -2073,7 +2105,8 @@ AieRC XAie_DmaGetPendingBdCount(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -2123,7 +2156,8 @@ AieRC XAie_DmaGetChannelStatus(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -2174,7 +2208,8 @@ AieRC XAie_DmaWaitForDone(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -2229,7 +2264,8 @@ AieRC XAie_DmaWaitForDoneBusy(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if (TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if (TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -2285,7 +2321,8 @@ AieRC XAie_DmaWaitForBdTaskQueue(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -2346,7 +2383,8 @@ AieRC XAie_DmaWaitForBdTaskQueueBusy(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -2397,7 +2435,8 @@ AieRC XAie_DmaGetMaxQueueSize(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -2611,7 +2650,8 @@ AieRC XAie_DmaChannelDescInit(XAie_DevInst *DevInst,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -3115,7 +3155,8 @@ AieRC XAie_DmaGetBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 *Len,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -3209,7 +3250,8 @@ AieRC XAie_DmaUpdateBdLen(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Len,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -3257,7 +3299,8 @@ AieRC XAie_DmaUpdateBdAddr(XAie_DevInst *DevInst, XAie_LocType Loc, u64 Addr,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -3320,7 +3363,8 @@ AieRC XAie_DmaGetBdLenPvtBuffPool(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -3384,7 +3428,8 @@ AieRC XAie_DmaUpdateBdLenPvtBuffPool(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -3443,7 +3488,8 @@ AieRC XAie_DmaUpdateBdAddrPvtBuffPool(XAie_DevInst *DevInst, XAie_LocType Loc,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}
@@ -3502,8 +3548,25 @@ AieRC XAie_DmaGetBdLenGeneric(XAie_DevInst *DevInst, XAie_LocType Loc,
 						u8 ChNum, XAie_DmaDirection Dir, u32 *Len,	u16 BdNum)
 {
 	u8 TileType;
+
+	if((DevInst == XAIE_NULL) || (Len == NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	if(Dir >= DMA_MAX) {
+		XAIE_ERROR("Invalid DMA direction\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-		
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
+		XAIE_ERROR("Invalid Tile Type\n");
+		return XAIE_INVALID_TILE;
+	}
+
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DevInst->DevProp.DevGen, TileType, Dir))
 		return XAie_DmaGetBdLen(DevInst, Loc, Len, BdNum);
 	else
@@ -3529,8 +3592,25 @@ AieRC XAie_DmaUpdateBdLenGeneric(XAie_DevInst *DevInst, XAie_LocType Loc,
 						u8 ChNum, XAie_DmaDirection Dir, u32 Len, u16 BdNum)
 {
 	u8 TileType;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	if(Dir >= DMA_MAX) {
+		XAIE_ERROR("Invalid DMA direction\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-		
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
+		XAIE_ERROR("Invalid Tile Type\n");
+		return XAIE_INVALID_TILE;
+	}
+
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DevInst->DevProp.DevGen, TileType, Dir))
 		return XAie_DmaUpdateBdLen(DevInst, Loc, Len, BdNum);
 	else
@@ -3558,8 +3638,25 @@ AieRC XAie_DmaUpdateBdAddrGeneric(XAie_DevInst *DevInst, XAie_LocType Loc,
 						u8 ChNum, XAie_DmaDirection Dir, u64 Addr,	u16 BdNum)
 {
 	u8 TileType;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	if(Dir >= DMA_MAX) {
+		XAIE_ERROR("Invalid DMA direction\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-		
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
+		XAIE_ERROR("Invalid Tile Type\n");
+		return XAIE_INVALID_TILE;
+	}
+
 	if(!_XAie_DmaTileAndChannelDirSupportsPvtBuffPoolBds(DevInst->DevProp.DevGen, TileType, Dir))
 		return XAie_DmaUpdateBdAddr(DevInst, Loc, Addr, BdNum);
 	else
@@ -3596,7 +3693,8 @@ AieRC XAie_DmaSetPadValue(XAie_DevInst *DevInst, XAie_LocType Loc, u8 ChNum,
 	}
 
 	TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL) {
+	if(TileType == XAIEGBL_TILE_TYPE_SHIMPL ||
+			TileType == XAIEGBL_TILE_TYPE_MAX) {
 		XAIE_ERROR("Invalid Tile Type\n");
 		return XAIE_INVALID_TILE;
 	}

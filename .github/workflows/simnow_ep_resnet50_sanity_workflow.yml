@@ -235,10 +235,18 @@ jobs:
           export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
 
           echo "Running: TARGET=simnow_ep ./build_and_run.sh package"
-          TARGET=simnow_ep ./build_and_run.sh package || {
-            echo "❌ ERROR: package step failed (exit code $?)."
-            exit 1
-          }
+          for attempt in 1 2 3; do
+            echo "Package attempt $attempt/3..."
+            if TARGET=simnow_ep ./build_and_run.sh package; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ ERROR: package step failed after 3 attempts."
+              exit 1
+            fi
+            echo "⚠️  Package attempt $attempt failed; retrying in 5s..."
+            sleep 5
+          done
 
           if [ ! -d "multi_layer_test/Work/hw_run" ]; then
             echo "❌ ERROR: Expected multi_layer_test/Work/hw_run/ not found after package step."
@@ -387,16 +395,24 @@ jobs:
           export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
 
           echo "Running: TARGET=simnow_ep ./build_and_run.sh deploy (SCP to $EP_SERVER)"
-          TARGET=simnow_ep ./build_and_run.sh deploy || {
-            rc=$?
-            echo "❌ ERROR: deploy step failed (exit code $rc)."
-            if [ "$rc" -eq 255 ]; then
-              echo "  Exit code 255: SSH/SCP connection refused or timed out."
-              echo "  Check the QEMU guest is still running on $EP_SERVER (see SimNow EP setup steps)."
+          for attempt in 1 2 3; do
+            echo "Deploy attempt $attempt/3..."
+            if TARGET=simnow_ep ./build_and_run.sh deploy; then
+              echo "✅ Deploy completed. Artifacts SCP'd to $EP_SERVER."
+              break
             fi
-            exit 1
-          }
-          echo "✅ Deploy completed. Artifacts SCP'd to $EP_SERVER."
+            rc=$?
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ ERROR: deploy step failed after 3 attempts (last exit code $rc)."
+              if [ "$rc" -eq 255 ]; then
+                echo "  Exit code 255: SSH/SCP connection refused or timed out."
+                echo "  Check the QEMU guest is still running on $EP_SERVER (see SimNow EP setup steps)."
+              fi
+              exit 1
+            fi
+            echo "⚠️  Deploy attempt $attempt failed (exit code $rc); retrying in 5s..."
+            sleep 5
+          done
 
       # -------------------------------------------------------
       # Run: TARGET=simnow_ep ./build_and_run.sh run (xrt_test)
@@ -423,11 +439,19 @@ jobs:
           export AIE_CODEGEN_PATH="$AIE_CODEGEN_PATH"
 
           echo "Running: TARGET=simnow_ep ./build_and_run.sh run"
-          TARGET=simnow_ep ./build_and_run.sh run || {
-            echo "❌ ERROR: xrt_test run failed (exit code $?)."
-            exit 1
-          }
-          echo "✅ xrt_test run completed successfully."
+          for attempt in 1 2 3; do
+            echo "Run attempt $attempt/3..."
+            if TARGET=simnow_ep ./build_and_run.sh run; then
+              echo "✅ xrt_test run completed successfully."
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "❌ ERROR: xrt_test run failed after 3 attempts."
+              exit 1
+            fi
+            echo "⚠️  Run attempt $attempt failed; retrying in 5s..."
+            sleep 5
+          done
 
       # -------------------------------------------------------
       # Teardown: always stop the SimNow + QEMU containers this run

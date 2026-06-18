@@ -2873,6 +2873,13 @@ void _XAie_TxnResourceCleanup(XAie_DevInst *DevInst)
 int XAie_RequestCustomTxnOp(XAie_DevInst *DevInst) {
 
 	XAie_TxnInst *Inst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return (int)XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	Inst = _XAie_GetTxnInst(DevInst, Backend->Ops.GetTid());
@@ -2910,6 +2917,13 @@ AieRC XAie_AddCustomTxnOp(XAie_DevInst *DevInst, u8 OpNumber, void* Args, size_t
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) {
@@ -2978,6 +2992,13 @@ AieRC XAie_Txn_Write32(XAie_DevInst *DevInst, u64 RegOff, u32 Value) {
 	u64 Tid;
 	AieRC RC;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	Tid = Backend->Ops.GetTid();
@@ -3022,6 +3043,13 @@ AieRC XAie_Txn_Read32(XAie_DevInst *DevInst, u64 RegOff, u32 *Data) {
 	u64 Tid;
 	AieRC RC;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) || (Data == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	Tid = Backend->Ops.GetTid();
@@ -3073,6 +3101,13 @@ AieRC XAie_Txn_MaskWrite32(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Valu
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	Tid = Backend->Ops.GetTid();
@@ -3120,6 +3155,13 @@ AieRC XAie_Txn_MaskPoll(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value, 
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	Tid = Backend->Ops.GetTid();
@@ -3183,6 +3225,13 @@ AieRC XAie_Txn_MaskPollBusy(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Val
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	Tid = Backend->Ops.GetTid();
@@ -3245,6 +3294,13 @@ AieRC XAie_Txn_BlockWrite32(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data, 
 	u64 Tid;
 	u32 *Buf;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) || (Data == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	Tid = Backend->Ops.GetTid();
@@ -3316,6 +3372,13 @@ AieRC XAie_Txn_BlockSet32(XAie_DevInst *DevInst, u64 RegOff, const u32 Data, u32
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	Tid = Backend->Ops.GetTid();
@@ -3379,6 +3442,13 @@ AieRC XAie_Txn_NoOp(XAie_DevInst *DevInst, uint32_t Count)
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) 
@@ -3430,17 +3500,26 @@ AieRC XAie_Txn_NoOp(XAie_DevInst *DevInst, uint32_t Count)
 ******************************************************************************/
 AieRC XAie_Txn_Preempt(XAie_DevInst *DevInst, XAie_PreemptHdr* Preempt)
 {
-	u8 p_level = Preempt->Preempt_level;
+	AieRC RC;
+	u64 Tid;
+	XAie_TxnInst *TxnInst;
+	const XAie_Backend *Backend;
+	u8 p_level;
+
+	if((DevInst == XAIE_NULL) || (Preempt == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	p_level = Preempt->Preempt_level;
 	if(p_level >= INVALID)
 	{
 		XAIE_ERROR("Error: Preempt_level = %d",p_level);
 		return XAIE_ERR;
 	}
 
-	AieRC RC;
-	u64 Tid;
-	XAie_TxnInst *TxnInst;
-	const XAie_Backend *Backend = DevInst->Backend;
+	Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) 
 	{
@@ -3491,6 +3570,13 @@ AieRC XAie_Txn_LoadPdi(XAie_DevInst *DevInst, u16 PdiId)
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL) 
@@ -3541,6 +3627,13 @@ AieRC XAie_Txn_MergeSync(XAie_DevInst *DevInst, u8 num_tokens, u8 num_cols)
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if (num_cols > DevInst->NumCols) {
@@ -3610,6 +3703,13 @@ AieRC XAie_Txn_DdrAddressPatch(XAie_DevInst *DevInst, u64 regaddr, u64 argidx,
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL)
@@ -3675,6 +3775,13 @@ AieRC XAie_Txn_PmLoadStart(XAie_DevInst *DevInst, u32 PmLoadId)
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL)
@@ -3733,6 +3840,13 @@ AieRC XAie_Txn_PmLoadEnd(XAie_DevInst *DevInst)
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 	if(DevInst->TxnList.Next != NULL)
 	{
@@ -3794,6 +3908,13 @@ AieRC XAie_Txn_CreateScratchpad(XAie_DevInst *DevInst, u8 UsageType, u32 Size,
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if(UsageType != XAIE_STATE_TABLE)
@@ -3856,6 +3977,13 @@ AieRC XAie_Txn_UpdateStateTable(XAie_DevInst *DevInst, u8 StateTableIdx,
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL)
@@ -3917,6 +4045,13 @@ AieRC XAie_Txn_UpdateReg(XAie_DevInst *DevInst, u64 RegOff, u8 StateTableIdx,
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL)
@@ -3973,6 +4108,13 @@ AieRC XAie_Txn_UpdateScratch(XAie_DevInst *DevInst)
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if(DevInst->TxnList.Next != NULL)
@@ -4011,6 +4153,13 @@ AieRC XAie_Txn_RunOp(XAie_DevInst *DevInst, u8 Is_Config_ShimDMABD, void *Arg)
 	AieRC RC;
 	u64 Tid;
 	XAie_TxnInst *TxnInst;
+
+	if((DevInst == XAIE_NULL) ||
+		(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid arguments\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	Tid = Backend->Ops.GetTid();

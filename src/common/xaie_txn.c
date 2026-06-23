@@ -665,52 +665,62 @@ AieRC _XAie_Txn_Submit(XAie_DevInst *DevInst, XAie_TxnInst *TxnInst)
 
 static inline void _XAie_AppendWrite32(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
-	XAie_Write32Hdr *Hdr = (XAie_Write32Hdr*)(uintptr_t)TxnPtr;
-	Hdr->RegOff = Cmd->RegOff;
-	Hdr->Value = Cmd->Value;
-	Hdr->Size = (u32)sizeof(*Hdr);
-	Hdr->OpHdr.Col = 0;
-	Hdr->OpHdr.Row = 0;
-	Hdr->OpHdr.Op = (u8)XAIE_IO_WRITE;
+	/*
+	 * Build the header on the stack (correctly aligned by the compiler)
+	 * and memcpy it into TxnPtr. TxnPtr may be unaligned for the 8-byte
+	 * RegOff member, so a direct struct store would be undefined behavior.
+	 */
+	XAie_Write32Hdr Hdr;
+	memset(&Hdr, 0, sizeof(Hdr));
+	Hdr.RegOff = Cmd->RegOff;
+	Hdr.Value = Cmd->Value;
+	Hdr.Size = (u32)sizeof(Hdr);
+	Hdr.OpHdr.Col = 0;
+	Hdr.OpHdr.Row = 0;
+	Hdr.OpHdr.Op = (u8)XAIE_IO_WRITE;
+	memcpy(TxnPtr, &Hdr, sizeof(Hdr));
 }
 
 static inline void _XAie_AppendMaskWrite32(XAie_TxnCmd *Cmd, u8 *TxnPtr)
 {
-	XAie_MaskWrite32Hdr *Hdr = (XAie_MaskWrite32Hdr*)(uintptr_t)TxnPtr;
-
-	Hdr->RegOff = Cmd->RegOff;
-	Hdr->Mask = Cmd->Mask;
-	Hdr->Value = Cmd->Value;
-	Hdr->Size = (u32)sizeof(*Hdr);
-	Hdr->OpHdr.Col = 0;
-	Hdr->OpHdr.Row = 0;
-	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKWRITE;
+	XAie_MaskWrite32Hdr Hdr;
+	memset(&Hdr, 0, sizeof(Hdr));
+	Hdr.RegOff = Cmd->RegOff;
+	Hdr.Mask = Cmd->Mask;
+	Hdr.Value = Cmd->Value;
+	Hdr.Size = (u32)sizeof(Hdr);
+	Hdr.OpHdr.Col = 0;
+	Hdr.OpHdr.Row = 0;
+	Hdr.OpHdr.Op = (u8)XAIE_IO_MASKWRITE;
+	memcpy(TxnPtr, &Hdr, sizeof(Hdr));
 }
 
 static inline void _XAie_AppendMaskPoll32(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 {
-	XAie_MaskPoll32Hdr *Hdr = (XAie_MaskPoll32Hdr*)(uintptr_t)TxnPtr;
-
-	Hdr->RegOff = Cmd->RegOff;
-	Hdr->Mask = Cmd->Mask;
-	Hdr->Value = Cmd->Value;
-	Hdr->Size = (u32)sizeof(*Hdr);
-	Hdr->OpHdr.Col = 0;
-	Hdr->OpHdr.Row = 0;
-	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL;
+	XAie_MaskPoll32Hdr Hdr;
+	memset(&Hdr, 0, sizeof(Hdr));
+	Hdr.RegOff = Cmd->RegOff;
+	Hdr.Mask = Cmd->Mask;
+	Hdr.Value = Cmd->Value;
+	Hdr.Size = (u32)sizeof(Hdr);
+	Hdr.OpHdr.Col = 0;
+	Hdr.OpHdr.Row = 0;
+	Hdr.OpHdr.Op = (u8)XAIE_IO_MASKPOLL;
+	memcpy(TxnPtr, &Hdr, sizeof(Hdr));
 }
 
 static inline void _XAie_AppendMaskPollBusy32(XAie_TxnCmd *Cmd, uint8_t *TxnPtr)
 {
-	XAie_MaskPoll32Hdr *Hdr = (XAie_MaskPoll32Hdr*)(uintptr_t)TxnPtr;
-
-	Hdr->RegOff = Cmd->RegOff;
-	Hdr->Mask = Cmd->Mask;
-	Hdr->Value = Cmd->Value;
-	Hdr->Size = (u32)sizeof(*Hdr);
-	Hdr->OpHdr.Col = 0;
-	Hdr->OpHdr.Row = 0;
-	Hdr->OpHdr.Op = (u8)XAIE_IO_MASKPOLL_BUSY;
+	XAie_MaskPoll32Hdr Hdr;
+	memset(&Hdr, 0, sizeof(Hdr));
+	Hdr.RegOff = Cmd->RegOff;
+	Hdr.Mask = Cmd->Mask;
+	Hdr.Value = Cmd->Value;
+	Hdr.Size = (u32)sizeof(Hdr);
+	Hdr.OpHdr.Col = 0;
+	Hdr.OpHdr.Row = 0;
+	Hdr.OpHdr.Op = (u8)XAIE_IO_MASKPOLL_BUSY;
+	memcpy(TxnPtr, &Hdr, sizeof(Hdr));
 }
 
 static inline void _XAie_AppendBlockSet32(XAie_TxnCmd *Cmd, u8 *TxnPtr)

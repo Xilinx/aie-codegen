@@ -1318,7 +1318,8 @@ AieRC XAie_DmaWriteBd(XAie_DevInst *DevInst, XAie_DmaDesc *DmaDesc,
 	const XAie_DmaMod *DmaMod;
 	u8 MaxNumBds;
 
-	if((DmaDesc == XAIE_NULL) ||
+	if((DmaDesc == XAIE_NULL) || (DevInst == XAIE_NULL) ||
+				(DevInst->IsReady != XAIE_COMPONENT_IS_READY) ||
 			(DmaDesc->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Arguments\n");
 		return XAIE_INVALID_ARGS;

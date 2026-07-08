@@ -156,12 +156,16 @@ typedef struct XAie_BackendOps {
 	AieRC (*MaskPoll)(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
 			u32 TimeOutUs);
 	AieRC (*BlockWrite32)(void *IOInst, u64 RegOff, const u32 *Data, u32 Size);
+	AieRC (*BlockWrite32Ext)(void *IOInst, u64 RegOff, const u32 *Data, u32 Size);
 	AieRC (*BlockSet32)(void *IOInst, u64 RegOff, u32 Data, u32 Size);
 	AieRC (*CmdWrite)(void *IOInst, u8 Col, u8 Row, u8 Command, u32 CmdWd0,
 			u32 CmdWd1, const char *CmdStr);
 	AieRC (*RunOp)(void *IOInst, XAie_DevInst *DevInst,
 		     XAie_BackendOpCode Op, void *Arg);
 	AieRC (*AddressPatching)(void *IOInst, u16 Arg_Index, u8 Num_BDs);
+	AieRC (*AddressPatchingPL)(void *IOInst, u16 Arg_Index);
+	AieRC (*MaskPollExt)(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
+			u32 TimeOutUs);
 	AieRC (*WaitTaskCompleteToken) (XAie_DevInst *DevInst,
 	uint16_t Column, uint16_t Row, uint32_t Channel, uint8_t NumTokens);
 	XAie_MemInst* (*MemAllocate)(XAie_DevInst *DevInst, u64 Size,

@@ -641,6 +641,28 @@ AieRC XAie_MaskPoll(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 			Value, TimeOutUs);
 }
 
+AieRC XAie_MaskPoll_Ext(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
+		u32 TimeOutUs)
+{
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
+
+	if (Backend->Ops.MaskPollExt != NULL) {
+		return Backend->Ops.MaskPollExt((void *)DevInst->IOInst, RegOff,
+				Mask, Value, TimeOutUs);
+	}
+
+	XAIE_ERROR("External MaskPoll function pointer points to NULL\n");
+	return XAIE_NOT_SUPPORTED;
+}
+
 AieRC XAie_MaskPollBusy(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 		u32 TimeOutUs)
 {
@@ -685,6 +707,28 @@ AieRC XAie_BlockWrite32(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data, u32 
 	}
 	return Backend->Ops.BlockWrite32((void *)(DevInst->IOInst), RegOff,
 			Data, Size);
+}
+
+AieRC XAie_BlockWrite32_Ext(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data,
+		u32 Size)
+{
+	const XAie_Backend *Backend;
+
+	if((DevInst == XAIE_NULL) || (Data == NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	Backend = DevInst->Backend;
+
+	if (Backend->Ops.BlockWrite32Ext != NULL) {
+		return Backend->Ops.BlockWrite32Ext((void *)DevInst->IOInst,
+				RegOff, Data, Size);
+	}
+
+	XAIE_ERROR("External BlockWrite32 function pointer points to NULL\n");
+	return XAIE_NOT_SUPPORTED;
 }
 
 AieRC XAie_BlockSet32(XAie_DevInst *DevInst, u64 RegOff, u32 Data, u32 Size)
@@ -793,6 +837,24 @@ AieRC XAie_AddressPatching(XAie_DevInst *DevInst, u16 Arg_Offset, u8 Num_BDs)
 		return Backend->Ops.AddressPatching((void *)DevInst->IOInst, Arg_Offset, Num_BDs);
 	} else {
 		XAIE_ERROR("Address Patching function pointer points to NULL\n");
+		return XAIE_NOT_SUPPORTED;
+	}
+}
+
+AieRC XAie_AddressPatching_PL(XAie_DevInst *DevInst, u16 Arg_Offset)
+{
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	const XAie_Backend *Backend = DevInst->Backend;
+
+	if (Backend->Ops.AddressPatchingPL != NULL) {
+		return Backend->Ops.AddressPatchingPL((void *)DevInst->IOInst, Arg_Offset);
+	} else {
+		XAIE_ERROR("PL Address Patching function pointer points to NULL\n");
 		return XAIE_NOT_SUPPORTED;
 	}
 }

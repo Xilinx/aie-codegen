@@ -51,6 +51,8 @@
 #define ISA_OPCODE_REL_ACQ_SYNC 0x21
 #define ISA_OPCODE_LOAD_CORES 0x04
 #define ISA_OPCODE_LOAD_CORES_CP 0x20
+#define ISA_OPCODE_UC_DMA_MASK_POLL_EXT 0x22
+#define ISA_OPCODE_APPLY_OFFSET_PL 0x23
 
 // Operation sizes
 
@@ -82,6 +84,8 @@
 #define ISA_OPSIZE_REL_ACQ_SYNC 0x0c
 #define ISA_OPSIZE_LOAD_CORES 0x0c
 #define ISA_OPSIZE_LOAD_CORES_CP 0x08
+#define ISA_OPSIZE_UC_DMA_MASK_POLL_EXT 0x14
+#define ISA_OPSIZE_APPLY_OFFSET_PL 0x08
 
 #ifdef CERT_FW
 // Operation implementation forward declarations
@@ -108,6 +112,8 @@ static unsigned int control_op_poll_32(const uint8_t *_pc, uint32_t address, uin
 static unsigned int control_op_mask_poll_32(const uint8_t *_pc, uint32_t address, uint32_t mask, uint32_t value);
 static unsigned int control_op_trace(const uint8_t *_pc, uint16_t info);
 static unsigned int control_op_nop(const uint8_t *_pc);
+static unsigned int control_op_uc_dma_mask_poll_ext(const uint8_t *_pc, uint64_t address, uint32_t mask, uint32_t value);
+static unsigned int control_op_apply_offset_pl(const uint8_t *_pc, uint16_t table_ptr, uint16_t buffer_id);
 
 
 // Dispatchers
@@ -314,6 +320,30 @@ static inline unsigned int control_dispatch_load_cores(const uint8_t *pc)
   );
 }
 
+static inline unsigned int control_dispatch_uc_dma_mask_poll_ext(const uint8_t *pc)
+{
+  /* The 64-bit address at pc[4] is only 4-byte aligned, so read it as two
+   * naturally aligned 32-bit words and recombine instead of doing an unaligned
+   * (uint64_t *) load, which is undefined behavior on strict-alignment targets. */
+  uint32_t address_lo = *(uint32_t *)(&pc[4]);
+  uint32_t address_hi = *(uint32_t *)(&pc[8]);
+  return control_op_uc_dma_mask_poll_ext(
+    pc,
+    /* address (const) */ ((uint64_t)address_hi << 32) | address_lo,
+    /* mask (const) */ *(uint32_t *)(&pc[12]),
+    /* value (const) */ *(uint32_t *)(&pc[16])
+  );
+}
+
+static inline unsigned int control_dispatch_apply_offset_pl(const uint8_t *pc)
+{
+  return control_op_apply_offset_pl(
+    pc,
+    /* table_ptr (const) */ *(uint16_t *)(&pc[2]),
+    /* buffer_id (const) */ *(uint16_t *)(&pc[4])
+  );
+}
+
 // Case statements for regular operations
 
 #define DISPATCH_REGULAR_OPS \
@@ -335,8 +365,10 @@ static inline unsigned int control_dispatch_load_cores(const uint8_t *pc)
   case ISA_OPCODE_POLL_32: pc += control_dispatch_poll_32(pc); break; \
   case ISA_OPCODE_MASK_POLL_32: pc += control_dispatch_mask_poll_32(pc); break; \
   case ISA_OPCODE_TRACE: pc += control_dispatch_trace(pc); break; \
-  case ISA_OPCODE_NOP: pc += control_dispatch_nop(pc); break;
-  case ISA_OPCODE_LOAD_CORES: pc += control_dispatch_load_cores(pc); break;
+  case ISA_OPCODE_NOP: pc += control_dispatch_nop(pc); break; \
+  case ISA_OPCODE_LOAD_CORES: pc += control_dispatch_load_cores(pc); break; \
+  case ISA_OPCODE_UC_DMA_MASK_POLL_EXT: pc += control_dispatch_uc_dma_mask_poll_ext(pc); break; \
+  case ISA_OPCODE_APPLY_OFFSET_PL: pc += control_dispatch_apply_offset_pl(pc); break;
 #endif // CERT_FW
 
 #endif

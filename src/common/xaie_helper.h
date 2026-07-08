@@ -237,6 +237,8 @@ XAIE_AIG_EXPORT AieRC XAie_MaskPollBusy(XAie_DevInst *DevInst, u64 RegOff, u32 M
 		u32 TimeOutUs);
 XAIE_AIG_EXPORT AieRC XAie_BlockWrite32(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data,
 			u32 Size);
+XAIE_AIG_EXPORT AieRC XAie_BlockWrite32_Ext(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data,
+			u32 Size);
 XAIE_AIG_EXPORT AieRC XAie_BlockSet32(XAie_DevInst *DevInst, u64 RegOff, u32 Data, u32 Size);
 XAIE_AIG_EXPORT void XAie_Log(FILE *Fd, const char *prefix, const char *func, u32 line,
 		const char *Format, ...);
@@ -248,6 +250,9 @@ XAIE_AIG_EXPORT AieRC XAie_CmdWrite(XAie_DevInst *DevInst, u8 Col, u8 Row, u8 Co
 /* Public Functions. Later this should be moved to xaiegbl.h. Also functions should be moved to xaiegbl.c */
 XAIE_AIG_EXPORT AieRC XAie_Write32(XAie_DevInst *DevInst, u64 RegOff, u32 Value);
 XAIE_AIG_EXPORT AieRC XAie_AddressPatching(XAie_DevInst *DevInst, u16 Arg_Offset, u8 Num_BDs);
+XAIE_AIG_EXPORT AieRC XAie_AddressPatching_PL(XAie_DevInst *DevInst, u16 Arg_Offset);
+XAIE_AIG_EXPORT AieRC XAie_MaskPoll_Ext(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
+			u32 TimeOutUs);
 XAIE_AIG_EXPORT AieRC XAie_WaitTct(XAie_DevInst *DevInst, uint16_t Column, uint16_t Row, uint32_t Channel, uint8_t NumTokens);
 XAIE_AIG_EXPORT AieRC XAie_WaitUCDMA(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_ModeConfig(XAie_DevInst *DevInst, XAie_ModeSelect Mode);

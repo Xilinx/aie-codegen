@@ -32,7 +32,7 @@ function(aie_codegen_add_sources target)
     ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie2pgbl_reginit.c
     ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie2psgbl_reginit.c
     ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie4gbl_reginit.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie4medusagbl_reginit.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/global/xaie4mdsgbl_reginit.c
     ${CMAKE_CURRENT_SOURCE_DIR}/global/xaiegbl.c
     ${CMAKE_CURRENT_SOURCE_DIR}/global/xaiegbl_reginit.c
     ${CMAKE_CURRENT_SOURCE_DIR}/global/xaiemlgbl_reginit.c

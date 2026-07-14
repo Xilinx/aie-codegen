@@ -66,7 +66,7 @@ typedef SSIZE_T ssize_t;
 #define PCJ_SPLIT_INITIAL_CAPACITY 4U
 #define SHIM_BD_NUM_REGS  9
 #define MAX_LABELS_PER_ASM_FILE 1000
-#define FNAME_SIZE 100
+#define FNAME_SIZE 512
 #define HASH_INVALID -1
 #define MAX_REMOTE_BARRIER_ID 7
 #define MAX_COMMENT_LENGTH 128
@@ -197,7 +197,7 @@ typedef SSIZE_T ssize_t;
 #define BUFFER_GROWTH_FACTOR 2
 
 /************************** Constant Definitions *****************************/
-char FName[FNAME_SIZE];
+static _Thread_local char FName[FNAME_SIZE];
 
 /****************************** Type Definitions *****************************/
 
@@ -317,6 +317,13 @@ typedef struct {
 	FILE* DebugAsmFile;
 	FILE* DebugAsmFileData0;
 	FILE* DebugAsmFileData1;
+	/* Directory-scoped temp file paths derived from FileName at open time, so
+	 * that the correct temp files can be removed at close time when concurrent
+	 * threads write to different op directories. */
+	char TempPath1[FNAME_SIZE];
+	char TempPath2[FNAME_SIZE];
+	char TempPath3[FNAME_SIZE];
+	char TempPath4[FNAME_SIZE];
 	/* In-memory buffers */
 	XAie_MemBuffer *ControlCodeBuf;
 	XAie_MemBuffer *ControlCodeDataBuf;
@@ -4993,12 +5000,47 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	ControlCodeInst->DevInst = DevInst;
 	ControlCodeInst->ScrachpadName = NULL;
 	ControlCodeInst->Mode = (u8)XAIE_INVALID_MODE;
+
+	/* Derive temp file paths in the same directory as FileName so that
+	 * concurrent threads (each writing to a different op directory) do not
+	 * collide on a shared set of CWD-relative temp files. The paths are stored
+	 * on ControlCodeInst so XAie_CloseControlCodeFile() can remove the correct
+	 * files. */
+	{
+		/* Find the last path separator */
+		const char *lastSep = NULL;
+		const char *p;
+		int n1, n2, n3, n4;
+		for (p = FileName; *p; ++p) {
+			if (*p == '/' || *p == '\\') lastSep = p;
+		}
+		if (lastSep) {
+			size_t dirLen = (size_t)(lastSep - FileName) + 1; /* include separator */
+			n1 = snprintf(ControlCodeInst->TempPath1, FNAME_SIZE, "%.*s" TEMP_ASM_FILE1, (int)dirLen, FileName);
+			n2 = snprintf(ControlCodeInst->TempPath2, FNAME_SIZE, "%.*s" TEMP_ASM_FILE2, (int)dirLen, FileName);
+			n3 = snprintf(ControlCodeInst->TempPath3, FNAME_SIZE, "%.*s" TEMP_ASM_FILE3, (int)dirLen, FileName);
+			n4 = snprintf(ControlCodeInst->TempPath4, FNAME_SIZE, "%.*s" TEMP_ASM_FILE4, (int)dirLen, FileName);
+		} else {
+			n1 = snprintf(ControlCodeInst->TempPath1, FNAME_SIZE, "%s", TEMP_ASM_FILE1);
+			n2 = snprintf(ControlCodeInst->TempPath2, FNAME_SIZE, "%s", TEMP_ASM_FILE2);
+			n3 = snprintf(ControlCodeInst->TempPath3, FNAME_SIZE, "%s", TEMP_ASM_FILE3);
+			n4 = snprintf(ControlCodeInst->TempPath4, FNAME_SIZE, "%s", TEMP_ASM_FILE4);
+		}
+		/* Detect truncation/encoding errors so we never silently open temp
+		 * files at a wrong (truncated) path. */
+		if (n1 < 0 || n1 >= FNAME_SIZE || n2 < 0 || n2 >= FNAME_SIZE ||
+		    n3 < 0 || n3 >= FNAME_SIZE || n4 < 0 || n4 >= FNAME_SIZE) {
+			XAIE_ERROR("Temp file path too long for FNAME_SIZE (%d)\n", FNAME_SIZE);
+			return XAIE_ERR;
+		}
+	}
+
 	/* All file creations below go through _XAie_SecureFopen() so that newly
 	 * created files have owner-only (0600) permissions without touching the
 	 * process-global umask. See common/xaie_secure_io.c for rationale. */
 	ControlCodeInst->ControlCodefp      = _XAie_SecureFopen(FileName, "w");
-	ControlCodeInst->ControlCodedatafp  = _XAie_SecureFopen(TEMP_ASM_FILE1, "w+");
-	ControlCodeInst->ControlCodedata2fp = _XAie_SecureFopen(TEMP_ASM_FILE2, "w+");
+	ControlCodeInst->ControlCodedatafp  = _XAie_SecureFopen(ControlCodeInst->TempPath1, "w+");
+	ControlCodeInst->ControlCodedata2fp = _XAie_SecureFopen(ControlCodeInst->TempPath2, "w+");
 
 	/* Validate control code file pointers before opening debug ASM files
 	 * to avoid unnecessary resource allocation if control code setup fails */
@@ -5023,17 +5065,36 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 
 	/* Open debug ASM files only after control code files are confirmed valid */
 	if (!ControlCodeInst->DisableDebugAsm) {
-		snprintf(FName, FNAME_SIZE, "%s", FileName);
-		while(TmpPtr && (*TmpPtr  != '.' ))
-			TmpPtr++;
-		if (TmpPtr && ((size_t)(TmpPtr - FName) + sizeof(".DEBUG") <= FNAME_SIZE)) {
-			memcpy(TmpPtr, ".DEBUG", sizeof(".DEBUG"));
-		} else {
+		int FNameLen = snprintf(FName, FNAME_SIZE, "%s", FileName);
+		if (FNameLen < 0 || FNameLen >= FNAME_SIZE) {
 			XAIE_ERROR("Filename too long to append .DEBUG extension\n");
+		} else {
+			/* Search for the extension dot within the basename only, so a '.'
+			 * in a parent directory name is not mistaken for the file
+			 * extension. Use the last dot in the basename; if the basename has
+			 * no dot, append .DEBUG at the end (preserving prior behavior). */
+			char *BaseStart = FName;
+			char *Cursor;
+			for (Cursor = FName; *Cursor; ++Cursor) {
+				if (*Cursor == '/' || *Cursor == '\\')
+					BaseStart = Cursor + 1;
+			}
+			TmpPtr = NULL;
+			for (Cursor = BaseStart; *Cursor; ++Cursor) {
+				if (*Cursor == '.')
+					TmpPtr = Cursor;
+			}
+			if (TmpPtr == NULL)
+				TmpPtr = FName + FNameLen; /* no extension: append at end */
+			if ((size_t)(TmpPtr - FName) + sizeof(".DEBUG") <= FNAME_SIZE) {
+				memcpy(TmpPtr, ".DEBUG", sizeof(".DEBUG"));
+			} else {
+				XAIE_ERROR("Filename too long to append .DEBUG extension\n");
+			}
 		}
 
-		ControlCodeInst->DebugAsmFileData0 = _XAie_SecureFopen(TEMP_ASM_FILE3, "w+");
-		ControlCodeInst->DebugAsmFileData1 = _XAie_SecureFopen(TEMP_ASM_FILE4, "w+");
+		ControlCodeInst->DebugAsmFileData0 = _XAie_SecureFopen(ControlCodeInst->TempPath3, "w+");
+		ControlCodeInst->DebugAsmFileData1 = _XAie_SecureFopen(ControlCodeInst->TempPath4, "w+");
 		ControlCodeInst->DebugAsmFile = _XAie_SecureFopen(FName, "w+");
 	}
 
@@ -5169,9 +5230,20 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	FILE *SavedDebugAsmFile = ControlCodeInst->DebugAsmFile;
 	FILE *SavedDebugAsmFileData0 = ControlCodeInst->DebugAsmFileData0;
 	FILE *SavedDebugAsmFileData1 = ControlCodeInst->DebugAsmFileData1;
-	
+	/* Save the directory-scoped temp paths too, so XAie_CloseControlCodeFile()
+	 * still removes the correct files instead of falling back to CWD-relative
+	 * names if file mode was already opened. */
+	char SavedTempPath1[FNAME_SIZE];
+	char SavedTempPath2[FNAME_SIZE];
+	char SavedTempPath3[FNAME_SIZE];
+	char SavedTempPath4[FNAME_SIZE];
+	memcpy(SavedTempPath1, ControlCodeInst->TempPath1, FNAME_SIZE);
+	memcpy(SavedTempPath2, ControlCodeInst->TempPath2, FNAME_SIZE);
+	memcpy(SavedTempPath3, ControlCodeInst->TempPath3, FNAME_SIZE);
+	memcpy(SavedTempPath4, ControlCodeInst->TempPath4, FNAME_SIZE);
+
 	memset(ControlCodeInst, 0, sizeof(XAie_ControlCodeIO));
-	
+
 	/* Restore file pointers if they existed, and copy flag from DevInst */
 	ControlCodeInst->ControlCodefp = SavedControlCodefp;
 	ControlCodeInst->ControlCodedatafp = SavedControlCodedatafp;
@@ -5179,6 +5251,10 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	ControlCodeInst->DebugAsmFile = SavedDebugAsmFile;
 	ControlCodeInst->DebugAsmFileData0 = SavedDebugAsmFileData0;
 	ControlCodeInst->DebugAsmFileData1 = SavedDebugAsmFileData1;
+	memcpy(ControlCodeInst->TempPath1, SavedTempPath1, FNAME_SIZE);
+	memcpy(ControlCodeInst->TempPath2, SavedTempPath2, FNAME_SIZE);
+	memcpy(ControlCodeInst->TempPath3, SavedTempPath3, FNAME_SIZE);
+	memcpy(ControlCodeInst->TempPath4, SavedTempPath4, FNAME_SIZE);
 	ControlCodeInst->DisableDebugAsm = (DevInst->DisableDebugAsm != 0U) ? 1U : 0U;
 	
 	ControlCodeInst->ScrachpadName = NULL;
@@ -5775,11 +5851,11 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 		
 		memset(FName, '\0', FNAME_SIZE);
 
-		remove(TEMP_ASM_FILE1);
-		remove(TEMP_ASM_FILE2);
+		remove(ControlCodeInst->TempPath1[0] ? ControlCodeInst->TempPath1 : TEMP_ASM_FILE1);
+		remove(ControlCodeInst->TempPath2[0] ? ControlCodeInst->TempPath2 : TEMP_ASM_FILE2);
 		if (!ControlCodeInst->DisableDebugAsm) {
-			remove(TEMP_ASM_FILE3);
-			remove(TEMP_ASM_FILE4);
+			remove(ControlCodeInst->TempPath3[0] ? ControlCodeInst->TempPath3 : TEMP_ASM_FILE3);
+			remove(ControlCodeInst->TempPath4[0] ? ControlCodeInst->TempPath4 : TEMP_ASM_FILE4);
 		}
 
 		ControlCodeInst->ControlCodefp = NULL;

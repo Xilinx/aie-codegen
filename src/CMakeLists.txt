@@ -30,6 +30,7 @@ include(AieCodegenMsvc)
 # --- Options (AIE_CODEGEN_* prefix) -------------------------------------------
 
 option(AIE_CODEGEN_BUILD_SHARED "Build aie_codegen as a shared library" ON)
+option(AIE_CODEGEN_ENABLE_ELF "Enable ELF loader functions (XAIE_FEATURE_ELF_ENABLE)" OFF)
 
 option(CONTROLCODE_BACKEND "Enable control code IO backend" ON)
 option(SOCKET_BACKEND "Enable socket IO backend" OFF)
@@ -76,6 +77,12 @@ set_target_properties(${PROJECT_NAME} PROPERTIES ${_aie_codegen_target_props})
 aie_codegen_apply_include_directories(${PROJECT_NAME})
 
 # Compile definitions
+if(AIE_CODEGEN_ENABLE_ELF)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE XAIE_FEATURE_ELF_ENABLE)
+  if(MSVC)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
+  endif()
+endif()
 if(CONTROLCODE_BACKEND)
   target_compile_definitions(${PROJECT_NAME} PRIVATE __AIECONTROLCODE__)
 endif()

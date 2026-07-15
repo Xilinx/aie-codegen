@@ -197,7 +197,15 @@ typedef SSIZE_T ssize_t;
 #define BUFFER_GROWTH_FACTOR 2
 
 /************************** Constant Definitions *****************************/
-char FName[FNAME_SIZE];
+/* Cross-platform thread-local storage specifier. MSVC's C compiler does not
+ * support the C11 _Thread_local keyword, so use __declspec(thread) instead. */
+#if defined(_MSC_VER)
+#define XAIE_THREAD_LOCAL __declspec(thread)
+#else
+#define XAIE_THREAD_LOCAL _Thread_local
+#endif
+
+static XAIE_THREAD_LOCAL char FName[FNAME_SIZE];
 
 /****************************** Type Definitions *****************************/
 

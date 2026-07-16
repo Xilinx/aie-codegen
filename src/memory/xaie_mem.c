@@ -58,6 +58,7 @@ AieRC XAie_DataMemWrWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 {
 	u64 RegAddr;
 	u8 TileType;
+	const XAie_MemMod *MemMod;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -70,6 +71,26 @@ AieRC XAie_DataMemWrWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
 		XAIE_ERROR("Tile type mismatch\n");
 		return XAIE_INVALID_TILE;
+	}
+
+	MemMod = DevInst->DevProp.DevMod[TileType].MemMod;
+	if(MemMod == XAIE_NULL) {
+		XAIE_ERROR("Memory module not available for tile type %d\n",
+				TileType);
+		return XAIE_INVALID_ARGS;
+	}
+
+	/* Verify 4-byte alignment for 32-bit word access */
+	if(Addr & XAIE_MEM_WORD_ALIGN_MASK) {
+		XAIE_ERROR("Address 0x%x is not 4-byte aligned\n", Addr);
+		return XAIE_INVALID_ARGS;
+	}
+
+	/* Check address + word size is within tile data memory [0, Size) */
+	if(((u64)Addr + sizeof(u32)) > MemMod->Size) {
+		XAIE_ERROR("Address 0x%x is outside valid data memory range "
+				"[0x0, 0x%x)\n", Addr, MemMod->Size);
+		return XAIE_INVALID_ADDRESS;
 	}
 
 	RegAddr = (u64)(Addr) +
@@ -86,7 +107,7 @@ AieRC XAie_DataMemWrWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 *
 * @param	DevInst: Device Instance
 * @param	Loc: Loc of AIE Tiles
-* @param	Addr: Address in data memory to write.
+* @param	Addr: Address in data memory to read.
 * @param	Data: Pointer to store 32-bit value read from memory.
 *
 * @return	XAIE_OK on success and error code on failure
@@ -99,6 +120,7 @@ AieRC XAie_DataMemRdWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 {
 	u64 RegAddr;
 	u8 TileType;
+	const XAie_MemMod *MemMod;
 
 	if((DevInst == XAIE_NULL) || (Data == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -111,6 +133,26 @@ AieRC XAie_DataMemRdWord(XAie_DevInst *DevInst, XAie_LocType Loc,
 			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
 		XAIE_ERROR("Tile type mismatch\n");
 		return XAIE_INVALID_TILE;
+	}
+
+	MemMod = DevInst->DevProp.DevMod[TileType].MemMod;
+	if(MemMod == XAIE_NULL) {
+		XAIE_ERROR("Memory module not available for tile type %d\n",
+				TileType);
+		return XAIE_INVALID_ARGS;
+	}
+
+	/* Verify 4-byte alignment for 32-bit word access */
+	if(Addr & XAIE_MEM_WORD_ALIGN_MASK) {
+		XAIE_ERROR("Address 0x%x is not 4-byte aligned\n", Addr);
+		return XAIE_INVALID_ARGS;
+	}
+
+	/* Check address + word size is within tile data memory [0, Size) */
+	if(((u64)Addr + sizeof(u32)) > MemMod->Size) {
+		XAIE_ERROR("Address 0x%x is outside valid data memory range "
+				"[0x0, 0x%x)\n", Addr, MemMod->Size);
+		return XAIE_INVALID_ADDRESS;
 	}
 
 	RegAddr = (u64)(Addr) +
@@ -228,6 +270,7 @@ AieRC XAie_DataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 	AieRC RC;
 	u8 TileType;
 	const unsigned char *CharSrc = (const unsigned char *)Src;
+	const XAie_MemMod *MemMod;
 
 	if((DevInst == XAIE_NULL) ||
 		(DevInst->IsReady != XAIE_COMPONENT_IS_READY) || (Src == NULL))
@@ -241,6 +284,20 @@ AieRC XAie_DataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
 		XAIE_ERROR("Tile type mismatch\n");
 		return XAIE_INVALID_TILE;
+	}
+
+	MemMod = DevInst->DevProp.DevMod[TileType].MemMod;
+	if(MemMod == XAIE_NULL) {
+		XAIE_ERROR("Memory module not available for tile type %d\n",
+				TileType);
+		return XAIE_INVALID_ARGS;
+	}
+
+	/* Check address + size is within tile data memory [0, Size) */
+	if(((u64)Addr + Size) > MemMod->Size) {
+		XAIE_ERROR("Address range [0x%x, 0x%x) is outside valid data memory "
+				"[0x0, 0x%x)\n", Addr, Addr + Size, MemMod->Size);
+		return XAIE_INVALID_RANGE;
 	}
 
 	RC = _XAie_DataMemoryBlockWrite(DevInst, Loc, Addr, CharSrc,
@@ -277,6 +334,7 @@ AieRC XAie_SharedDataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 A
 	u32 RemBytes = Size;
 	u32 TempWord;
 	u8 TileType;
+	const XAie_MemMod *MemMod;
 	u8 FirstReadOffset = (u8)Addr & XAIE_MEM_WORD_ALIGN_MASK;
 	unsigned char *CharDst = (unsigned char *)Dst;
 
@@ -292,6 +350,20 @@ AieRC XAie_SharedDataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 A
 			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
 		XAIE_ERROR("Tile type mismatch\n");
 		return XAIE_INVALID_TILE;
+	}
+
+	MemMod = DevInst->DevProp.DevMod[TileType].MemMod;
+	if(MemMod == XAIE_NULL) {
+		XAIE_ERROR("Memory module not available for tile type %d\n",
+				TileType);
+		return XAIE_INVALID_ARGS;
+	}
+
+	/* Check address + size is within tile data memory [0, Size) */
+	if(((u64)Addr + Size) > MemMod->Size) {
+		XAIE_ERROR("Address range [0x%x, 0x%x) is outside valid data memory "
+				"[0x0, 0x%x)\n", Addr, Addr + Size, MemMod->Size);
+		return XAIE_INVALID_RANGE;
 	}
 
 	/* Absolute 4-byte aligned AXI-MM address to write */
@@ -371,6 +443,7 @@ AieRC XAie_SharedDataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc,
         AieRC RC;
         u8 TileType;
         unsigned char *CharSrc = (unsigned char *)Src;
+        const XAie_MemMod *MemMod;
 
         if((DevInst == XAIE_NULL) ||
                 (DevInst->IsReady != XAIE_COMPONENT_IS_READY) || (Src == NULL))
@@ -384,6 +457,20 @@ AieRC XAie_SharedDataMemBlockWrite(XAie_DevInst *DevInst, XAie_LocType Loc,
                         (TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
                 XAIE_ERROR("Tile type mismatch\n");
                 return XAIE_INVALID_TILE;
+        }
+
+        MemMod = DevInst->DevProp.DevMod[TileType].MemMod;
+        if(MemMod == XAIE_NULL) {
+                XAIE_ERROR("Memory module not available for tile type %d\n",
+                                TileType);
+                return XAIE_INVALID_ARGS;
+        }
+
+        /* Check address + size is within tile data memory [0, Size) */
+        if(((u64)Addr + Size) > MemMod->Size) {
+                XAIE_ERROR("Address range [0x%x, 0x%x) is outside valid data memory "
+                                "[0x0, 0x%x)\n", Addr, Addr + Size, MemMod->Size);
+                return XAIE_INVALID_RANGE;
         }
 
         RC = _XAie_DataMemoryBlockWrite(DevInst, Loc, Addr, CharSrc,
@@ -420,6 +507,7 @@ AieRC XAie_DataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 	u32 RemBytes = Size;
 	u32 TempWord;
 	u8 TileType;
+	const XAie_MemMod *MemMod;
 
 	u8 FirstReadOffset = (u8)(Addr & XAIE_MEM_WORD_LAST_BYTE_MASK) & XAIE_MEM_WORD_ALIGN_MASK;
 	unsigned char *CharDst = (unsigned char *)Dst;
@@ -436,6 +524,20 @@ AieRC XAie_DataMemBlockRead(XAie_DevInst *DevInst, XAie_LocType Loc, u32 Addr,
 			(TileType != XAIEGBL_TILE_TYPE_MEMTILE)) {
 		XAIE_ERROR("Tile type mismatch\n");
 		return XAIE_INVALID_TILE;
+	}
+
+	MemMod = DevInst->DevProp.DevMod[TileType].MemMod;
+	if(MemMod == XAIE_NULL) {
+		XAIE_ERROR("Memory module not available for tile type %d\n",
+				TileType);
+		return XAIE_INVALID_ARGS;
+	}
+
+	/* Check address + size is within tile data memory [0, Size) */
+	if(((u64)Addr + Size) > MemMod->Size) {
+		XAIE_ERROR("Address range [0x%x, 0x%x) is outside valid data memory "
+				"[0x0, 0x%x)\n", Addr, Addr + Size, MemMod->Size);
+		return XAIE_INVALID_RANGE;
 	}
 
 	/* Absolute 4-byte aligned AXI-MM address to write */

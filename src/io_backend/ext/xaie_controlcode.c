@@ -278,6 +278,7 @@ typedef struct {
 	u8  IsJobOpen;
 	u8  IsPageOpen;
 	u8  IsShimBd;
+	u8  IsExtGroup;
 	u8  Mode;
 	u8  IsAdjacentMemWrite;
 	u8  PageBreak;
@@ -355,6 +356,7 @@ typedef struct {
 	u8   IsJobOpen;
 	u8   IsPageOpen;
 	u8   IsShimBd;
+	u8   IsExtGroup;          /* type of the currently-open uC-DMA combine group: 1 = BlockWrite32_Ext writes, 0 = ordinary writes. Only meaningful while CombineCommands == 1. */
 	u8   Mode;
 	u8   IsAdjacentMemWrite;
 	u32  CombinedMemWriteSize;
@@ -1069,6 +1071,7 @@ static inline void _XAie_SavePageState(XAie_ControlCodeIO *ControlCodeInst,
 	s->IsJobOpen               = ControlCodeInst->IsJobOpen;
 	s->IsPageOpen              = ControlCodeInst->IsPageOpen;
 	s->IsShimBd                = ControlCodeInst->IsShimBd;
+	s->IsExtGroup              = ControlCodeInst->IsExtGroup;
 	s->Mode                    = ControlCodeInst->Mode;
 	s->IsAdjacentMemWrite      = ControlCodeInst->IsAdjacentMemWrite;
 	s->PageBreak               = ControlCodeInst->PageBreak;
@@ -1116,6 +1119,7 @@ static inline void _XAie_RestorePageState(XAie_ControlCodeIO *ControlCodeInst,
 	ControlCodeInst->IsJobOpen               = s->IsJobOpen;
 	ControlCodeInst->IsPageOpen              = s->IsPageOpen;
 	ControlCodeInst->IsShimBd                = s->IsShimBd;
+	ControlCodeInst->IsExtGroup              = s->IsExtGroup;
 	ControlCodeInst->Mode                    = s->Mode;
 	ControlCodeInst->IsAdjacentMemWrite      = s->IsAdjacentMemWrite;
 	ControlCodeInst->PageBreak               = s->PageBreak;
@@ -1522,6 +1526,48 @@ AieRC XAie_ControlCodeIO_Init(XAie_DevInst *DevInst)
 /*****************************************************************************/
 /**
 *
+* This function emits the deferred UC_DMA_WRITE_DES_SYNC instruction that
+* heads an open uC-DMA ShimBD chain (XAIE_SHIM_BD_CHAINING_ENABLE), if one
+* is open, and resets the chain accounting. A ShimBD chain accumulates its
+* member BDs under NumShimBDsChained without emitting the WRITE_DES_SYNC
+* until the chain is closed, so any place that needs to force the chain
+* closed early (job end, mode change, or a combine-group kind switch) must
+* go through this to avoid leaving the chain silently open.
+*
+* On a printf failure ErrorState is set and picked up by the next
+* CONTROLCODE_PRINTF_CHECK in the caller, same as _XAie_EndJob.
+*
+* @param	ControlCodeInst: ControlCodeInst instance pointer.
+*
+* @return	void.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static void _XAie_FlushShimBdChain(XAie_ControlCodeIO *ControlCodeInst) {
+
+	if (ControlCodeInst->NumShimBDsChained == 0) {
+		return;
+	}
+
+	CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
+			"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
+			ControlCodeInst->UcbdLabelNum);
+	CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
+			"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
+			ControlCodeInst->UcbdLabelNum);
+	ControlCodeInst->UcPageSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
+	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+
+	ControlCodeInst->UcPageTextSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
+	ControlCodeInst->NumShimBDsChained = 0;
+	ControlCodeInst->CombineCommands = 0;
+	ControlCodeInst->UcbdLabelNum++;
+}
+
+/*****************************************************************************/
+/**
+*
 * This function ends a Control code Job
 *
 * @param	ControlCodeInst: ControlCodeInst instance pointer.
@@ -1555,19 +1601,7 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 
 	}
 	else if(ControlCodeInst->NumShimBDsChained > 0) {
-		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
-				"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
-				ControlCodeInst->UcbdLabelNum);
-		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
-				"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
-				ControlCodeInst->UcbdLabelNum);
-		ControlCodeInst->UcPageSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
-		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
-
-		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
-		ControlCodeInst->NumShimBDsChained = 0;
-		ControlCodeInst->CombineCommands = 0;
-		ControlCodeInst->UcbdLabelNum++;
+		_XAie_FlushShimBdChain(ControlCodeInst);
 	}
 
 	/* PCJ trigger point: the user has just called XAie_EndJob to terminate
@@ -1753,6 +1787,7 @@ static void _XAie_StartNewJob(XAie_ControlCodeIO  *ControlCodeInst,
 		ControlCodeInst->PrevMemWriteType     = -1;
 		ControlCodeInst->CombineCommands      = 0;
 		ControlCodeInst->IsShimBd             = 0;
+		ControlCodeInst->IsExtGroup           = 0;
 		ControlCodeInst->Mode                 = 0;
 		ControlCodeInst->IsAdjacentMemWrite   = 0;
 		ControlCodeInst->PageBreak            = 0;
@@ -1873,20 +1908,8 @@ AieRC XAie_ConfigMode(void *IOInst, XAie_ModeSelect Mode)
 			}
 			break;
 		case XAIE_SHIM_BD_CHAINING_DISABLE:
-			{
-				if(ControlCodeInst->NumShimBDsChained != 0) {
-					CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
-							"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
-							ControlCodeInst->UcbdLabelNum);
-					CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
-							"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
-							ControlCodeInst->UcbdLabelNum);
-					ControlCodeInst->UcPageSize += ISA_OPCODE_UC_DMA_WRITE_DES_SYNC;
-				_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
-					ControlCodeInst->NumShimBDsChained = 0;
-					ControlCodeInst->UcbdLabelNum++;
-				}
-			}
+			_XAie_FlushShimBdChain(ControlCodeInst);
+			CHECK_ERROR_STATE(ControlCodeInst);
 			break;
 		case XAIE_WRITE_DES_ASYNC_ENABLE:
 			break;
@@ -1916,6 +1939,78 @@ XAie_ModeSelect XAie_GetConfigMode(void *IOInst)
 /*****************************************************************************/
 /**
 *
+* Never merge ext and ordinary writes, via combine group or adjacency.
+* Checked unconditionally: a barrier can leave CombineCommands = 0 while
+* the address still looks adjacent to a different-kind write.
+*
+* If a ShimBD chain of the other kind is still open (NumShimBDsChained > 0),
+* its deferred UC_DMA_WRITE_DES_SYNC is flushed first: that emission path
+* keys off NumShimBDsChained rather than CombineCommands, so merely zeroing
+* CombineCommands would leave the open chain in place and let the incoming
+* write's descriptor be silently appended to it.
+*
+* The flush itself emits a SYNC, so check for page overflow before
+* flushing too, same as every other emission site in this file.
+*
+* @param	ControlCodeInst: ControlCode instance pointer
+* @param	IsExtWrite: 1 if the incoming write is BlockWrite32_Ext, 0
+*		if it is an ordinary Write32/BlockWrite32.
+*
+* @return	None.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static inline void _XAie_IsolateCombineGroup(XAie_ControlCodeIO *ControlCodeInst,
+		u8 IsExtWrite)
+{
+	if (ControlCodeInst->IsExtGroup != IsExtWrite) {
+		if ((ControlCodeInst->NumShimBDsChained > 0) &&
+				((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
+				 ControlCodeInst->PageSizeMax)) {
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+		}
+		_XAie_FlushShimBdChain(ControlCodeInst);
+		ControlCodeInst->CombineCommands = 0;
+		ControlCodeInst->IsAdjacentMemWrite = 0;
+	}
+	ControlCodeInst->IsExtGroup = IsExtWrite;
+}
+
+/*****************************************************************************/
+/**
+*
+* Returns whether this write's own uC-DMA trigger instruction, and the label
+* increment that goes with it, must be deferred because it is genuinely
+* joining an open ShimBD chain (XAIE_SHIM_BD_CHAINING_ENABLE) that a later
+* disable/flush will emit a single trigger for.
+*
+* A write that merely happens to run while chaining mode is enabled but is
+* not itself a ShimBD (e.g. an ordinary/Ext write interleaved between
+* chained BDs right after _XAie_IsolateCombineGroup flushed the prior chain)
+* must get its own immediate trigger and label, exactly as it would outside
+* chaining mode. Gating on Mode alone (regardless of IsShimBd) leaves such a
+* write's BD unreferenced by any trigger and reuses the still-pending label
+* for the next write, producing two data-section definitions of the same
+* label name.
+*
+* @param	ControlCodeInst: ControlCode instance pointer
+*
+* @return	1 if trigger/label emission must be deferred, 0 otherwise.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static inline u8 _XAie_ShimBdChainDefersTrigger(XAie_ControlCodeIO *ControlCodeInst)
+{
+	return (ControlCodeInst->Mode == XAIE_SHIM_BD_CHAINING_ENABLE) &&
+		ControlCodeInst->IsShimBd;
+}
+
+/*****************************************************************************/
+/**
+*
 * This is the memory IO function to write 32bit data to the specified address.
 *
 * @param	IOInst: IO instance pointer
@@ -1930,6 +2025,7 @@ XAie_ModeSelect XAie_GetConfigMode(void *IOInst)
 *******************************************************************************/
 AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 {
+	u8 IsExtWrite = 0;
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
 	u32 OpSize;
@@ -1950,6 +2046,9 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 	else {
 		ControlCodeInst->IsAdjacentMemWrite = 0;
 	}
+
+	_XAie_IsolateCombineGroup(ControlCodeInst, IsExtWrite);
+	CHECK_ERROR_STATE(ControlCodeInst);
 
 	ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
 		((ControlCodeInst->UcPageTextSize + (ControlCodeInst->IsAdjacentMemWrite ? 0:OpSize)) % DATA_SECTION_ALIGNMENT));
@@ -2289,6 +2388,7 @@ AieRC XAie_ControlCodeIO_MaskPoll(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
 AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 		u32 Size)
 {
+	u8 IsExtWrite = 0;
 	u8 PageBreakOccured = 0;
 	u32 Hash = 0;
 	u32 CompletedSize = 0;
@@ -2325,6 +2425,11 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 			else {
 				ControlCodeInst->IsAdjacentMemWrite = 0;
 			}
+
+			/* IsExtWrite is constant per call, so only the first emitting
+			 * iteration flips IsExtGroup; later iterations are a no-op. */
+			_XAie_IsolateCombineGroup(ControlCodeInst, IsExtWrite);
+			CHECK_ERROR_STATE(ControlCodeInst);
 
 			if(ControlCodeInst->PageBreak == 0) {
 				ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
@@ -2385,7 +2490,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 								break;
 							}
 						}
-					}	
+					}
 				}
 
 				if( (ControlCodeInst->IsShimBd) &&
@@ -2400,7 +2505,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 					_XAie_ControlCodeSeekAndOverwrite(ControlCodeInst, 4, -3, " 1\n");
 				}
 				else {
-					if(ControlCodeInst->Mode != XAIE_SHIM_BD_CHAINING_ENABLE) {
+					if(!_XAie_ShimBdChainDefersTrigger(ControlCodeInst)) {
 						if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE) {
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
 								"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
@@ -2428,7 +2533,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 						CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA0, "UCBD_label_%d:\n",
 								ControlCodeInst->UcbdLabelNum);
 					}
-					if(ControlCodeInst->Mode != XAIE_SHIM_BD_CHAINING_ENABLE) {
+					if(!_XAie_ShimBdChainDefersTrigger(ControlCodeInst)) {
 						ControlCodeInst->UcbdLabelNum++;
 					}
 				}
@@ -2452,7 +2557,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 					}
 				}
 				ControlCodeInst->PageBreak = 0;
-				
+
 				if(ControlCodeInst->LabelMatchFound == 0) {
 					CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA2, "DMAWRITE_data_%d:\n",
 							ControlCodeInst->UcDmaDataNum);
@@ -2580,6 +2685,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 		const u32 *Data, u32 Size)
 {
+	u8 IsExtWrite = 1;
 	u8 PageBreakOccured = 0;
 	u32 Hash = 0;
 	u32 CompletedSize = 0;
@@ -2616,6 +2722,11 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 			else {
 				ControlCodeInst->IsAdjacentMemWrite = 0;
 			}
+
+			/* IsExtWrite is constant per call, so only the first emitting
+			 * iteration flips IsExtGroup; later iterations are a no-op. */
+			_XAie_IsolateCombineGroup(ControlCodeInst, IsExtWrite);
+			CHECK_ERROR_STATE(ControlCodeInst);
 
 			if(ControlCodeInst->PageBreak == 0) {
 				ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
@@ -2682,16 +2793,21 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 				if( (ControlCodeInst->IsShimBd) &&
 					(ControlCodeInst->NumShimBDsChained == 0) ) {
 					ControlCodeInst->CombineCommands = 0;
-					ControlCodeInst->LabelMatchFound = 0;
-					ControlCodeInst->UcDmaDataNum = ControlCodeInst->CurrentDataBWLabel;
 				}
+
+				/* Disable data de-dup for ext writes: each is patched by its
+				 * own APPLY_OFFSET_PL, so it must own a unique data buffer,
+				 * chained or not. IsExtWrite is always 1 here, so no guard
+				 * is needed. */
+				ControlCodeInst->LabelMatchFound = 0;
+				ControlCodeInst->UcDmaDataNum = ControlCodeInst->CurrentDataBWLabel;
 
 				if(ControlCodeInst->CombineCommands) {
 					_XAie_ControlCodeSeekAndOverwrite(ControlCodeInst, 1, -3, " 1\n");
 					_XAie_ControlCodeSeekAndOverwrite(ControlCodeInst, 4, -3, " 1\n");
 				}
 				else {
-					if(ControlCodeInst->Mode != XAIE_SHIM_BD_CHAINING_ENABLE) {
+					if(!_XAie_ShimBdChainDefersTrigger(ControlCodeInst)) {
 						if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE) {
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
 								"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
@@ -2719,7 +2835,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 						CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA0, "UCBD_label_%d:\n",
 								ControlCodeInst->UcbdLabelNum);
 					}
-					if(ControlCodeInst->Mode != XAIE_SHIM_BD_CHAINING_ENABLE) {
+					if(!_XAie_ShimBdChainDefersTrigger(ControlCodeInst)) {
 						ControlCodeInst->UcbdLabelNum++;
 					}
 				}
@@ -4468,6 +4584,7 @@ AieRC XAie_ControlCodeIO_LoadCoresStart(void *IOInst, u32 UniqueCoreElfId, const
 		ControlCodeInst->PrevMemWriteType        = -1;
 		ControlCodeInst->CombineCommands         = 0;
 		ControlCodeInst->IsShimBd                = 0;
+		ControlCodeInst->IsExtGroup              = 0;
 		ControlCodeInst->Mode                    = 0;
 		ControlCodeInst->IsAdjacentMemWrite      = 0;
 		ControlCodeInst->PageBreak               = 0;
@@ -4665,6 +4782,7 @@ AieRC XAie_ControlCodeIO_LoadCoresCPStart(void *IOInst, u32 UniqueCoreElfId)
 		ControlCodeInst->PrevMemWriteType     = -1;
 		ControlCodeInst->CombineCommands      = 0;
 		ControlCodeInst->IsShimBd             = 0;
+		ControlCodeInst->IsExtGroup           = 0;
 		ControlCodeInst->Mode                 = 0;
 		ControlCodeInst->IsAdjacentMemWrite   = 0;
 		ControlCodeInst->PageBreak            = 0;

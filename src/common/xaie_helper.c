@@ -867,6 +867,11 @@ AieRC XAie_SetPadInteger(XAie_DevInst *DevInst, char* BuffName, u32 BuffSize)
 		return XAIE_INVALID_ARGS;
 	}
 
+	if(BuffName == XAIE_NULL) {
+		XAIE_ERROR("Buffer name cannot be NULL\n");
+		return XAIE_ERR;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 	
 	if (Backend->Ops.SetPadInteger != NULL) {
@@ -883,6 +888,16 @@ AieRC XAie_SetPadString(XAie_DevInst *DevInst, char* BuffName, char* BuffBlobPat
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	if(BuffName == XAIE_NULL) {
+		XAIE_ERROR("Buffer name cannot be NULL\n");
+		return XAIE_ERR;
+	}
+
+	if(BuffBlobPath == XAIE_NULL) {
+		XAIE_ERROR("Buffer Blob Path cannot be NULL\n");
+		return XAIE_ERR;
 	}
 
 	const XAie_Backend *Backend = DevInst->Backend;
@@ -951,7 +966,7 @@ XAie_ModeSelect XAie_GetModeConfig(XAie_DevInst *DevInst)
 
 AieRC XAie_Preempt(XAie_DevInst *DevInst, u16 PreemptId, char* SaveLabel, char* RestoreLabel, u32* HintMap, u32 HintMapSizeInWords)
 {
-	if((DevInst == XAIE_NULL) ||
+	if((DevInst == XAIE_NULL) || (SaveLabel == XAIE_NULL) || (RestoreLabel == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;

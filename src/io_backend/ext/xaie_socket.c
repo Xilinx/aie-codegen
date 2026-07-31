@@ -44,9 +44,6 @@
 #include "xaie_io_common.h"
 #include "xaie_io_privilege.h"
 #include "xaie_npi.h"
-#ifdef __SWIGINTERFACE__
-#include "swig_socket_interface.h"
-#endif
 
 #ifdef __AIGSOCKETCI__
 #include "sleep.h"
@@ -54,10 +51,8 @@
 
 
 /***************************** Macro Definitions *****************************/
-#ifndef __SWIGINTERFACE__
 #define XAIE_IO_SOCKET_CMDBUFSIZE	48U
 #define XAIE_IO_SOCKET_RDBUFSIZE	11U /* "0xDEADBEEF\n" */
-#endif
 
 /****************************** Type Definitions *****************************/
 #ifdef __AIESOCKET__
@@ -544,7 +539,6 @@ static AieRC _XAie_SocketIO_NpiMaskPoll(void *IOInst, u64 RegOff, u32 Mask,
 	return Ret;
 }
 
-#ifndef __SWIGINTERFACE__
 static AieRC XAie_SocketIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 		XAie_BackendOpCode Op, void *Arg)
 {
@@ -600,7 +594,6 @@ static AieRC XAie_SocketIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 
 	return XAIE_OK;
 }
-#endif //__SWIGINTERFACE__
 
 static XAie_MemInst* XAie_SocketMemAllocate(XAie_DevInst *DevInst, u64 Size,
 		XAie_MemCacheProp Cache)
@@ -725,7 +718,6 @@ static AieRC XAie_SocketIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data,
 	return XAIE_ERR;
 }
 
-#ifndef __SWIGINTERFACE__
 static AieRC XAie_SocketIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 		XAie_BackendOpCode Op, void *Arg)
 {
@@ -735,7 +727,6 @@ static AieRC XAie_SocketIO_RunOp(void *IOInst, XAie_DevInst *DevInst,
 	(void)Arg;
 	return XAIE_FEATURE_NOT_SUPPORTED;
 }
-#endif
 
 static XAie_MemInst* XAie_SocketMemAllocate(XAie_DevInst *DevInst, u64 Size,
 		XAie_MemCacheProp Cache)
@@ -806,9 +797,7 @@ const XAie_Backend SocketBackend =
 	.Ops.BlockWrite32 = XAie_SocketIO_BlockWrite32,
 	.Ops.BlockSet32 = XAie_SocketIO_BlockSet32,
 	.Ops.CmdWrite = XAie_SocketIO_CmdWrite,
-#ifndef __SWIGINTERFACE__
 	.Ops.RunOp = XAie_SocketIO_RunOp,
-#endif
 	.Ops.MemAllocate = XAie_SocketMemAllocate,
 	.Ops.MemFree = XAie_SocketMemFree,
 	.Ops.MemSyncForCPU = XAie_SocketMemSyncForCPU,

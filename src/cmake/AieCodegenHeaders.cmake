@@ -6,7 +6,7 @@
 
 set(_AIE_CODEGEN_HEADER_DIRS
   common core device dma events global interrupt
-  io_backend io_backend/ext io_backend/privilege io_backend/swig
+  io_backend io_backend/ext io_backend/privilege
   locks memory noc npi perfcnt pl pm routing stream_switch timer trace
 )
 

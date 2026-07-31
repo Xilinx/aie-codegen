@@ -819,7 +819,8 @@ static AieRC _XAie_FindNextNoCTile(XAie_DevInst *DevInst, XAie_LocType Loc,
 static AieRC _XAie_ErrorHandlingInitAie2psAieTile(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	u32 BroadcastBitMap, BroadcastBlockDir;
+	u32 BroadcastBitMap;
+	u8 BroadcastBlockDir;
 	AieRC RC;
 
 	if (TileType != XAIEGBL_TILE_TYPE_AIETILE) {
@@ -829,9 +830,9 @@ static AieRC _XAie_ErrorHandlingInitAie2psAieTile(XAie_DevInst *DevInst, XAie_Lo
 
 	/* Block broadcast 0 from propagating to north, east and west
 	 */
-	BroadcastBlockDir = (u32)XAIE_EVENT_BROADCAST_NORTH |
-			    (u32)XAIE_EVENT_BROADCAST_EAST |
-			    (u32)XAIE_EVENT_BROADCAST_WEST;
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_EAST |
+			    XAIE_EVENT_BROADCAST_WEST;
 	RC = XAie_EventBroadcastBlockDir(DevInst, Loc,
 		   XAIE_CORE_MOD, XAIE_EVENT_SWITCH_A,
 		   XAIE_ERROR_BROADCAST_ID, BroadcastBlockDir);
@@ -886,7 +887,8 @@ static AieRC _XAie_ErrorHandlingInitAie2psAieTile(XAie_DevInst *DevInst, XAie_Lo
 static AieRC _XAie_ErrorHandlingInitAie2psMemTile(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	u32 BroadcastBitMap, BroadcastBlockDir;
+	u32 BroadcastBitMap;
+	u8 BroadcastBlockDir;
 	AieRC RC;
 
 	if (TileType != XAIEGBL_TILE_TYPE_MEMTILE) {
@@ -895,9 +897,9 @@ static AieRC _XAie_ErrorHandlingInitAie2psMemTile(XAie_DevInst *DevInst, XAie_Lo
 	}
 	/* Block broadcast 0 from propagating to north, east and west
 	 */
-	BroadcastBlockDir = (u32)XAIE_EVENT_BROADCAST_NORTH |
-			    (u32)XAIE_EVENT_BROADCAST_EAST |
-			    (u32)XAIE_EVENT_BROADCAST_WEST;
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_EAST |
+			    XAIE_EVENT_BROADCAST_WEST;
 	RC = XAie_EventBroadcastBlockDir(DevInst, Loc,
 		   XAIE_MEM_MOD, XAIE_EVENT_SWITCH_A,
 		   XAIE_ERROR_BROADCAST_ID, BroadcastBlockDir);
@@ -952,7 +954,8 @@ static AieRC _XAie_ErrorHandlingInitAie2psMemTile(XAie_DevInst *DevInst, XAie_Lo
 static AieRC _XAie_ErrorHandlingInitAie2psShimTileCol0(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	u32 BroadcastBitMap, BroadcastBlockDir;
+	u32 BroadcastBitMap;
+	u8 BroadcastBlockDir;
 	AieRC RC;
 
 	if ((TileType != XAIEGBL_TILE_TYPE_SHIMNOC) &&
@@ -966,9 +969,9 @@ static AieRC _XAie_ErrorHandlingInitAie2psShimTileCol0(XAie_DevInst *DevInst, XA
 	}
 	/* For Col 0, propagate broadcast 2 east only
 	 */
-	BroadcastBlockDir = (u32)XAIE_EVENT_BROADCAST_NORTH |
-			    (u32)XAIE_EVENT_BROADCAST_WEST |
-			    (u32)XAIE_EVENT_BROADCAST_SOUTH;
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_WEST |
+			    XAIE_EVENT_BROADCAST_SOUTH;
 	RC = XAie_EventBroadcastBlockDir(DevInst, Loc,
 			XAIE_PL_MOD, XAIE_EVENT_SWITCH_A,
 			XAIE_ERROR_BROADCAST_ID_USER_EVENT1,
@@ -989,9 +992,9 @@ static AieRC _XAie_ErrorHandlingInitAie2psShimTileCol0(XAie_DevInst *DevInst, XA
 	 */
 	BroadcastBitMap = BIT(XAIE_ERROR_BROADCAST_ID) |
 			  BIT(XAIE_ERROR_BROADCAST_ID_UC_EVENT);
-	BroadcastBlockDir = (u32)XAIE_EVENT_BROADCAST_NORTH |
-			    (u32)XAIE_EVENT_BROADCAST_WEST |
-			    (u32)XAIE_EVENT_BROADCAST_SOUTH;
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_WEST |
+			    XAIE_EVENT_BROADCAST_SOUTH;
 	RC = XAie_EventBroadcastBlockMapDir(DevInst, Loc,
 			XAIE_PL_MOD, XAIE_EVENT_SWITCH_A,
 			BroadcastBitMap,
@@ -1030,7 +1033,8 @@ static AieRC _XAie_ErrorHandlingInitAie2psShimTileCol0(XAie_DevInst *DevInst, XA
 static AieRC _XAie_ErrorHandlingInitAie2psShimTileLeadCol(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	u32 BroadcastBitMap, BroadcastBlockDir;
+	u32 BroadcastBitMap;
+	u8 BroadcastBlockDir;
 	AieRC RC;
 
 	if ((TileType != XAIEGBL_TILE_TYPE_SHIMNOC) &&
@@ -1046,9 +1050,9 @@ static AieRC _XAie_ErrorHandlingInitAie2psShimTileLeadCol(XAie_DevInst *DevInst,
 	 */
 	BroadcastBitMap = BIT(XAIE_ERROR_BROADCAST_ID) |
 			  BIT(XAIE_ERROR_BROADCAST_ID_UC_EVENT);
-	BroadcastBlockDir = (u32)XAIE_EVENT_BROADCAST_NORTH |
-			    (u32)XAIE_EVENT_BROADCAST_EAST |
-			    (u32)XAIE_EVENT_BROADCAST_SOUTH;
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_EAST |
+			    XAIE_EVENT_BROADCAST_SOUTH;
 
 	RC = XAie_EventBroadcastBlockMapDir(DevInst, Loc,
 			XAIE_PL_MOD, XAIE_EVENT_SWITCH_A,
@@ -1067,9 +1071,9 @@ static AieRC _XAie_ErrorHandlingInitAie2psShimTileLeadCol(XAie_DevInst *DevInst,
 	}
 	/* For column 1, block broadcast for id 2 in all directions
 	 */
-	BroadcastBlockDir = (u32)XAIE_EVENT_BROADCAST_NORTH |
-			    (u32)XAIE_EVENT_BROADCAST_WEST |
-			    (u32)XAIE_EVENT_BROADCAST_SOUTH;
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_WEST |
+			    XAIE_EVENT_BROADCAST_SOUTH;
 	RC = XAie_EventBroadcastBlockDir(DevInst, Loc,
 			XAIE_PL_MOD, XAIE_EVENT_SWITCH_A,
 			XAIE_ERROR_BROADCAST_ID_USER_EVENT1,
@@ -1108,7 +1112,8 @@ static AieRC _XAie_ErrorHandlingInitAie2psShimTileLeadCol(XAie_DevInst *DevInst,
 static AieRC _XAie_ErrorHandlingInitAie2psShimTile(XAie_DevInst *DevInst, XAie_LocType Loc)
 {
 	u8 TileType = DevInst->DevOps->GetTTypefromLoc(DevInst, Loc);
-	u32 BroadcastBitMap, BroadcastBlockDir;
+	u32 BroadcastBitMap;
+	u8 BroadcastBlockDir;
 	AieRC RC;
 
 	if ((TileType != XAIEGBL_TILE_TYPE_SHIMNOC) &&
@@ -1124,9 +1129,9 @@ static AieRC _XAie_ErrorHandlingInitAie2psShimTile(XAie_DevInst *DevInst, XAie_L
 	 */
 	BroadcastBitMap = BIT(XAIE_ERROR_BROADCAST_ID) |
 			  BIT(XAIE_ERROR_BROADCAST_ID_UC_EVENT);
-	BroadcastBlockDir = (u32)XAIE_EVENT_BROADCAST_NORTH |
-			    (u32)XAIE_EVENT_BROADCAST_WEST |
-			    (u32)XAIE_EVENT_BROADCAST_SOUTH;
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_WEST |
+			    XAIE_EVENT_BROADCAST_SOUTH;
 	RC = XAie_EventBroadcastBlockMapDir(DevInst, Loc,
 			XAIE_PL_MOD, XAIE_EVENT_SWITCH_A,
 			BroadcastBitMap,
@@ -1145,9 +1150,9 @@ static AieRC _XAie_ErrorHandlingInitAie2psShimTile(XAie_DevInst *DevInst, XAie_L
 	}
 	/* Propagate broadcast 2 west only
 	 */
-	BroadcastBlockDir = (u32)XAIE_EVENT_BROADCAST_NORTH |
-			    (u32)XAIE_EVENT_BROADCAST_EAST |
-			    (u32)XAIE_EVENT_BROADCAST_SOUTH;
+	BroadcastBlockDir = XAIE_EVENT_BROADCAST_NORTH |
+			    XAIE_EVENT_BROADCAST_EAST |
+			    XAIE_EVENT_BROADCAST_SOUTH;
 	RC = XAie_EventBroadcastBlockDir(DevInst, Loc,
 			XAIE_PL_MOD, XAIE_EVENT_SWITCH_A,
 			XAIE_ERROR_BROADCAST_ID_USER_EVENT1,

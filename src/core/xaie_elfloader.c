@@ -39,6 +39,7 @@
 #include "xaie_feature_config.h"
 #include "xaie_ecc.h"
 #include "xaie_mem.h"
+#include "xaie_secure_io_internal.h"
 
 #ifdef XAIE_FEATURE_ELF_ENABLE
 /************************** Constant Definitions *****************************/
@@ -758,6 +759,7 @@ AieRC XAie_LoadElfPartial(XAie_DevInst *DevInst, XAie_LocType Loc,
 	long int ElfSize;
 	u64 ElfSz;
 	AieRC RC;
+	char ErrBuf[128U];
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -825,10 +827,10 @@ AieRC XAie_LoadElfPartial(XAie_DevInst *DevInst, XAie_LocType Loc,
 	(void)LoadSym;
 #endif
 
-	Fd = fopen(ElfPtr, "rb");
+	Fd = _XAie_SecureFopen(ElfPtr, "rb");
 	if(Fd == XAIE_NULL) {
 		XAIE_ERROR("Unable to open elf file, %s: %s\n",
-				ElfPtr, strerror(errno));
+				ElfPtr, _XAie_Strerror(errno, ErrBuf, sizeof(ErrBuf)));
 		return XAIE_INVALID_ELF;
 	}
 
@@ -836,7 +838,7 @@ AieRC XAie_LoadElfPartial(XAie_DevInst *DevInst, XAie_LocType Loc,
 	Ret = fseek(Fd, 0L, SEEK_END);
 	if(Ret != 0) {
 		XAIE_ERROR("Failed to get end of file, %s: %s\n",
-				ElfPtr, strerror(errno));
+				ElfPtr, _XAie_Strerror(errno, ErrBuf, sizeof(ErrBuf)));
 		if(fclose(Fd) == EOF) {  
         		XAIE_ERROR("Failed to close file \n");  
     		}
@@ -846,7 +848,7 @@ AieRC XAie_LoadElfPartial(XAie_DevInst *DevInst, XAie_LocType Loc,
 	ElfSize = ftell(Fd);
 	if (ElfSize < 0) {
 		XAIE_ERROR("Failed to determine file size, %s: %s\n",
-				ElfPtr, strerror(errno));
+				ElfPtr, _XAie_Strerror(errno, ErrBuf, sizeof(ErrBuf)));
 		if(fclose(Fd) == EOF) {  
         		XAIE_ERROR("Failed to close file \n");  
     		}

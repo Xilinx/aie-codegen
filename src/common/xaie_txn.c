@@ -471,6 +471,7 @@ static AieRC _XAie_ExecuteCmd(XAie_DevInst *DevInst, XAie_TxnCmd *Cmd,
 
 			if((Flags & XAIE_TXN_INST_EXPORTED_MASK) == 0U) {
 				free((void *)(uintptr_t)Cmd->DataPtr);
+				Cmd->DataPtr = 0U;
 			}
 			break;
 		case XAIE_IO_BLOCKSET:

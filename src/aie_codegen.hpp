@@ -3937,8 +3937,6 @@ typedef enum class XAie_DmaFifoCounter {
 #define _CheckBit(bitmap, pos)   ((bitmap)[(u64)(pos) / (sizeof((bitmap)[0]) * 8U)] & \
 				(u32)(1U << (u64)(pos) % (sizeof((bitmap)[0]) * 8U)))
 
-#ifndef __SWIGINTERFACE__
-
 #define _XAIE_ERROR(...)							      \
 	do {								      \
 		XAie_Log((FILE*)(uintptr_t)stderr, "[AIE ERROR]", __func__, __LINE__,	      \
@@ -3969,17 +3967,6 @@ typedef enum class XAie_DmaFifoCounter {
 #define _XAIE_DBG(DevInst, ...) {}
 
 #endif /* XAIE_DEBUG */
-
-#else
-
-// redirect XAIE_ERROR to printf
-#define _XAIE_ERROR     printf
-
-// no need for debug/warn printf so empty macro
-#define _XAIE_DBG(...)   {}
-#define _XAIE_WARN(...)  {}
-
-#endif /* __SWIGINTERFACE__ */
 
 /* Compute offset of field within a structure */
 #define _XAIE_OFFSET_OF(structure, member) offsetof(structure, member)

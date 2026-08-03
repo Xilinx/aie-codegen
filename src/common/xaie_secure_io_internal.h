@@ -53,5 +53,29 @@
 *******************************************************************************/
 FILE *_XAie_SecureFopen(const char *Path, const char *Mode);
 
+/*****************************************************************************/
+/**
+*
+* Return a human-readable description of `ErrNum` into the caller supplied
+* buffer. This is a thin, thread-safe wrapper over strerror_s() on Windows
+* and strerror_r()/strerror() elsewhere, provided so callers can format
+* errno values without tripping MSVC's C4996 deprecation of strerror().
+*
+* The returned pointer always points to a NUL-terminated string: either
+* `Buf` (when the platform call writes into it) or a static/implementation
+* string. It is never NULL, so it is safe to pass directly to printf-style
+* logging even if the underlying call fails.
+*
+* @param        ErrNum: errno value to describe.
+* @param        Buf: Caller-owned buffer the message may be written into.
+* @param        BufLen: Size of `Buf` in bytes; must be non-zero.
+*
+* @return       Pointer to a NUL-terminated error string (never NULL).
+*
+* @note         None.
+*
+*******************************************************************************/
+const char *_XAie_Strerror(int ErrNum, char *Buf, size_t BufLen);
+
 #endif /* XAIE_SECURE_IO_INTERNAL_H */
 /** @} */

@@ -142,4 +142,44 @@ FILE *_XAie_SecureFopen(const char *Path, const char *Mode)
 	}
 	return Fp;
 }
+
+/*****************************************************************************/
+/**
+*
+* See xaie_secure_io_internal.h for documentation.
+*
+*******************************************************************************/
+const char *_XAie_Strerror(int ErrNum, char *Buf, size_t BufLen)
+{
+	if (Buf == NULL || BufLen == 0U) {
+		return "";
+	}
+
+#ifdef _WIN32
+	if (strerror_s(Buf, BufLen, ErrNum) != 0) {
+		Buf[0] = '\0';
+	}
+	return Buf;
+#elif defined(_GNU_SOURCE)
+	/* glibc's strerror_r returns a (possibly static) pointer. */
+	return strerror_r(ErrNum, Buf, BufLen);
+#elif (_POSIX_C_SOURCE >= 200112L) || defined(_XOPEN_SOURCE)
+	/* XSI strerror_r writes into Buf and returns 0 on success. */
+	if (strerror_r(ErrNum, Buf, BufLen) != 0) {
+		Buf[0] = '\0';
+	}
+	return Buf;
+#else
+	{
+		const char *Msg = strerror(ErrNum);
+
+		if (Msg != NULL) {
+			(void)snprintf(Buf, BufLen, "%s", Msg);
+		} else {
+			Buf[0] = '\0';
+		}
+		return Buf;
+	}
+#endif
+}
 /** @} */

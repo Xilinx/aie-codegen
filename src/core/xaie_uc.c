@@ -29,6 +29,7 @@
 #include "xaie_core_aie.h"
 #include "xaie_feature_config.h"
 #include "xaie_mem.h"
+#include "xaie_secure_io_internal.h"
 
 #ifdef XAIE_FEATURE_UC_ENABLE
 
@@ -120,11 +121,11 @@ static AieRC _XAie_LoadDataMemSection(XAie_DevInst *DevInst, XAie_LocType Loc,
 	u32 OverFlowBytes;
 	const XAie_UcMod *UcMod;
 	unsigned char *Tmp = XAIE_NULL;
-	u32 AddrMask, MemSize;
-	u8 Inv = 1U, MemType;
+	u32 AddrMask = 0U, MemSize = 0U;
+	u8 Inv = 1U, MemType = 0U;
 	const unsigned char *Buffer = SectionPtr;
 	AieRC (*BlockWrite)(XAie_DevInst *DevInst, XAie_LocType Loc,
-		u32 Addr, const void *Src, u32 Size);
+		u32 Addr, const void *Src, u32 Size) = XAIE_NULL;
 
 	UcMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_SHIMNOC].UcMod;
 
@@ -175,7 +176,7 @@ static AieRC _XAie_LoadDataMemSection(XAie_DevInst *DevInst, XAie_LocType Loc,
 		MemSize = UcMod->PrivDataMemSize;
 		BlockWrite = XAie_DataMemBlockWrite;
 
-	} else if(MemType == XAIE_MODULE_DATA_MEMORY) {
+	} else {
 		AddrMask = UcMod->DataMemSize - 1;
 		MemSize = UcMod->DataMemSize;
 		BlockWrite = XAie_SharedDataMemBlockWrite;
@@ -366,6 +367,7 @@ AieRC XAie_LoadUc(XAie_DevInst *DevInst, XAie_LocType Loc, const char *ElfPtr)
 	long int ElfSize;
 	u64 ElfSz;
 	AieRC RC;
+	char ErrBuf[128U];
 
 
 	if((DevInst == XAIE_NULL) ||
@@ -385,10 +387,10 @@ AieRC XAie_LoadUc(XAie_DevInst *DevInst, XAie_LocType Loc, const char *ElfPtr)
 		return XAIE_INVALID_ARGS;
 	}
 
-	Fd = fopen(ElfPtr, "r");
+	Fd = _XAie_SecureFopen(ElfPtr, "r");
 	if(Fd == XAIE_NULL) {
 		XAIE_ERROR("Unable to open elf file, %d: %s\n",
-			errno, strerror(errno));
+			errno, _XAie_Strerror(errno, ErrBuf, sizeof(ErrBuf)));
 		return XAIE_INVALID_ELF;
 	}
 
@@ -396,7 +398,7 @@ AieRC XAie_LoadUc(XAie_DevInst *DevInst, XAie_LocType Loc, const char *ElfPtr)
 	Ret = fseek(Fd, 0L, SEEK_END);
 	if(Ret != 0) {
 		XAIE_ERROR("Failed to get end of file, %d: %s\n",
-			errno, strerror(errno));
+			errno, _XAie_Strerror(errno, ErrBuf, sizeof(ErrBuf)));
 		if(fclose(Fd) == EOF) {  
         		XAIE_ERROR("Failed to close file \n");  
     		}
@@ -406,7 +408,7 @@ AieRC XAie_LoadUc(XAie_DevInst *DevInst, XAie_LocType Loc, const char *ElfPtr)
 	ElfSize = ftell(Fd);
 	if (ElfSize < 0) {
 		XAIE_ERROR("Failed to determine file size, %d: %s\n",
-				errno, strerror(errno));
+				errno, _XAie_Strerror(errno, ErrBuf, sizeof(ErrBuf)));
 		if(fclose(Fd) == EOF) {  
         		XAIE_ERROR("Failed to close file \n");  
     		}

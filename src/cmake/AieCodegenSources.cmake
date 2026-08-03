@@ -49,8 +49,6 @@ function(aie_codegen_add_sources target)
     ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/ext/xaie_sim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/ext/xaie_socket.c
     ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/privilege/xaie_io_privilege.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/swig/swig_controlcode.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/swig/swig_socket.c
     ${CMAKE_CURRENT_SOURCE_DIR}/io_backend/xaie_io.c
     ${CMAKE_CURRENT_SOURCE_DIR}/locks/xaie_locks.c
     ${CMAKE_CURRENT_SOURCE_DIR}/locks/xaie_locks_aie.c

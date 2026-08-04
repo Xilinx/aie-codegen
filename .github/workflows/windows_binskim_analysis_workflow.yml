@@ -90,6 +90,13 @@ jobs:
 
           Set-Location aie-codegen
 
+          # The shallow (--depth 1) clone lacks the common ancestor required to
+          # merge the PR head, which triggers "refusing to merge unrelated
+          # histories" once the base branch advances past the PR's base commit.
+          # Unshallow to restore full history before merging.
+          git fetch --unshallow origin
+          if ($LASTEXITCODE -ne 0) { git fetch origin }
+
           # Fetch the PR head ref (refs/pull/<PR>/head) — this is where PR changes land.
           Write-Host "Fetching PR #$($env:PR_NUMBER) changes..."
           git fetch origin "+refs/pull/$($env:PR_NUMBER)/head:refs/pr/$($env:PR_NUMBER)/head"

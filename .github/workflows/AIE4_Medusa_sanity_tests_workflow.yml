@@ -57,7 +57,7 @@ jobs:
             break
           fi
           echo "Waiting for job at $buildUrl to complete..."
-          sleep 10
+          sleep 90
         done
 
         # Post result comment
@@ -65,5 +65,6 @@ jobs:
           echo "✅ Jenkins validation completed. PR is ready to merge."
         else
           echo "❌ Jenkins validation failed. PR will not be merged."
+          echo "🔗 Jenkins console log: ${buildUrl%/}/consoleFull"
           exit 1
         fi

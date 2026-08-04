@@ -71,7 +71,7 @@ jobs:
       # Rules:
       #  - Both keys are optional and independent.
       #  - Omitting repo   → canonical https://gitenterprise.xilinx.com/ai-engine/AigCtrlCodeValidationSuite.git
-      #  - Omitting branch → main
+      #  - Omitting branch → integ
       #  - SSH override URLs (git@...) are used as-is; the PAT is NOT injected.
       # -------------------------------------------------------
       - name: Resolve AigCtrlCodeValidationSuite repo and branch from PR body
@@ -94,7 +94,7 @@ jobs:
 
           # Apply defaults for anything not specified.
           FINAL_REPO="${OVERRIDE_REPO:-${AIGCTRL_REPO}}"
-          FINAL_BRANCH="${OVERRIDE_BRANCH:-main}"
+          FINAL_BRANCH="${OVERRIDE_BRANCH:-integ}"
 
           # Validate: repo must not be empty after resolution.
           if [ -z "$FINAL_REPO" ]; then
@@ -113,7 +113,7 @@ jobs:
             [ -n "${OVERRIDE_REPO}"   ] && echo "   repo   → ${FINAL_REPO}"
             [ -n "${OVERRIDE_BRANCH}" ] && echo "   branch → ${FINAL_BRANCH}"
           else
-            echo "ℹ️  No PR override — using canonical repo + main branch."
+            echo "ℹ️  No PR override — using canonical repo + integ branch."
             echo "   repo   → ${FINAL_REPO}"
             echo "   branch → ${FINAL_BRANCH}"
           fi
@@ -202,6 +202,12 @@ jobs:
 
           retry_clone "$AIE_CODEGEN_CLONE_URL" "aie-codegen" "$AIE_CODEGEN_BASE_BRANCH"
           cd aie-codegen
+
+          # The shallow (--depth 1) clone lacks the common ancestor required to
+          # merge the PR head, which triggers "refusing to merge unrelated
+          # histories" once the base branch advances past the PR's base commit.
+          # Unshallow to restore full history before merging.
+          git fetch --unshallow origin || git fetch origin
 
           # -------------------------------------------------------
           # Step 2: Fetch the PR head ref (refs/pull/<PR>/head) and

@@ -61,7 +61,7 @@ jobs:
               break
             fi
             echo "Waiting for job at $buildUrl to complete..."
-            sleep 10
+            sleep 90
           done
           [ "$building" = "false" ] || { echo "Timed out waiting for Jenkins job to complete" >&2; exit 1; }
 
@@ -70,6 +70,7 @@ jobs:
             echo "✅ Code scan build analysis completed. PR is ready to merge."
           else
             echo "❌ Code scan build analysis failed (result: $result). PR will not be merged." >&2
+            echo "🔗 Jenkins console log: ${buildUrl%/}/consoleFull" >&2
             exit 1
           fi
           

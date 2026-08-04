@@ -121,26 +121,46 @@ jobs:
       # -------------------------------------------------------
       - name: Build aie_codegen.dll with CMake
         run: |
-          $ErrorActionPreference = 'Stop'
           Set-Location "$env:WORK_ROOT\aie-codegen"
 
-          Write-Host "Configuring CMake (shared library build)..."
-          cmake -S ./src -B build -DAIE_CODEGEN_BUILD_SHARED=on
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "❌ ERROR: CMake configuration failed (exit code $LASTEXITCODE)."
-            exit 1
+          # Retry the CMake configure+build up to $maxAttempts times so a
+          # transient build failure re-runs instead of failing the PR check.
+          $maxAttempts = 3
+          $retryDelay  = 30
+          $dll   = "$env:WORK_ROOT\aie-codegen\build\Debug\aie_codegen.dll"
+          $built = $false
+
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            Write-Host "=== Build attempt $attempt of $maxAttempts ==="
+
+            Write-Host "Configuring CMake (shared library build)..."
+            cmake -S ./src -B build -DAIE_CODEGEN_BUILD_SHARED=on
+            if ($LASTEXITCODE -ne 0) {
+              Write-Warning "⚠️ CMake configuration failed (exit code $LASTEXITCODE)."
+            }
+            else {
+              Write-Host "Building..."
+              cmake --build build --parallel
+              if ($LASTEXITCODE -ne 0) {
+                Write-Warning "⚠️ CMake build failed (exit code $LASTEXITCODE)."
+              }
+              elseif (-not (Test-Path $dll)) {
+                Write-Warning "⚠️ Expected DLL not found after build: $dll"
+              }
+              else {
+                $built = $true
+                break
+              }
+            }
+
+            if ($attempt -lt $maxAttempts) {
+              Write-Host "Retrying in ${retryDelay}s..."
+              Start-Sleep -Seconds $retryDelay
+            }
           }
 
-          Write-Host "Building..."
-          cmake --build build --parallel
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "❌ ERROR: CMake build failed (exit code $LASTEXITCODE)."
-            exit 1
-          }
-
-          $dll = "$env:WORK_ROOT\aie-codegen\build\Debug\aie_codegen.dll"
-          if (-not (Test-Path $dll)) {
-            Write-Error "❌ ERROR: Expected DLL not found after build: $dll"
+          if (-not $built) {
+            Write-Error "❌ ERROR: Build failed after $maxAttempts attempts."
             exit 1
           }
           Write-Host "✅ Build succeeded. DLL: $dll"

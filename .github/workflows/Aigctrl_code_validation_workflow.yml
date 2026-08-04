@@ -230,12 +230,31 @@ jobs:
       - name: Configure and build with CMake
         shell: bash
         run: |
-          set -euo pipefail
-
           cd "$WORK_ROOT/AigCtrlCodeValidationSuite"
 
-          cmake -S . -B build -DAIE_CODEGEN_LOCAL_PATH=aie-codegen
-          cmake --build build --parallel
+          # Retry the CMake configure+build up to $max_attempts times so a
+          # transient build failure re-runs instead of failing the PR check.
+          max_attempts=3
+          retry_delay=30
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "=== Build attempt $attempt of $max_attempts ==="
+            if (
+              set -euo pipefail
+              cmake -S . -B build -DAIE_CODEGEN_LOCAL_PATH=aie-codegen
+              cmake --build build --parallel
+            ); then
+              exit 0
+            fi
+            echo "⚠️  Build attempt $attempt of $max_attempts failed."
+            attempt=$((attempt + 1))
+            if [ "$attempt" -le "$max_attempts" ]; then
+              echo "Retrying in ${retry_delay}s..."
+              sleep "$retry_delay"
+            fi
+          done
+          echo "❌ Build failed after $max_attempts attempts."
+          exit 1
 
       - name: Run unit tests and produce JUnit XML results
         shell: bash

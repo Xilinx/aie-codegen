@@ -47,10 +47,6 @@ typedef SSIZE_T ssize_t;
 #include <sys/types.h>
 #endif
 
-#define TEMP_ASM_FILE1    ".temp_data1.txt"
-#define TEMP_ASM_FILE2    ".temp_data2.txt"
-#define TEMP_ASM_FILE3    ".temp_data3.txt"
-#define TEMP_ASM_FILE4    ".temp_data4.txt"
 #define PAGE_SIZE_MAX	  8192
 
 /* Per-slice overhead pre-charged to UcPageSize / UcPageTextSize during PCJ
@@ -66,7 +62,6 @@ typedef SSIZE_T ssize_t;
 #define PCJ_SPLIT_INITIAL_CAPACITY 4U
 #define SHIM_BD_NUM_REGS  9
 #define MAX_LABELS_PER_ASM_FILE 1000
-#define FNAME_SIZE 512
 #define HASH_INVALID -1
 #define MAX_REMOTE_BARRIER_ID 7
 #define MAX_COMMENT_LENGTH 128
@@ -196,17 +191,6 @@ typedef SSIZE_T ssize_t;
 #define INITIAL_BUFFER_SIZE 8192
 #define BUFFER_GROWTH_FACTOR 2
 
-/************************** Constant Definitions *****************************/
-/* Cross-platform thread-local storage specifier. MSVC's C compiler does not
- * support the C11 _Thread_local keyword, so use __declspec(thread) instead. */
-#if defined(_MSC_VER)
-#define XAIE_THREAD_LOCAL __declspec(thread)
-#else
-#define XAIE_THREAD_LOCAL _Thread_local
-#endif
-
-static XAIE_THREAD_LOCAL char FName[FNAME_SIZE];
-
 /****************************** Type Definitions *****************************/
 
 /**
@@ -326,13 +310,8 @@ typedef struct {
 	FILE* DebugAsmFile;
 	FILE* DebugAsmFileData0;
 	FILE* DebugAsmFileData1;
-	/* Directory-scoped temp file paths derived from FileName at open time, so
-	 * that the correct temp files can be removed at close time when concurrent
-	 * threads write to different op directories. */
-	char TempPath1[FNAME_SIZE];
-	char TempPath2[FNAME_SIZE];
-	char TempPath3[FNAME_SIZE];
-	char TempPath4[FNAME_SIZE];
+	FILE* OutputFp;  /* Final output file handle for control code. Flushed to file in XAie_CloseControlCodeFile*/
+	FILE* OutputDebugFp; /* Final output file handle for debug asm. Flushed to file in XAie_CloseControlCodeFile*/
 	/* In-memory buffers */
 	XAie_MemBuffer *ControlCodeBuf;
 	XAie_MemBuffer *ControlCodeDataBuf;
@@ -407,7 +386,6 @@ typedef struct {
 /************************** Function Definitions *****************************/
 
 /* Forward declarations */
-static void _XAie_MergeFiles(FILE *SrcFp, FILE *DesFp);
 static int _XAie_ControlCodeSeekAndOverwrite(XAie_ControlCodeIO *ControlCodeInst,
 		XAie_FileTarget FileTarget, long Offset, const char *Replacement);
 static inline void _XAie_LoadCoresCacheTeardown(XAie_LoadCoresCache *Cache);
@@ -1314,15 +1292,17 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 					}
 
 					if (newline_pos < size) {
-						/* Update the buffer - keep everything up to Position+1, replace with new ending */
-						size_t new_size = (size_t)Position + 1U + strlen(new_ending);
-						data[Position + 1] = '\0'; /* Temporarily terminate */
-
-						/* Ensure we have enough capacity */
-						if (new_size <= ControlCodeInst->ControlCodeDataBuf->Capacity) {
-							memcpy(data + Position + 1, new_ending,
-							       strlen(new_ending) + 1U);
-							ControlCodeInst->ControlCodeDataBuf->Size = new_size;
+					/* Overwrite in place; trailing bytes are left untouched to stay byte-identical
+					 * to the old temp-file implementation. */
+					size_t rep_len = strlen(new_ending);
+					size_t writepos = (size_t)Position + 1U;
+					if (writepos + rep_len <= ControlCodeInst->ControlCodeDataBuf->Capacity) {
+						memcpy(data + writepos, new_ending, rep_len);
+						/* fprintf extends the file when writing past the
+						 * end; mirror that by only growing Size. */
+						if (writepos + rep_len > ControlCodeInst->ControlCodeDataBuf->Size) {
+								ControlCodeInst->ControlCodeDataBuf->Size = writepos + rep_len;
+							}
 						}
 					}
 					break;
@@ -1359,15 +1339,20 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 					}
 
 					if (newline_pos < size) {
-						/* Update the buffer - keep everything up to Position+1, replace with new ending */
-						size_t new_size = (size_t)Position + 1U + strlen(new_ending);
-						data[Position + 1] = '\0'; /* Temporarily terminate */
-
-						/* Ensure we have enough capacity */
-						if (new_size <= ControlCodeInst->DebugAsmDataBuf0->Capacity) {
-							memcpy(data + Position + 1, new_ending,
-							       strlen(new_ending) + 1U);
-							ControlCodeInst->DebugAsmDataBuf0->Size = new_size;
+						/* Overwrite in place to match the historical "w+"
+						 * file behaviour (fseek + fprintf): bytes are
+						 * replaced where they sit and any trailing bytes are
+						 * left untouched, so output stays byte-identical to
+						 * the previous temp-file implementation. */
+						size_t rep_len = strlen(new_ending);
+						size_t writepos = (size_t)Position + 1U;
+						if (writepos + rep_len <= ControlCodeInst->DebugAsmDataBuf0->Capacity) {
+							memcpy(data + writepos, new_ending, rep_len);
+							/* fprintf extends the file when writing past the
+							 * end; mirror that by only growing Size. */
+							if (writepos + rep_len > ControlCodeInst->DebugAsmDataBuf0->Size) {
+								ControlCodeInst->DebugAsmDataBuf0->Size = writepos + rep_len;
+							}
 						}
 					}
 					break;
@@ -1380,73 +1365,6 @@ static AieRC _XAie_UpdateDataLengthDmaBd(XAie_ControlCodeIO *ControlCodeInst, u3
 			}
 		}
 	}
-	/* Handle file mode (works in both file-only and dual mode) */
-	if (ControlCodeInst->ControlCodedatafp) {
-		int Count = 0;
-		int Data;
-
-		long file_len = ftell(ControlCodeInst->ControlCodedatafp);
-		SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, 0, SEEK_END);
-
-		if (file_len >= 0L) {
-			ssize_t Position = (ssize_t)file_len - (ssize_t)1;
-
-			while (Position >= 0) {
-				SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, (long)Position, SEEK_SET);
-				Data = fgetc(ControlCodeInst->ControlCodedatafp);
-
-				if (Data == ',')
-					Count++;
-
-				if (Count == 3) {
-					SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, (long)(Position + 1), SEEK_SET);
-					fprintf(ControlCodeInst->ControlCodedatafp, " 0x%x, %d, 0\n", Datalength, ExtFlag);
-					break;
-				}
-
-				if (Data == '\n' && Position != ((ssize_t)file_len - (ssize_t)1))
-					break;
-
-				Position--;
-			}
-		}
-
-		SAFE_FSEEK(ControlCodeInst->ControlCodedatafp, 0, SEEK_END);
-	}
-
-	if (!ControlCodeInst->DisableDebugAsm && ControlCodeInst->DebugAsmFileData0) {
-		int Count = 0;
-		int Data;
-
-		long file_len = ftell(ControlCodeInst->DebugAsmFileData0);
-		SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, 0, SEEK_END);
-
-		if (file_len >= 0L) {
-			ssize_t Position = (ssize_t)file_len - (ssize_t)1;
-
-			while (Position >= 0) {
-				SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, (long)Position, SEEK_SET);
-				Data = fgetc(ControlCodeInst->DebugAsmFileData0);
-
-				if (Data == ',')
-					Count++;
-
-				if (Count == 3) {
-					SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, (long)(Position + 1), SEEK_SET);
-					fprintf(ControlCodeInst->DebugAsmFileData0, " 0x%x, %d, 0\n", Datalength, ExtFlag);
-					break;
-				}
-
-				if (Data == '\n' && Position != ((ssize_t)file_len - (ssize_t)1))
-					break;
-
-				Position--;
-			}
-		}
-
-		SAFE_FSEEK(ControlCodeInst->DebugAsmFileData0, 0, SEEK_END);
-	}
-
 	return XAIE_OK;
 }
 
@@ -2142,11 +2060,6 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 								buf4->Data[buf4->Size - 2] = '1';
 							}
 						}
-					}
-					/* ALWAYS handle files if available (parallel flow) */
-					if (ControlCodeInst->ControlCodedatafp || ControlCodeInst->DebugAsmFileData0) {
-						_XAie_ControlCodeSeekAndOverwrite(ControlCodeInst, 1, -3, " 1\n");
-						_XAie_ControlCodeSeekAndOverwrite(ControlCodeInst, 4, -3, " 1\n");
 					}
 				}
 			}
@@ -5114,7 +5027,6 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 		return XAIE_ERR;
 	}
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
-	char* TmpPtr = FName;
 
 	if(DevInst->Backend->Type != XAIE_IO_BACKEND_CONTROLCODE) {
 		XAIE_ERROR("This is supported only in Controlcode Backend %d \n", DevInst->Backend->Type);
@@ -5127,101 +5039,103 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	ControlCodeInst->ScrachpadName = NULL;
 	ControlCodeInst->Mode = (u8)XAIE_INVALID_MODE;
 
-	/* Derive temp file paths in the same directory as FileName so that
-	 * concurrent threads (each writing to a different op directory) do not
-	 * collide on a shared set of CWD-relative temp files. The paths are stored
-	 * on ControlCodeInst so XAie_CloseControlCodeFile() can remove the correct
-	 * files. */
-	{
-		/* Find the last path separator */
-		const char *lastSep = NULL;
-		const char *p;
-		int n1, n2, n3, n4;
-		for (p = FileName; *p; ++p) {
-			if (*p == '/' || *p == '\\') lastSep = p;
-		}
-		if (lastSep) {
-			size_t dirLen = (size_t)(lastSep - FileName) + 1; /* include separator */
-			n1 = snprintf(ControlCodeInst->TempPath1, FNAME_SIZE, "%.*s" TEMP_ASM_FILE1, (int)dirLen, FileName);
-			n2 = snprintf(ControlCodeInst->TempPath2, FNAME_SIZE, "%.*s" TEMP_ASM_FILE2, (int)dirLen, FileName);
-			n3 = snprintf(ControlCodeInst->TempPath3, FNAME_SIZE, "%.*s" TEMP_ASM_FILE3, (int)dirLen, FileName);
-			n4 = snprintf(ControlCodeInst->TempPath4, FNAME_SIZE, "%.*s" TEMP_ASM_FILE4, (int)dirLen, FileName);
-		} else {
-			n1 = snprintf(ControlCodeInst->TempPath1, FNAME_SIZE, "%s", TEMP_ASM_FILE1);
-			n2 = snprintf(ControlCodeInst->TempPath2, FNAME_SIZE, "%s", TEMP_ASM_FILE2);
-			n3 = snprintf(ControlCodeInst->TempPath3, FNAME_SIZE, "%s", TEMP_ASM_FILE3);
-			n4 = snprintf(ControlCodeInst->TempPath4, FNAME_SIZE, "%s", TEMP_ASM_FILE4);
-		}
-		/* Detect truncation/encoding errors so we never silently open temp
-		 * files at a wrong (truncated) path. */
-		if (n1 < 0 || n1 >= FNAME_SIZE || n2 < 0 || n2 >= FNAME_SIZE ||
-		    n3 < 0 || n3 >= FNAME_SIZE || n4 < 0 || n4 >= FNAME_SIZE) {
-			XAIE_ERROR("Temp file path too long for FNAME_SIZE (%d)\n", FNAME_SIZE);
-			return XAIE_ERR;
-		}
-	}
+	/* The control code (and its data sections) is assembled in per-instance
+	 * in-memory buffers and flushed to the output file(s) in XAie_CloseControlCodeFile */
+	ControlCodeInst->UseInMemoryBuffers = 1;
 
-	/* All file creations below go through _XAie_SecureFopen() so that newly
-	 * created files have owner-only (0600) permissions without touching the
-	 * process-global umask. See common/xaie_secure_io.c for rationale. */
-	ControlCodeInst->ControlCodefp      = _XAie_SecureFopen(FileName, "w");
-	ControlCodeInst->ControlCodedatafp  = _XAie_SecureFopen(ControlCodeInst->TempPath1, "w+");
-	ControlCodeInst->ControlCodedata2fp = _XAie_SecureFopen(ControlCodeInst->TempPath2, "w+");
-
-	/* Validate control code file pointers before opening debug ASM files
-	 * to avoid unnecessary resource allocation if control code setup fails */
-	if (ControlCodeInst->ControlCodefp == NULL ||
-		ControlCodeInst->ControlCodedatafp == NULL ||
-		ControlCodeInst->ControlCodedata2fp == NULL) {
-
-		if(ControlCodeInst->ControlCodefp) {
-			fclose(ControlCodeInst->ControlCodefp);
-			ControlCodeInst->ControlCodefp = NULL;
-		}
-		if (ControlCodeInst->ControlCodedatafp) {
-			fclose(ControlCodeInst->ControlCodedatafp);
-			ControlCodeInst->ControlCodedatafp = NULL;
-		}
-		if (ControlCodeInst->ControlCodedata2fp) {
-			fclose(ControlCodeInst->ControlCodedata2fp);
-			ControlCodeInst->ControlCodedata2fp = NULL;
-		}
+	/* Open (and truncate) the final output file up front so that writability
+	 * problems are reported here rather than at close.*/
+	ControlCodeInst->OutputFp = _XAie_SecureFopen(FileName, "w");
+	if (ControlCodeInst->OutputFp == NULL) {
+		XAIE_ERROR("Failed to open control code output file: %s\n", FileName);
 		return XAIE_ERR;
 	}
 
-	/* Open debug ASM files only after control code files are confirmed valid */
-	if (!ControlCodeInst->DisableDebugAsm) {
-		int FNameLen = snprintf(FName, FNAME_SIZE, "%s", FileName);
-		if (FNameLen < 0 || FNameLen >= FNAME_SIZE) {
-			XAIE_ERROR("Filename too long to append .DEBUG extension\n");
-		} else {
-			/* Search for the extension dot within the basename only, so a '.'
-			 * in a parent directory name is not mistaken for the file
-			 * extension. Use the last dot in the basename; if the basename has
-			 * no dot, append .DEBUG at the end (preserving prior behavior). */
-			char *BaseStart = FName;
-			char *Cursor;
-			for (Cursor = FName; *Cursor; ++Cursor) {
-				if (*Cursor == '/' || *Cursor == '\\')
-					BaseStart = Cursor + 1;
-			}
-			TmpPtr = NULL;
-			for (Cursor = BaseStart; *Cursor; ++Cursor) {
-				if (*Cursor == '.')
-					TmpPtr = Cursor;
-			}
-			if (TmpPtr == NULL)
-				TmpPtr = FName + FNameLen; /* no extension: append at end */
-			if ((size_t)(TmpPtr - FName) + sizeof(".DEBUG") <= FNAME_SIZE) {
-				memcpy(TmpPtr, ".DEBUG", sizeof(".DEBUG"));
-			} else {
-				XAIE_ERROR("Filename too long to append .DEBUG extension\n");
-			}
-		}
+	/* Allocate the control code memory buffers; validate before allocating
+	 * the debug ASM buffers to avoid wasted work if this fails. */
+	ControlCodeInst->ControlCodeBuf      = _XAie_MemBufferInit();
+	ControlCodeInst->ControlCodeDataBuf  = _XAie_MemBufferInit();
+	ControlCodeInst->ControlCodeData2Buf = _XAie_MemBufferInit();
+	if (!ControlCodeInst->ControlCodeBuf || !ControlCodeInst->ControlCodeDataBuf ||
+		!ControlCodeInst->ControlCodeData2Buf) {
+		_XAie_MemBufferFree(ControlCodeInst->ControlCodeBuf);
+		_XAie_MemBufferFree(ControlCodeInst->ControlCodeDataBuf);
+		_XAie_MemBufferFree(ControlCodeInst->ControlCodeData2Buf);
+		ControlCodeInst->ControlCodeBuf = NULL;
+		ControlCodeInst->ControlCodeDataBuf = NULL;
+		ControlCodeInst->ControlCodeData2Buf = NULL;
+		fclose(ControlCodeInst->OutputFp);
+		ControlCodeInst->OutputFp = NULL;
+		XAIE_ERROR("Failed to allocate control code memory buffers\n");
+		return XAIE_ERR;
+	}
 
-		ControlCodeInst->DebugAsmFileData0 = _XAie_SecureFopen(ControlCodeInst->TempPath3, "w+");
-		ControlCodeInst->DebugAsmFileData1 = _XAie_SecureFopen(ControlCodeInst->TempPath4, "w+");
-		ControlCodeInst->DebugAsmFile = _XAie_SecureFopen(FName, "w+");
+	/* Open the debug ASM output file and its buffers only when enabled. */
+	if (!ControlCodeInst->DisableDebugAsm) {
+		/* Search only the basename, so a '.' in a parent dir isn't
+		 * mistaken for the extension. */
+		const char *baseStart = FileName;
+		for (const char *cursor = FileName; *cursor; ++cursor) {
+			if (*cursor == '/' || *cursor == '\\')
+				baseStart = cursor + 1;
+		}
+		const char *extension = NULL;
+		for (const char *cursor = baseStart; *cursor; ++cursor) {
+			if (*cursor == '.')
+				extension = cursor;
+		}
+		char* debugAsmFileName = NULL;
+		size_t baseFileNameLength = ((extension) ? (size_t)(extension - FileName) : strlen(FileName));
+		size_t debugAsmFileNameLength = baseFileNameLength + strlen(".DEBUG") + 1;
+		debugAsmFileName = (char*) calloc(debugAsmFileNameLength, sizeof(char)); // guaranteed to be NUL-terminated
+		if (debugAsmFileName == NULL) {
+			// DEFER: this should be a cleanup function to keep the code DRY
+			_XAie_MemBufferFree(ControlCodeInst->ControlCodeBuf);
+			_XAie_MemBufferFree(ControlCodeInst->ControlCodeDataBuf);
+			_XAie_MemBufferFree(ControlCodeInst->ControlCodeData2Buf);
+			ControlCodeInst->ControlCodeBuf = NULL;
+			ControlCodeInst->ControlCodeDataBuf = NULL;
+			ControlCodeInst->ControlCodeData2Buf = NULL;
+			fclose(ControlCodeInst->OutputFp);
+			ControlCodeInst->OutputFp = NULL;
+			XAIE_ERROR("Failed to allocate debug ASM file name\n");
+			return XAIE_ERR;
+		}
+		memcpy(debugAsmFileName, FileName, baseFileNameLength);
+		memcpy(debugAsmFileName + baseFileNameLength, ".DEBUG", strlen(".DEBUG") + 1);
+		ControlCodeInst->OutputDebugFp    = _XAie_SecureFopen(debugAsmFileName, "w");
+		free(debugAsmFileName);
+		debugAsmFileName = NULL;
+		ControlCodeInst->DebugAsmBuf      = _XAie_MemBufferInit();
+		ControlCodeInst->DebugAsmDataBuf0 = _XAie_MemBufferInit();
+		ControlCodeInst->DebugAsmDataBuf1 = _XAie_MemBufferInit();
+
+		/* Debug ASM setup failed; tear down both debug ASM and control code
+		 * state since we cannot proceed without debug ASM when it is enabled */
+		if (ControlCodeInst->OutputDebugFp == NULL ||
+			!ControlCodeInst->DebugAsmBuf || !ControlCodeInst->DebugAsmDataBuf0 ||
+			!ControlCodeInst->DebugAsmDataBuf1) {
+			_XAie_MemBufferFree(ControlCodeInst->ControlCodeBuf);
+			_XAie_MemBufferFree(ControlCodeInst->ControlCodeDataBuf);
+			_XAie_MemBufferFree(ControlCodeInst->ControlCodeData2Buf);
+			_XAie_MemBufferFree(ControlCodeInst->DebugAsmBuf);
+			_XAie_MemBufferFree(ControlCodeInst->DebugAsmDataBuf0);
+			_XAie_MemBufferFree(ControlCodeInst->DebugAsmDataBuf1);
+			ControlCodeInst->ControlCodeBuf = NULL;
+			ControlCodeInst->ControlCodeDataBuf = NULL;
+			ControlCodeInst->ControlCodeData2Buf = NULL;
+			ControlCodeInst->DebugAsmBuf = NULL;
+			ControlCodeInst->DebugAsmDataBuf0 = NULL;
+			ControlCodeInst->DebugAsmDataBuf1 = NULL;
+			if (ControlCodeInst->OutputDebugFp) {
+				fclose(ControlCodeInst->OutputDebugFp);
+				ControlCodeInst->OutputDebugFp = NULL;
+			}
+			fclose(ControlCodeInst->OutputFp);
+			ControlCodeInst->OutputFp = NULL;
+			XAIE_ERROR("Failed to set up debug ASM output\n");
+			return XAIE_ERR;
+		}
 	}
 
 	ControlCodeInst->PageSizeMax = PageSize;
@@ -5232,40 +5146,13 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	ControlCodeInst->LabelMap = (XAie_LabelMap*)calloc(1,sizeof(XAie_LabelMap));
 	ControlCodeInst->PrevMemWriteType = -1;
 	ControlCodeInst->BarrierId = 0;
-	
+
 	if(ControlCodeInst->LabelMap) {
 		if(_XAie_LabelMapSetup(ControlCodeInst->LabelMap, ControlCodeInst) == XAIE_OK) {
 			XAIE_DBG("Label optimization setup success\n");
 		}
 	}
 
-	/* Debug ASM file open failed; close both debug ASM and control code
-	 * files since we cannot proceed without debug ASM when it is enabled */
-	if (!ControlCodeInst->DisableDebugAsm &&
-		(ControlCodeInst->DebugAsmFileData0 == NULL ||
-		 ControlCodeInst->DebugAsmFileData1 == NULL ||
-		 ControlCodeInst->DebugAsmFile == NULL)) {
-
-		if (ControlCodeInst->DebugAsmFileData0) {
-			fclose(ControlCodeInst->DebugAsmFileData0);
-			ControlCodeInst->DebugAsmFileData0 = NULL;
-		}
-		if (ControlCodeInst->DebugAsmFileData1) {
-			fclose(ControlCodeInst->DebugAsmFileData1);
-			ControlCodeInst->DebugAsmFileData1 = NULL;
-		}
-		if (ControlCodeInst->DebugAsmFile) {
-			fclose(ControlCodeInst->DebugAsmFile);
-			ControlCodeInst->DebugAsmFile = NULL;
-		}
-		fclose(ControlCodeInst->ControlCodefp);
-		ControlCodeInst->ControlCodefp = NULL;
-		fclose(ControlCodeInst->ControlCodedatafp);
-		ControlCodeInst->ControlCodedatafp = NULL;
-		fclose(ControlCodeInst->ControlCodedata2fp);
-		ControlCodeInst->ControlCodedata2fp = NULL;
-		return XAIE_ERR;
-	}
 	XAIE_DBG("Generating: %s\n", FileName);
 
 	if(DevInst->DevProp.DevGen == XAIE_DEV_GEN_AIE4) {
@@ -5348,39 +5235,9 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	}
 	
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
-	
-	/* Save existing file pointers and flags if file mode was already opened */
-	FILE *SavedControlCodefp = ControlCodeInst->ControlCodefp;
-	FILE *SavedControlCodedatafp = ControlCodeInst->ControlCodedatafp;
-	FILE *SavedControlCodedata2fp = ControlCodeInst->ControlCodedata2fp;
-	FILE *SavedDebugAsmFile = ControlCodeInst->DebugAsmFile;
-	FILE *SavedDebugAsmFileData0 = ControlCodeInst->DebugAsmFileData0;
-	FILE *SavedDebugAsmFileData1 = ControlCodeInst->DebugAsmFileData1;
-	/* Save the directory-scoped temp paths too, so XAie_CloseControlCodeFile()
-	 * still removes the correct files instead of falling back to CWD-relative
-	 * names if file mode was already opened. */
-	char SavedTempPath1[FNAME_SIZE];
-	char SavedTempPath2[FNAME_SIZE];
-	char SavedTempPath3[FNAME_SIZE];
-	char SavedTempPath4[FNAME_SIZE];
-	memcpy(SavedTempPath1, ControlCodeInst->TempPath1, FNAME_SIZE);
-	memcpy(SavedTempPath2, ControlCodeInst->TempPath2, FNAME_SIZE);
-	memcpy(SavedTempPath3, ControlCodeInst->TempPath3, FNAME_SIZE);
-	memcpy(SavedTempPath4, ControlCodeInst->TempPath4, FNAME_SIZE);
 
 	memset(ControlCodeInst, 0, sizeof(XAie_ControlCodeIO));
 
-	/* Restore file pointers if they existed, and copy flag from DevInst */
-	ControlCodeInst->ControlCodefp = SavedControlCodefp;
-	ControlCodeInst->ControlCodedatafp = SavedControlCodedatafp;
-	ControlCodeInst->ControlCodedata2fp = SavedControlCodedata2fp;
-	ControlCodeInst->DebugAsmFile = SavedDebugAsmFile;
-	ControlCodeInst->DebugAsmFileData0 = SavedDebugAsmFileData0;
-	ControlCodeInst->DebugAsmFileData1 = SavedDebugAsmFileData1;
-	memcpy(ControlCodeInst->TempPath1, SavedTempPath1, FNAME_SIZE);
-	memcpy(ControlCodeInst->TempPath2, SavedTempPath2, FNAME_SIZE);
-	memcpy(ControlCodeInst->TempPath3, SavedTempPath3, FNAME_SIZE);
-	memcpy(ControlCodeInst->TempPath4, SavedTempPath4, FNAME_SIZE);
 	ControlCodeInst->DisableDebugAsm = (DevInst->DisableDebugAsm != 0U) ? 1U : 0U;
 	
 	ControlCodeInst->ScrachpadName = NULL;
@@ -5441,18 +5298,6 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	
 	XAIE_DBG("Generating control code in memory\n");
 	fflush(stdout);
-
-	/* If file mode was already active, temporarily NULL file pointers to avoid duplicate header writes */
-	/* Headers were already written to files by XAie_OpenControlCodeFile */
-	u8 file_mode_was_active = (SavedControlCodefp != NULL);
-	if (file_mode_was_active) {
-		ControlCodeInst->ControlCodefp = NULL;
-		ControlCodeInst->ControlCodedatafp = NULL;
-		ControlCodeInst->ControlCodedata2fp = NULL;
-		ControlCodeInst->DebugAsmFile = NULL;
-		ControlCodeInst->DebugAsmFileData0 = NULL;
-		ControlCodeInst->DebugAsmFileData1 = NULL;
-	}
 
 	/* Write header content to buffers */
 	XAIE_DBG("Writing target directive (DevGen=%d)\n", DevInst->DevProp.DevGen);
@@ -5528,16 +5373,6 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA1, ".align    4\n");
 	}
 
-	/* Restore file pointers if they were temporarily NULLed to avoid duplicate header writes */
-	if (file_mode_was_active) {
-		ControlCodeInst->ControlCodefp = SavedControlCodefp;
-		ControlCodeInst->ControlCodedatafp = SavedControlCodedatafp;
-		ControlCodeInst->ControlCodedata2fp = SavedControlCodedata2fp;
-		ControlCodeInst->DebugAsmFile = SavedDebugAsmFile;
-		ControlCodeInst->DebugAsmFileData0 = SavedDebugAsmFileData0;
-		ControlCodeInst->DebugAsmFileData1 = SavedDebugAsmFileData1;
-	}
-
 	XAIE_DBG("XAie_AllocControlCodeBuffer: Completed successfully\n");
 	XAIE_DBG("Control code in-memory initialization complete\n");
 	fflush(stdout);
@@ -5562,8 +5397,8 @@ static AieRC _XAie_MergeMemBuffers(XAie_MemBuffer *SrcBuf, XAie_MemBuffer *DesBu
 		return XAIE_ERR;
 	}
 	
-	/* Ensure destination buffer has enough capacity */
-	size_t needed_capacity = DesBuf->Size + SrcBuf->Size;
+	/* +1 for the NUL terminator written below. */
+	size_t needed_capacity = DesBuf->Size + SrcBuf->Size + 1;
 	if (needed_capacity > DesBuf->Capacity) {
 		size_t new_capacity = DesBuf->Capacity;
 		while (new_capacity < needed_capacity) {
@@ -5797,10 +5632,9 @@ void XAie_ReleaseControlCodeBuffer(XAie_DevInst *DevInst)
 		return;
 	}
 
-	/* If file mode is still active, don't free buffers yet - they're still needed */
-	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
-		/* Just mark in-memory mode as closed, buffers will be freed by XAie_CloseControlCodeFile */
-		ControlCodeInst->UseInMemoryBuffers = 0;
+	/* Dual mode: defer free to XAie_CloseControlCodeFile; keep
+	 * UseInMemoryBuffers set so writes/Close still work. */
+	if (ControlCodeInst->OutputFp) {
 		return;
 	}
 
@@ -5896,34 +5730,9 @@ AieRC XAie_EndPage(XAie_DevInst *DevInst) {
 
 /*****************************************************************************/
 /**
-* Merges the given text file.
-* @param	SrcFp: file pointer of Source File.
-* @param	DesFile: file pointer of Destination File.
-*
-* @note		Internal API only.
-*
-******************************************************************************/
-static void _XAie_MergeFiles(FILE *SrcFp, FILE *DesFp) {
-	int TempBuf;
-
-	if (!SrcFp || !DesFp) {
-		XAIE_ERROR("Files not opened\n");
-		return;
-	}
-
-	fseek(SrcFp, 0, SEEK_SET);
-	fseek(DesFp, 0, SEEK_END);
-
-	while ((TempBuf = fgetc(SrcFp)) != EOF) {
-		fputc(TempBuf, DesFp);
-	}
-
-}
-
-/*****************************************************************************/
-/**
 * This function used to stop the control code capture.
-* This also merges the temp files and updates the control code file.
+* This flushes the in-memory control code (and data) buffers to the output
+* file(s) and frees them.
 *
 ******************************************************************************/
 void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
@@ -5953,35 +5762,47 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 		}
 		_XAie_PCJStateFree(ControlCodeInst);
 
+		/* Finalize the in-memory buffers: close the last page and append the
+		 * trailing EOF to the text section(s). */
 		_XAie_EndPage(ControlCodeInst);
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "EOF\n\n");
-		if (ControlCodeInst->DebugAsmFile) {
+		if (!ControlCodeInst->DisableDebugAsm && ControlCodeInst->DebugAsmBuf) {
 			CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "EOF\n\n");
 		}
 
-		_XAie_MergeFiles(ControlCodeInst->ControlCodedatafp, ControlCodeInst->ControlCodefp);
-		_XAie_MergeFiles(ControlCodeInst->ControlCodedata2fp, ControlCodeInst->ControlCodefp);
-		if (ControlCodeInst->DebugAsmFile && ControlCodeInst->DebugAsmFileData0) {
-			_XAie_MergeFiles(ControlCodeInst->DebugAsmFileData0, ControlCodeInst->DebugAsmFile);
+		/* Append the data section buffers after the text section (mirroring the
+		 * previous temp-file merge order) and flush the assembled buffers to
+		 * the real output files. */
+		if (ControlCodeInst->ControlCodeBuf) {
+			_XAie_MergeMemBuffers(ControlCodeInst->ControlCodeDataBuf,
+					ControlCodeInst->ControlCodeBuf);
+			_XAie_MergeMemBuffers(ControlCodeInst->ControlCodeData2Buf,
+					ControlCodeInst->ControlCodeBuf);
+			if (ControlCodeInst->OutputFp) {
+				fwrite(ControlCodeInst->ControlCodeBuf->Data, 1,
+						ControlCodeInst->ControlCodeBuf->Size,
+						ControlCodeInst->OutputFp);
+			}
 		}
-		if (ControlCodeInst->DebugAsmFile && ControlCodeInst->DebugAsmFileData1) {
-			_XAie_MergeFiles(ControlCodeInst->DebugAsmFileData1, ControlCodeInst->DebugAsmFile);
+		if (!ControlCodeInst->DisableDebugAsm && ControlCodeInst->DebugAsmBuf) {
+			_XAie_MergeMemBuffers(ControlCodeInst->DebugAsmDataBuf0,
+					ControlCodeInst->DebugAsmBuf);
+			_XAie_MergeMemBuffers(ControlCodeInst->DebugAsmDataBuf1,
+					ControlCodeInst->DebugAsmBuf);
+			if (ControlCodeInst->OutputDebugFp) {
+				fwrite(ControlCodeInst->DebugAsmBuf->Data, 1,
+						ControlCodeInst->DebugAsmBuf->Size,
+						ControlCodeInst->OutputDebugFp);
+			}
 		}
 
-		fclose(ControlCodeInst->ControlCodefp);
-		if (ControlCodeInst->ControlCodedatafp) fclose(ControlCodeInst->ControlCodedatafp);
-		if (ControlCodeInst->ControlCodedata2fp) fclose(ControlCodeInst->ControlCodedata2fp);
-		if (ControlCodeInst->DebugAsmFile) fclose(ControlCodeInst->DebugAsmFile);
-		if (ControlCodeInst->DebugAsmFileData0) fclose(ControlCodeInst->DebugAsmFileData0);
-		if (ControlCodeInst->DebugAsmFileData1) fclose(ControlCodeInst->DebugAsmFileData1);
-		
-		memset(FName, '\0', FNAME_SIZE);
-
-		remove(ControlCodeInst->TempPath1[0] ? ControlCodeInst->TempPath1 : TEMP_ASM_FILE1);
-		remove(ControlCodeInst->TempPath2[0] ? ControlCodeInst->TempPath2 : TEMP_ASM_FILE2);
-		if (!ControlCodeInst->DisableDebugAsm) {
-			remove(ControlCodeInst->TempPath3[0] ? ControlCodeInst->TempPath3 : TEMP_ASM_FILE3);
-			remove(ControlCodeInst->TempPath4[0] ? ControlCodeInst->TempPath4 : TEMP_ASM_FILE4);
+		if (ControlCodeInst->OutputFp) {
+			fclose(ControlCodeInst->OutputFp);
+			ControlCodeInst->OutputFp = NULL;
+		}
+		if (ControlCodeInst->OutputDebugFp) {
+			fclose(ControlCodeInst->OutputDebugFp);
+			ControlCodeInst->OutputDebugFp = NULL;
 		}
 
 		ControlCodeInst->ControlCodefp = NULL;
@@ -5991,24 +5812,20 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 		ControlCodeInst->DebugAsmFileData0 = NULL;
 		ControlCodeInst->DebugAsmFileData1 = NULL;
 
-		/* Free memory buffers if they exist (from dual mode usage) */
-		if (ControlCodeInst->ControlCodeBuf) {
-			_XAie_MemBufferFree(ControlCodeInst->ControlCodeBuf);
-			_XAie_MemBufferFree(ControlCodeInst->ControlCodeDataBuf);
-			_XAie_MemBufferFree(ControlCodeInst->ControlCodeData2Buf);
-			ControlCodeInst->ControlCodeBuf = NULL;
-			ControlCodeInst->ControlCodeDataBuf = NULL;
-			ControlCodeInst->ControlCodeData2Buf = NULL;
-		}
+		/* Free the in-memory buffers. */
+		_XAie_MemBufferFree(ControlCodeInst->ControlCodeBuf);
+		_XAie_MemBufferFree(ControlCodeInst->ControlCodeDataBuf);
+		_XAie_MemBufferFree(ControlCodeInst->ControlCodeData2Buf);
+		ControlCodeInst->ControlCodeBuf = NULL;
+		ControlCodeInst->ControlCodeDataBuf = NULL;
+		ControlCodeInst->ControlCodeData2Buf = NULL;
 
-		if (!ControlCodeInst->DisableDebugAsm) {
-			_XAie_MemBufferFree(ControlCodeInst->DebugAsmBuf);
-			_XAie_MemBufferFree(ControlCodeInst->DebugAsmDataBuf0);
-			_XAie_MemBufferFree(ControlCodeInst->DebugAsmDataBuf1);
-			ControlCodeInst->DebugAsmBuf = NULL;
-			ControlCodeInst->DebugAsmDataBuf0 = NULL;
-			ControlCodeInst->DebugAsmDataBuf1 = NULL;
-		}
+		_XAie_MemBufferFree(ControlCodeInst->DebugAsmBuf);
+		_XAie_MemBufferFree(ControlCodeInst->DebugAsmDataBuf0);
+		_XAie_MemBufferFree(ControlCodeInst->DebugAsmDataBuf1);
+		ControlCodeInst->DebugAsmBuf = NULL;
+		ControlCodeInst->DebugAsmDataBuf0 = NULL;
+		ControlCodeInst->DebugAsmDataBuf1 = NULL;
 
 		if(ControlCodeInst->LabelMap) {
 			if(_XAie_LabelMapTeardown(ControlCodeInst->LabelMap) == XAIE_OK) {
@@ -6044,6 +5861,10 @@ void XAie_CloseControlCodeFile(XAie_DevInst *DevInst) {
 			_XAie_LoadCoresCacheTeardown(ControlCodeInst->LoadCoresCache);
 			ControlCodeInst->LoadCoresCache = NULL;
 		}
+
+		/* Mark closed so a subsequent XAie_ControlCodeIO_Finish (which gates
+		 * on ControlCodefp || UseInMemoryBuffers) does not re-enter close. */
+		ControlCodeInst->UseInMemoryBuffers = 0;
 	}
 }
 

@@ -1662,7 +1662,7 @@ static AieRC _XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 TileType, const
 			StrmSwPortType PortTypeStart, StrmSwPortType PortTypeEnd, XAie_StrmPortIntf PortIntf, u8 Row, u8 Col, u8 NoOfRegs)
 {
 	AieRC RC = 0;
-	u8 PortType = 0;
+	StrmSwPortType PortType;
 	u64 RegAddr = 0;
 	u32 PortBaseAddr;
 	u8 NumPorts;

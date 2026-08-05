@@ -18,6 +18,14 @@ jobs:
     steps:
       - name: Run code scan build analysis.
         run: |
+          # Retry the whole Jenkins validation up to $max_attempts times so a
+          # transient failure re-triggers the job instead of failing the PR check.
+          max_attempts=3
+          retry_delay=30
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "=== Attempt $attempt of $max_attempts ==="
+            if (
           set -euo pipefail
           jenkinsUrl="${{ env.JENKINS_URL }}"
           user="${{ env.JENKINS_USER }}"
@@ -61,7 +69,7 @@ jobs:
               break
             fi
             echo "Waiting for job at $buildUrl to complete..."
-            sleep 10
+            sleep 90
           done
           [ "$building" = "false" ] || { echo "Timed out waiting for Jenkins job to complete" >&2; exit 1; }
 
@@ -69,7 +77,20 @@ jobs:
           if [ "$result" = "SUCCESS" ]; then
             echo "✅ Code scan build analysis completed. PR is ready to merge."
           else
-            echo "❌ Code scan build analysis failed (result: $result). PR will not be merged." >&2
+            echo "❌ Code scan build analysis failed (result: $result)." >&2
+            echo "🔗 Jenkins console log: ${buildUrl%/}/consoleFull" >&2
             exit 1
           fi
+            ); then
+              exit 0
+            fi
+            echo "⚠️  Attempt $attempt of $max_attempts failed." >&2
+            attempt=$((attempt + 1))
+            if [ "$attempt" -le "$max_attempts" ]; then
+              echo "Retrying in ${retry_delay}s..."
+              sleep "$retry_delay"
+            fi
+          done
+          echo "❌ All $max_attempts attempts failed. PR will not be merged." >&2
+          exit 1
           

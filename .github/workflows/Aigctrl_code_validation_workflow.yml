@@ -71,7 +71,7 @@ jobs:
       # Rules:
       #  - Both keys are optional and independent.
       #  - Omitting repo   → canonical https://gitenterprise.xilinx.com/ai-engine/AigCtrlCodeValidationSuite.git
-      #  - Omitting branch → main
+      #  - Omitting branch → integ
       #  - SSH override URLs (git@...) are used as-is; the PAT is NOT injected.
       # -------------------------------------------------------
       - name: Resolve AigCtrlCodeValidationSuite repo and branch from PR body
@@ -94,7 +94,7 @@ jobs:
 
           # Apply defaults for anything not specified.
           FINAL_REPO="${OVERRIDE_REPO:-${AIGCTRL_REPO}}"
-          FINAL_BRANCH="${OVERRIDE_BRANCH:-main}"
+          FINAL_BRANCH="${OVERRIDE_BRANCH:-integ}"
 
           # Validate: repo must not be empty after resolution.
           if [ -z "$FINAL_REPO" ]; then
@@ -113,7 +113,7 @@ jobs:
             [ -n "${OVERRIDE_REPO}"   ] && echo "   repo   → ${FINAL_REPO}"
             [ -n "${OVERRIDE_BRANCH}" ] && echo "   branch → ${FINAL_BRANCH}"
           else
-            echo "ℹ️  No PR override — using canonical repo + main branch."
+            echo "ℹ️  No PR override — using canonical repo + integ branch."
             echo "   repo   → ${FINAL_REPO}"
             echo "   branch → ${FINAL_BRANCH}"
           fi
@@ -203,6 +203,12 @@ jobs:
           retry_clone "$AIE_CODEGEN_CLONE_URL" "aie-codegen" "$AIE_CODEGEN_BASE_BRANCH"
           cd aie-codegen
 
+          # The shallow (--depth 1) clone lacks the common ancestor required to
+          # merge the PR head, which triggers "refusing to merge unrelated
+          # histories" once the base branch advances past the PR's base commit.
+          # Unshallow to restore full history before merging.
+          git fetch --unshallow origin || git fetch origin
+
           # -------------------------------------------------------
           # Step 2: Fetch the PR head ref (refs/pull/<PR>/head) and
           #         merge it in — this is where the PR changes land.
@@ -224,12 +230,31 @@ jobs:
       - name: Configure and build with CMake
         shell: bash
         run: |
-          set -euo pipefail
-
           cd "$WORK_ROOT/AigCtrlCodeValidationSuite"
 
-          cmake -S . -B build -DAIE_CODEGEN_LOCAL_PATH=aie-codegen
-          cmake --build build --parallel
+          # Retry the CMake configure+build up to $max_attempts times so a
+          # transient build failure re-runs instead of failing the PR check.
+          max_attempts=3
+          retry_delay=30
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "=== Build attempt $attempt of $max_attempts ==="
+            if (
+              set -euo pipefail
+              cmake -S . -B build -DAIE_CODEGEN_LOCAL_PATH=aie-codegen
+              cmake --build build --parallel
+            ); then
+              exit 0
+            fi
+            echo "⚠️  Build attempt $attempt of $max_attempts failed."
+            attempt=$((attempt + 1))
+            if [ "$attempt" -le "$max_attempts" ]; then
+              echo "Retrying in ${retry_delay}s..."
+              sleep "$retry_delay"
+            fi
+          done
+          echo "❌ Build failed after $max_attempts attempts."
+          exit 1
 
       - name: Run unit tests and produce JUnit XML results
         shell: bash

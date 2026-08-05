@@ -18,6 +18,14 @@ jobs:
     steps:
       - name: Run aiert fal build patch Tests.
         run: |
+          # Retry the whole Jenkins validation up to $max_attempts times so a
+          # transient failure re-triggers the job instead of failing the PR check.
+          max_attempts=3
+          retry_delay=30
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "=== Attempt $attempt of $max_attempts ==="
+            if (
           jenkinsUrl="${{ env.JENKINS_URL }}"
           user="${{ env.JENKINS_USER }}"
           token=$(jq -r '.jenkins_token' /proj/xresults_dcs7/kishorer/my_work/config_files/jenkins_config.json)
@@ -56,13 +64,26 @@ jobs:
               break
             fi
             echo "Waiting for job at $buildUrl to complete..."
-            sleep 10
+            sleep 90
           done
 
           # Post result comment
           if [ "$result" = "SUCCESS" ]; then
             echo "✅ Jenkins validation completed. PR is ready to merge."
           else
-            echo "❌ Jenkins validation failed. PR will not be merged."
+            echo "❌ Jenkins validation failed (result: $result)."
+            echo "🔗 Jenkins console log: ${buildUrl%/}/consoleFull"
             exit 1
           fi
+            ); then
+              exit 0
+            fi
+            echo "⚠️  Attempt $attempt of $max_attempts failed."
+            attempt=$((attempt + 1))
+            if [ "$attempt" -le "$max_attempts" ]; then
+              echo "Retrying in ${retry_delay}s..."
+              sleep "$retry_delay"
+            fi
+          done
+          echo "❌ All $max_attempts attempts failed. PR will not be merged."
+          exit 1

@@ -861,6 +861,39 @@ static AieRC XAie_SimMemGetDevAddrFromVAddr(XAie_DevInst *DevInst, void *VAddr,
 	return XAIE_OK;
 }
 
+static AieRC XAie_SimIO_BlockWrite32_Ext(void *IOInst, u64 RegOff, const u32 *Data,
+		u32 Size)
+{
+	for (u32 i = 0U; i < Size; i++) {
+		XAie_SimIO_Write32(IOInst, RegOff + i * 4U, *Data);
+		Data++;
+	}
+
+	return XAIE_OK;
+}
+
+static AieRC XAie_SimIO_MaskPoll_Ext(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
+		u32 TimeOutUs)
+{
+	u32 RegVal;
+
+	(void)TimeOutUs;
+
+	while (1) {
+		XAie_SimIO_Read32(IOInst, RegOff, &RegVal);
+		if ((RegVal & Mask) == Value)
+			return XAIE_OK;
+		usleep(1);
+	}
+}
+
+static AieRC XAie_SimIO_AddressPatchingPL(void *IOInst, u16 Arg_Index)
+{
+	(void)IOInst;
+	(void)Arg_Index;
+	return XAIE_OK;
+}
+
 #else
 
 static AieRC XAie_SimIO_Finish(void *IOInst)
@@ -1053,6 +1086,37 @@ static AieRC XAie_SimMemGetDevAddrFromVAddr(XAie_DevInst *DevInst, void *VAddr,
 	return XAIE_FEATURE_NOT_SUPPORTED;
 }
 
+static AieRC XAie_SimIO_BlockWrite32_Ext(void *IOInst, u64 RegOff, const u32 *Data,
+		u32 Size)
+{
+	(void)IOInst;
+	(void)RegOff;
+	(void)Data;
+	(void)Size;
+
+	return XAIE_ERR;
+}
+
+static AieRC XAie_SimIO_MaskPoll_Ext(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
+		u32 TimeOutUs)
+{
+	(void)IOInst;
+	(void)RegOff;
+	(void)Mask;
+	(void)Value;
+	(void)TimeOutUs;
+
+	return XAIE_ERR;
+}
+
+static AieRC XAie_SimIO_AddressPatchingPL(void *IOInst, u16 Arg_Index)
+{
+	(void)IOInst;
+	(void)Arg_Index;
+
+	return XAIE_ERR;
+}
+
 #endif /* __AIESIM__ */
 
 
@@ -1124,9 +1188,9 @@ const XAie_Backend SimBackend =
 	.Ops.SetAttr = XAie_SimIOSetAttr,
 	.Ops.WaitTaskCompleteToken = NULL,
 	.Ops.AddressPatching = NULL,
-	.Ops.AddressPatchingPL = NULL,
-	.Ops.MaskPollExt = NULL,
-	.Ops.BlockWrite32Ext = NULL,
+	.Ops.AddressPatchingPL = XAie_SimIO_AddressPatchingPL,
+	.Ops.MaskPollExt = XAie_SimIO_MaskPoll_Ext,
+	.Ops.BlockWrite32Ext = XAie_SimIO_BlockWrite32_Ext,
 	.Ops.ConfigMode = NULL,
 	.Ops.WaitUcDMA = NULL,
 	.Ops.GetConfigMode = NULL,

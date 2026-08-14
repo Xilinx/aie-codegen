@@ -4497,9 +4497,15 @@ static inline AieRC _XAie_EmitLoadCoresBuffer(XAie_ControlCodeIO *ControlCodeIns
                                                FILE *TargetFile,
                                                XAie_MemBuffer *TargetMemBuf,
                                                const char *ErrorMsg) {
+	/*
+	 * An empty LoadCores body is legal: the LOAD_CORES opcode and its label
+	 * are already emitted by LoadCoresStart, so a Start immediately followed
+	 * by End (no Write32/BlockWrite32 in between) does not corrupt any
+	 * downstream state. Treat it as a no-op returning XAIE_OK instead of the
+	 * spurious "No instructions for LoadCores" error (AIESW-33683).
+	 */
 	if (!SrcBuffer || SrcBuffer->Size == 0) {
-		XAIE_ERROR("No instructions for LoadCores\n");
-		return XAIE_ERR;
+		return XAIE_OK;
 	}
 	return _XAie_EmitLoadCoresBufferSlice(ControlCodeInst, SrcBuffer->Data,
 	                                       SrcBuffer->Size, TargetFile,

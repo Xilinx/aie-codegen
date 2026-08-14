@@ -1634,6 +1634,25 @@ static void _XAie_StartNewPage(XAie_ControlCodeIO  *ControlCodeInst) {
 	}
 
 	ControlCodeInst->CombineCommands = 0;
+
+	/* A control-code page is a self-contained image: every BD on a page must
+	 * reference data that is resident on that same page. Reset the cross-write
+	 * combine/adjacency tracking and the data-dedup comparison windows at the
+	 * page boundary so the first write on the new page starts a fresh
+	 * descriptor and defines its own (page-resident) data label instead of
+	 * extending a descriptor from -- or reusing a WRITE_data / DMAWRITE_data
+	 * label defined on -- the previous page. Without this, a page's BD can
+	 * point at a data label physically emitted on the previous page; the
+	 * assembler must then make that data resident on this page too, inflating
+	 * the page beyond what the running UcPageSize accounting predicted and
+	 * overflowing PAGE_SIZE_MAX (aiebu then rejects it). */
+	ControlCodeInst->CalculatedNextRegOff  = UINT64_MAX;
+	ControlCodeInst->PrevMemWriteType      = -1;
+	ControlCodeInst->CombinedMemWriteSize  = 0;
+	ControlCodeInst->IsAdjacentMemWrite    = 0;
+	ControlCodeInst->CompareLabelUpto      = ControlCodeInst->CurrentDataBWLabel;
+	ControlCodeInst->CompareLabelUptoWrite = ControlCodeInst->CurrentDataLabel;
+
 	ControlCodeInst->IsPageOpen 	 = 1;
 	ControlCodeInst->LabelMatchFound = 0;
 }

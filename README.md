@@ -112,6 +112,19 @@ Installed artifacts include the library, `aie_codegen.h`, headers under `aie_cod
 
 MSVC-only options (`AIE_CODEGEN_MSVC_RELEASE_PDB`, `AIE_CODEGEN_ENABLE_SOURCELINK`) are documented in `src/CMakeLists.txt` for compliance and symbol publishing scenarios.
 
+### Debug: backtrace annotations in `.DEBUG` output
+
+An opt-in, compile-time-only feature (Linux/GCC-Clang only, requires `libdw`) that prints a GDB-style call stack above each `;Page#:` marker in `.DEBUG` files, making it possible to trace which call site emitted a given control-code instruction. Disabled by default. Enable at configure time:
+
+```bash
+cmake -S src -B build -DAIE_CODEGEN_DEBUG_BACKTRACE=1 -DAIE_CODEGEN_DEBUG_BACKTRACE_DEPTH=8
+```
+
+- `AIE_CODEGEN_DEBUG_BACKTRACE`: `1` for full DWARF-resolved args (function name, parameters, file:line), `2` for function names only (lighter-weight, no argument decoding). Also settable via an identically-named environment variable. Defaults to `0` (disabled).
+- `AIE_CODEGEN_DEBUG_BACKTRACE_DEPTH`: number of stack frames to capture, `0`-`64`. Only meaningful once the mode above is enabled; defaults to `0`.
+
+See `src/cmake/AieCodegenBacktrace.cmake` for the full configure-time validation and defaults.
+
 ### Compiler selection
 
 You can pass the usual CMake variables when configuring, for example:

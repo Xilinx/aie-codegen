@@ -26,6 +26,7 @@ include(GNUInstallDirs)
 include(AieCodegenSources)
 include(AieCodegenIncludes)
 include(AieCodegenMsvc)
+include(AieCodegenBacktrace)
 
 # --- Options (AIE_CODEGEN_* prefix) -------------------------------------------
 
@@ -105,6 +106,7 @@ else()
     list(APPEND _gcc_warnings -Werror)
   endif()
   target_compile_options(${PROJECT_NAME} PRIVATE ${_gcc_warnings})
+  aie_codegen_apply_backtrace_options(${PROJECT_NAME})
 endif()
 
 # --- Install / package / quality ----------------------------------------------

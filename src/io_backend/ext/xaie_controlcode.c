@@ -5421,9 +5421,15 @@ static AieRC _XAie_MergeMemBuffers(XAie_MemBuffer *SrcBuf, XAie_MemBuffer *DesBu
 	if (needed_capacity > DesBuf->Capacity) {
 		size_t new_capacity = DesBuf->Capacity;
 		while (new_capacity < needed_capacity) {
+			size_t prev_capacity = new_capacity;
 			new_capacity *= BUFFER_GROWTH_FACTOR;
+			/* Detect size_t wraparound: growth must be strictly increasing. */
+			if (new_capacity <= prev_capacity) {
+				XAIE_ERROR("Buffer capacity overflow\n");
+				return XAIE_ERR;
+			}
 		}
-		
+
 		char *new_data = (char*)realloc(DesBuf->Data, new_capacity);
 		if (!new_data) {
 			return XAIE_ERR;

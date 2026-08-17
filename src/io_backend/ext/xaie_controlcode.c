@@ -2604,12 +2604,15 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 					
 				}
 				else {		
-					if((ControlCodeInst->UcPageSize + OpSize +
-						UC_DMA_BD_SIZE + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
-						_XAie_StartNewPage(ControlCodeInst);
-						_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
-					}
-
+					/*
+					 * AIESW-33681: The SYNC page-boundary check here is
+					 * dead code. It uses the identical formula and the
+					 * identical (unmodified) inputs as the check performed
+					 * unconditionally on entry to the IsAdjacentMemWrite==0
+					 * branch above, so it can never fire. Removed. (The
+					 * ASYNC arm is NOT redundant: it adds
+					 * ISA_OPSIZE_WAIT_UC_DMA for the WAIT_UC_DMA suffix.)
+					 */
 					CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
 							"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
 							ControlCodeInst->UcbdLabelNum);

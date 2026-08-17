@@ -4763,9 +4763,21 @@ static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeIns
 			: lastSliceTotalContent;
 
 		/* Skip an empty continuation slice. This can occur if a forced
-		 * page split lands at the very end of the buffered stream — the
-		 * trailing slice would otherwise emit a stub PCJ with no body. */
-		if (i > 0 && sliceInstrLen == 0 && sliceTotalContent == 0) {
+		 * page split lands at the very end of the buffered stream (e.g. a
+		 * BlockWrite32 + XAie_EndPage + EndJob sequence) — the trailing
+		 * slice would otherwise emit a stub PCJ with no body.
+		 *
+		 * The emit loop only ever produces a body via
+		 * _XAie_EmitLoadCoresBufferSlice, which is gated purely on the
+		 * instruction-buffer slice lengths.  Therefore a slice with no
+		 * instruction *and* no debug-instruction bytes is guaranteed to
+		 * emit an empty START_COND_JOB_PREEMPT/END_JOB pair regardless of
+		 * sliceTotalContent.  The previous predicate also required
+		 * sliceTotalContent == 0, which for the trailing slice equals
+		 * (UcPageSize - PCJ_SLICE_OVERHEAD_TOTAL) and is essentially never
+		 * zero at EndJob time — making the skip unreachable and letting a
+		 * stub PCJ through.  Gate solely on the slice body being empty. */
+		if (i > 0 && sliceInstrLen == 0 && sliceDebugInstrLen == 0) {
 			continue;
 		}
 

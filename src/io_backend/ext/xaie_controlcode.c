@@ -1970,9 +1970,8 @@ static void _XAie_FlushShimBdChain(XAie_ControlCodeIO *ControlCodeInst) {
 			"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
 			ControlCodeInst->UcbdLabelNum);
 	ControlCodeInst->UcPageSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
-	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
-
 	ControlCodeInst->UcPageTextSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
+	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 	ControlCodeInst->NumShimBDsChained = 0;
 	ControlCodeInst->CombineCommands = 0;
 	ControlCodeInst->UcbdLabelNum++;
@@ -2471,6 +2470,8 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
 	u32 OpSize;
+	/* Defer page-info print until OpSize and UC_DMA BD/data sizes are applied. */
+	u8 needPageInfoPrint = 0;
 
 	XAie_LabelMap* Map = ControlCodeInst->LabelMap;
 
@@ -2622,7 +2623,7 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 				}
 				ControlCodeInst->UcPageTextSize += OpSize;
 				ControlCodeInst->UcPageSize += OpSize;
-				_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+				needPageInfoPrint = 1;
 
 				CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA, "UCBD_label_%d:\n",
 						ControlCodeInst->UcbdLabelNum);
@@ -2660,6 +2661,10 @@ CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA,
 			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA2, "\t.long 0x%08x\n", Value);
 			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA1, "\t.long 0x%08x\n", Value);
 			ControlCodeInst->UcPageSize += UC_DMA_WORD_LEN;
+		}
+
+		if (needPageInfoPrint) {
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 		}
 	}
 

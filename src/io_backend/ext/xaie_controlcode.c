@@ -376,6 +376,8 @@ typedef struct {
 	u32 CurrentDataBWLabel;
 	u8 LabelMatchFound;
 	int PrevMemWriteType;
+	/* Set after async UC_DMA_WRITE_DES; cleared by WAIT_UC_DMA. */
+	u8 PendingAsyncDmaWait;
 	u64 BarrierId;
 	u32 HintMapId;
 	char* LoadCoresLabel;
@@ -426,6 +428,8 @@ static inline AieRC _XAie_PCJContextInit(XAie_ControlCodeIO *ControlCodeInst);
 static inline void  _XAie_PCJStateFree(XAie_ControlCodeIO *ControlCodeInst);
 static inline AieRC _XAie_PCJRecordSplitPoint(XAie_ControlCodeIO *ControlCodeInst);
 static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeInst);
+static void _XAie_StartNewPage(XAie_ControlCodeIO *ControlCodeInst);
+static void _XAie_StartNewJob(XAie_ControlCodeIO *ControlCodeInst, XAie_CertStartJobType JobType);
 
 /*****************************************************************************/
 /**
@@ -2003,12 +2007,19 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 		return;
 	}
 
-	if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE)
+	if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE && ControlCodeInst->PendingAsyncDmaWait)
 	{
+		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_UC_DMA) > ControlCodeInst->PageSizeMax) {
+			/* Clear before StartNewPage to avoid reentrant EndJob loop. */
+			ControlCodeInst->PendingAsyncDmaWait = 0;
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+		}
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "WAIT_UC_DMA\t $r0\n");
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "WAIT_UC_DMA\t $r0\n");
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_WAIT_UC_DMA;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_WAIT_UC_DMA;
+		ControlCodeInst->PendingAsyncDmaWait = 0;
 		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 
 	}
@@ -2602,9 +2613,10 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 					CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
 							"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
 							ControlCodeInst->UcbdLabelNum);
-					
+					ControlCodeInst->PendingAsyncDmaWait = 1;
+
 				}
-				else {		
+				else {
 					/*
 					 * AIESW-33681: The SYNC page-boundary check here is
 					 * dead code. It uses the identical formula and the
@@ -2961,6 +2973,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
 								"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
 								ControlCodeInst->UcbdLabelNum);
+						ControlCodeInst->PendingAsyncDmaWait = 1;
 						}
 						else {
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
@@ -3266,6 +3279,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
 								"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
 								ControlCodeInst->UcbdLabelNum);
+						ControlCodeInst->PendingAsyncDmaWait = 1;
 						}
 						else {
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
@@ -3720,6 +3734,7 @@ AieRC XAie_ControlCodeIO_WaitUcDMA(void *IOInst)
 	CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "WAIT_UC_DMA\t $r0\n");
 	ControlCodeInst->UcPageTextSize += ISA_OPSIZE_WAIT_UC_DMA;
 	ControlCodeInst->UcPageSize += ISA_OPSIZE_WAIT_UC_DMA;
+	ControlCodeInst->PendingAsyncDmaWait = 0;
 	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 
 	return XAIE_OK;

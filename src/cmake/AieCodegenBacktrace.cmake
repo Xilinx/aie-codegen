@@ -67,7 +67,11 @@ function(aie_codegen_apply_backtrace_options target)
       "AIE_CODEGEN_DEBUG_BACKTRACE=${AIE_CODEGEN_DEBUG_BACKTRACE} was requested but libdw was not found. "
       "Install elfutils-devel (RHEL/CentOS) or libdw-dev (Debian/Ubuntu) and reconfigure.")
   endif()
-  if(NOT LIBDW_LIB)
+  # XAIE_BACKTRACE_ENABLED (and the -g/frame-pointer/libdw linkage it implies)
+  # must only be turned on when the feature was explicitly requested -- not
+  # merely because libdw happens to be present on the build machine, which
+  # would silently compile the whole backtrace subsystem into every build.
+  if(NOT AIE_CODEGEN_DEBUG_BACKTRACE OR NOT LIBDW_LIB)
     return()
   endif()
 
@@ -75,7 +79,5 @@ function(aie_codegen_apply_backtrace_options target)
   target_link_libraries(${target} PRIVATE dw pthread dl stdc++)
   target_compile_definitions(${target} PRIVATE XAIE_BACKTRACE_ENABLED)
 
-  if(AIE_CODEGEN_DEBUG_BACKTRACE)
-    message(STATUS "aie_codegen: backtrace mode ${_bt_mode}, depth ${_bt_depth} compiled in (fixed at build time)")
-  endif()
+  message(STATUS "aie_codegen: backtrace mode ${_bt_mode}, depth ${_bt_depth} compiled in (fixed at build time)")
 endfunction()

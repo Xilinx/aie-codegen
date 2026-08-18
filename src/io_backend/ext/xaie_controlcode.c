@@ -2024,6 +2024,19 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 
 	}
 	else if(ControlCodeInst->NumShimBDsChained > 0) {
+		/* The flush emits a SYNC (ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC bytes)
+		 * whose cost is never reserved in UcPageSize while the chain is
+		 * open (each per-BD-add check only defends its own instant, then
+		 * the reservation evaporates uncommitted). Check for page overflow
+		 * before flushing, same as _XAie_IsolateCombineGroup does. */
+		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
+				ControlCodeInst->PageSizeMax) {
+			/* Avoids StartNewPage->EndPage->EndJob re-entering this branch. */
+			ControlCodeInst->NumShimBDsChained = 0;
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+			ControlCodeInst->NumShimBDsChained = 1;
+		}
 		_XAie_FlushShimBdChain(ControlCodeInst);
 	}
 
@@ -2360,6 +2373,15 @@ AieRC XAie_ConfigMode(void *IOInst, XAie_ModeSelect Mode)
 			}
 			break;
 		case XAIE_SHIM_BD_CHAINING_DISABLE:
+			if((ControlCodeInst->NumShimBDsChained > 0) &&
+					((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
+					 ControlCodeInst->PageSizeMax)) {
+				/* Same reentrancy hazard/fix as _XAie_EndJob's flush branch. */
+				ControlCodeInst->NumShimBDsChained = 0;
+				_XAie_StartNewPage(ControlCodeInst);
+				_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+				ControlCodeInst->NumShimBDsChained = 1;
+			}
 			_XAie_FlushShimBdChain(ControlCodeInst);
 			CHECK_ERROR_STATE(ControlCodeInst);
 			break;
@@ -2420,8 +2442,11 @@ static inline void _XAie_IsolateCombineGroup(XAie_ControlCodeIO *ControlCodeInst
 		if ((ControlCodeInst->NumShimBDsChained > 0) &&
 				((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
 				 ControlCodeInst->PageSizeMax)) {
+			/* Same reentrancy hazard/fix as the other ShimBD-flush checks. */
+			ControlCodeInst->NumShimBDsChained = 0;
 			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+			ControlCodeInst->NumShimBDsChained = 1;
 		}
 		_XAie_FlushShimBdChain(ControlCodeInst);
 		ControlCodeInst->CombineCommands = 0;

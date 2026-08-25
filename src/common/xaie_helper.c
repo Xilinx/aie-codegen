@@ -535,14 +535,128 @@ void _XAie_ClrBitInBitmap(u32 *Bitmap, u32 StartBit, u32 NumBit)
 	}
 }
 
+/*****************************************************************************/
+/**
+* This is a helper to validate that a register offset falls within the
+* device partition's column address range. It guards against invalid ColShift,
+* NumCols == 0, and shift overflow.
+*
+* @param	DevInst: Device Instance (must be non-NULL and ready)
+* @param	RegOff: Register offset to validate
+*
+* @return	XAIE_OK if RegOff is within range, XAIE_INVALID_ARGS otherwise.
+*
+* @note		Internal API only. Column-granularity check; intra-column
+*		(row/register) offsets below ColShift are not validated here.
+*
+******************************************************************************/
+static AieRC _XAie_ValidateRegOff(const XAie_DevInst *DevInst, u64 RegOff)
+{
+	u8 ColShift = DevInst->DevProp.ColShift;
+	u64 TotalCols;
+	u64 MinRegOff;
+	u64 MaxRegOff;
+
+	if(ColShift >= 64U) {
+		XAIE_ERROR("Invalid ColShift value: %u\n",
+			(unsigned)ColShift);
+		return XAIE_INVALID_ARGS;
+	}
+
+	if(DevInst->NumCols == 0U) {
+		XAIE_ERROR("NumCols is zero, no valid address range\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	TotalCols = (u64)DevInst->StartCol + (u64)DevInst->NumCols;
+
+	/* Check that the shift won't overflow u64 */
+	if(TotalCols > (U64_MAX >> ColShift)) {
+		XAIE_ERROR("Address range overflow: TotalCols=%llu"
+			" ColShift=%u\n", (unsigned long long)TotalCols,
+			(unsigned)ColShift);
+		return XAIE_INVALID_ARGS;
+	}
+
+	MinRegOff = (u64)DevInst->StartCol << ColShift;
+	MaxRegOff = TotalCols << ColShift;
+
+	if(RegOff < MinRegOff || RegOff >= MaxRegOff) {
+		XAIE_ERROR("Register offset 0x%llx out of range "
+			"[0x%llx, 0x%llx)\n",
+			(unsigned long long)RegOff,
+			(unsigned long long)MinRegOff,
+			(unsigned long long)MaxRegOff);
+		return XAIE_INVALID_ARGS;
+	}
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+* This is a helper to validate that a block operation (starting at RegOff
+* with Size u32 words) fits entirely within the partition's address range.
+*
+* @param	DevInst: Device Instance (must be non-NULL and ready)
+* @param	RegOff: Starting register offset of the block
+* @param	Size: Number of u32 words in the block (must be > 0)
+*
+* @return	XAIE_OK if the block fits, XAIE_INVALID_ARGS otherwise.
+*
+* @note		Internal API only. Calls _XAie_ValidateRegOff internally.
+*
+******************************************************************************/
+static AieRC _XAie_ValidateBlockRegOff(const XAie_DevInst *DevInst,
+	u64 RegOff, u32 Size)
+{
+	u8 ColShift = DevInst->DevProp.ColShift;
+	u64 TotalCols;
+	u64 MaxRegOff;
+	AieRC RC;
+
+	RC = _XAie_ValidateRegOff(DevInst, RegOff);
+	if(RC != XAIE_OK) {
+		return RC;
+	}
+
+	if(Size == 0U) {
+		XAIE_ERROR("Block size is zero\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	TotalCols = (u64)DevInst->StartCol + (u64)DevInst->NumCols;
+	MaxRegOff = TotalCols << ColShift;
+
+	/*
+	 * Register offsets are byte-addressed, so (MaxRegOff - RegOff) gives
+	 * the remaining bytes. Divide by sizeof(u32) to get the maximum number
+	 * of u32 words that fit. Using division avoids a multiplication that
+	 * could overflow on platforms with smaller intermediate types.
+	 */
+	if((u64)Size > (MaxRegOff - RegOff) / sizeof(u32)) {
+		XAIE_ERROR("Block operation exceeds address range\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	return XAIE_OK;
+}
+
 AieRC XAie_Write32(XAie_DevInst *DevInst, u64 RegOff, u32 Value)
 {
 	const XAie_Backend *Backend;
+	AieRC RC;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* Validate RegOff is within the device address range */
+	RC = _XAie_ValidateRegOff(DevInst, RegOff);
+	if(RC != XAIE_OK) {
+		return RC;
 	}
 
 	Backend = DevInst->Backend;
@@ -565,11 +679,18 @@ AieRC XAie_Write32(XAie_DevInst *DevInst, u64 RegOff, u32 Value)
 AieRC XAie_Read32(XAie_DevInst *DevInst, u64 RegOff, u32 *Data)
 {
 	const XAie_Backend *Backend;
+	AieRC RC;
 
 	if((DevInst == XAIE_NULL) || (Data == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* Validate RegOff is within the device address range */
+	RC = _XAie_ValidateRegOff(DevInst, RegOff);
+	if(RC != XAIE_OK) {
+		return RC;
 	}
 
 	Backend = DevInst->Backend;
@@ -592,11 +713,18 @@ AieRC XAie_Read32(XAie_DevInst *DevInst, u64 RegOff, u32 *Data)
 AieRC XAie_MaskWrite32(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value)
 {
 	const XAie_Backend *Backend;
+	AieRC RC;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* Validate RegOff is within the device address range */
+	RC = _XAie_ValidateRegOff(DevInst, RegOff);
+	if(RC != XAIE_OK) {
+		return RC;
 	}
 
 	Backend = DevInst->Backend;
@@ -621,11 +749,18 @@ AieRC XAie_MaskPoll(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 		u32 TimeOutUs)
 {
 	const XAie_Backend *Backend;
+	AieRC RC;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* Validate RegOff is within the device address range */
+	RC = _XAie_ValidateRegOff(DevInst, RegOff);
+	if(RC != XAIE_OK) {
+		return RC;
 	}
 
 	Backend = DevInst->Backend;
@@ -667,11 +802,18 @@ AieRC XAie_MaskPollBusy(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 		u32 TimeOutUs)
 {
 	const XAie_Backend *Backend;
+	AieRC RC;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* Validate RegOff is within the device address range */
+	RC = _XAie_ValidateRegOff(DevInst, RegOff);
+	if(RC != XAIE_OK) {
+		return RC;
 	}
 
 	Backend = DevInst->Backend;
@@ -689,11 +831,18 @@ AieRC XAie_MaskPollBusy(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 AieRC XAie_BlockWrite32(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data, u32 Size)
 {
 	const XAie_Backend *Backend;
+	AieRC RC;
 
 	if((DevInst == XAIE_NULL) || (Data == NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* Validate RegOff and block size are within the device address range */
+	RC = _XAie_ValidateBlockRegOff(DevInst, RegOff, Size);
+	if(RC != XAIE_OK) {
+		return RC;
 	}
 
 	Backend = DevInst->Backend;
@@ -734,11 +883,18 @@ AieRC XAie_BlockWrite32_Ext(XAie_DevInst *DevInst, u64 RegOff, const u32 *Data,
 AieRC XAie_BlockSet32(XAie_DevInst *DevInst, u64 RegOff, u32 Data, u32 Size)
 {
 	const XAie_Backend *Backend;
+	AieRC RC;
 
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
 		XAIE_ERROR("Invalid Device Instance\n");
 		return XAIE_INVALID_ARGS;
+	}
+
+	/* Validate RegOff and block size are within the device address range */
+	RC = _XAie_ValidateBlockRegOff(DevInst, RegOff, Size);
+	if(RC != XAIE_OK) {
+		return RC;
 	}
 
 	Backend = DevInst->Backend;

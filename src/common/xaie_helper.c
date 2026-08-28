@@ -1906,7 +1906,7 @@ static inline u32 XAie_Mask_Value(u8 devGen)
 *
 * This API provides the register offset in App B space for AIE4+ architecture
 * This api returns the same offset, if the device generation doesn't support
-* dual adress space
+* dual address space
 *
 * @param	devGen t: device generation/name
 * @param	regOffset: Type of tile aiecore tile, memtile or shimnoc tile

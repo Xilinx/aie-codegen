@@ -131,7 +131,7 @@ static AieRC _XAie2PS_DmaMemTileCheckPaddingConfig(XAie_DmaDesc *DmaDesc)
 
 			if(PDesc[Dim].After != 0U) {
 				XAIE_ERROR("Padding after for dimension %u must"
-						" be 0 when wrap is 1\n", Dim);
+						" be 0 when wrap is 0\n", Dim);
 				return XAIE_INVALID_DMA_DESC;
 			}
 
@@ -140,7 +140,7 @@ static AieRC _XAie2PS_DmaMemTileCheckPaddingConfig(XAie_DmaDesc *DmaDesc)
 					PadDim++) {
 				if((PDesc[PadDim].After != 0U) ||
 						(PDesc[PadDim].Before != 0U)) {
-					XAIE_ERROR("After and Before pading "
+					XAIE_ERROR("After and Before padding "
 							"for dimension %u must "
 							"be 0 when wrap for "
 							"dimension %u is 0\n",

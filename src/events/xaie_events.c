@@ -1109,7 +1109,7 @@ AieRC XAie_EventBroadcastReset(XAie_DevInst *DevInst, XAie_LocType Loc,
 *			for Shim tile and Mem tile switch value could be
 *			XAIE_EVENT_SWITCH_A or XAIE_EVENT_SWITCH_B.
 * @param	BroadcastId: Broadcast index.
-* @parma	Dir: Direction to block events on given broadcast index. Values
+* @param	Dir: Direction to block events on given broadcast index. Values
 *		     could be OR'ed to block multiple directions. For example,
 *		     to block event broadcast in West and East directions set
 *		     Dir as,
@@ -1204,7 +1204,7 @@ AieRC XAie_EventBroadcastBlockDir(XAie_DevInst *DevInst, XAie_LocType Loc,
 *			for Shim tile and Mem tile switch value could be
 *			XAIE_EVENT_SWITCH_A or XAIE_EVENT_SWITCH_B.
 * @param	ChannelBitMap: Bitmap to block broadcast channels.
-* @parma	Dir: Direction to block events on given broadcast index. Values
+* @param	Dir: Direction to block events on given broadcast index. Values
 *		     could be OR'ed to block multiple directions. For example,
 *		     to block event broadcast in West and East directions set
 *		     Dir as,
@@ -1305,7 +1305,7 @@ AieRC XAie_EventBroadcastBlockMapDir(XAie_DevInst *DevInst, XAie_LocType Loc,
 *			for Shim tile and Mem tile switch value could be
 *			XAIE_EVENT_SWITCH_A or XAIE_EVENT_SWITCH_B.
 * @param	BroadcastId: Broadcast index.
-* @parma	Dir: Direction to unblock events on given broadcast index.
+* @param	Dir: Direction to unblock events on given broadcast index.
 *		     Values could be OR'ed to unblock multiple directions. For
 *		     example, to unblock event broadcast in West and East
 *		     directions set Dir as,

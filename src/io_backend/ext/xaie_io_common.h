@@ -11,7 +11,7 @@
 * @{
 *
 * This file contains the data structures and routines for low level IO
-* operations that are common accross multiple backends.
+* operations that are common across multiple backends.
 *
 * <pre>
 * MODIFICATION HISTORY:

@@ -1015,6 +1015,25 @@ AieRC XAie_AddressPatching_PL(XAie_DevInst *DevInst, u16 Arg_Offset)
 	}
 }
 
+AieRC XAie_AddressPatching_SRAM(XAie_DevInst *DevInst, u32 SramAddress, u8 Num_BDs)
+{
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	const XAie_Backend *Backend = DevInst->Backend;
+
+	if (Backend->Ops.AddressPatchingSRAM != NULL) {
+		return Backend->Ops.AddressPatchingSRAM((void *)DevInst->IOInst,
+				SramAddress, Num_BDs);
+	} else {
+		XAIE_ERROR("SRAM Address Patching function pointer points to NULL\n");
+		return XAIE_NOT_SUPPORTED;
+	}
+}
+
 AieRC XAie_SetPadInteger(XAie_DevInst *DevInst, char* BuffName, u32 BuffSize)
 {
 	if((DevInst == XAIE_NULL) ||

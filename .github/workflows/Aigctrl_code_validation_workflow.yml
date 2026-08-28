@@ -88,9 +88,11 @@ jobs:
 
           # Extract optional override keys (case-sensitive, leading spaces allowed).
           OVERRIDE_REPO=$(grep -m1 '^\s*AigCtrlCodeValidationSuite-repo:' "$PR_BODY_FILE" \
-            | sed 's/^\s*AigCtrlCodeValidationSuite-repo:\s*//' | tr -d '\r' || true)
+            | sed 's/^\s*AigCtrlCodeValidationSuite-repo:\s*//' | tr -d '\r' \
+            | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)
           OVERRIDE_BRANCH=$(grep -m1 '^\s*AigCtrlCodeValidationSuite-branch:' "$PR_BODY_FILE" \
-            | sed 's/^\s*AigCtrlCodeValidationSuite-branch:\s*//' | tr -d '\r' || true)
+            | sed 's/^\s*AigCtrlCodeValidationSuite-branch:\s*//' | tr -d '\r' \
+            | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)
 
           # Apply defaults for anything not specified.
           FINAL_REPO="${OVERRIDE_REPO:-${AIGCTRL_REPO}}"

@@ -1189,6 +1189,7 @@ const XAie_Backend SimBackend =
 	.Ops.WaitTaskCompleteToken = NULL,
 	.Ops.AddressPatching = NULL,
 	.Ops.AddressPatchingPL = XAie_SimIO_AddressPatchingPL,
+	.Ops.AddressPatchingSRAM = NULL,
 	.Ops.MaskPollExt = XAie_SimIO_MaskPoll_Ext,
 	.Ops.BlockWrite32Ext = XAie_SimIO_BlockWrite32_Ext,
 	.Ops.ConfigMode = NULL,

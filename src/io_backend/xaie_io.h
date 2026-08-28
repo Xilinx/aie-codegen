@@ -164,6 +164,7 @@ typedef struct XAie_BackendOps {
 		     XAie_BackendOpCode Op, void *Arg);
 	AieRC (*AddressPatching)(void *IOInst, u16 Arg_Index, u8 Num_BDs);
 	AieRC (*AddressPatchingPL)(void *IOInst, u16 Arg_Index);
+	AieRC (*AddressPatchingSRAM)(void *IOInst, u32 SramAddress, u8 Num_BDs);
 	AieRC (*MaskPollExt)(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
 			u32 TimeOutUs);
 	AieRC (*WaitTaskCompleteToken) (XAie_DevInst *DevInst,

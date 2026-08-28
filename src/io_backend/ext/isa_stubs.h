@@ -35,6 +35,7 @@
 #define ISA_OPCODE_WRITE_32_D 0x0b
 #define ISA_OPCODE_READ_32 0x0c
 #define ISA_OPCODE_READ_32_D 0x0d
+#define ISA_OPCODE_APPLY_OFFSET_SRAM 0x24
 #define ISA_OPCODE_APPLY_OFFSET_57 0x0e
 #define ISA_OPCODE_ADD 0x0f
 #define ISA_OPCODE_MOV 0x10
@@ -68,6 +69,7 @@
 #define ISA_OPSIZE_WRITE_32_D 0x0c
 #define ISA_OPSIZE_READ_32 0x08
 #define ISA_OPSIZE_READ_32_D 0x04
+#define ISA_OPSIZE_APPLY_OFFSET_SRAM 0x0c
 #define ISA_OPSIZE_APPLY_OFFSET_57 0x08
 #define ISA_OPSIZE_ADD 0x08
 #define ISA_OPSIZE_MOV 0x08
@@ -102,6 +104,7 @@ static unsigned int control_op_uc_dma_write_des_sync(const uint8_t *_pc, uint16_
 static unsigned int control_op_write_32_d(const uint8_t *_pc, uint8_t flags, uint32_t address, uint32_t value);
 static unsigned int control_op_read_32(const uint8_t *_pc, uint8_t value_reg, uint32_t address);
 static unsigned int control_op_read_32_d(const uint8_t *_pc, uint8_t address_reg, uint8_t value_reg);
+static unsigned int control_op_apply_offset_sram(const uint8_t *_pc, uint16_t table_ptr, uint16_t num_entries, uint32_t address);
 static unsigned int control_op_apply_offset_57(const uint8_t *_pc, uint16_t table_ptr, uint16_t num_entries, uint8_t offset_high_reg, uint8_t offset_low_reg);
 static unsigned int control_op_add(const uint8_t *_pc, uint8_t dest_reg, uint32_t value);
 static unsigned int control_op_mov(const uint8_t *_pc, uint8_t dest_reg, uint32_t value);
@@ -344,6 +347,16 @@ static inline unsigned int control_dispatch_apply_offset_pl(const uint8_t *pc)
   );
 }
 
+static inline unsigned int control_dispatch_apply_offset_sram(const uint8_t *pc)
+{
+  return control_op_apply_offset_sram(
+    pc,
+    /* table_ptr (const) */ *(uint16_t *)(&pc[2]),
+    /* num_entries (const) */ *(uint16_t *)(&pc[4]),
+    /* address (const) */ *(uint32_t *)(&pc[8])
+  );
+}
+
 // Case statements for regular operations
 
 #define DISPATCH_REGULAR_OPS \
@@ -357,6 +370,7 @@ static inline unsigned int control_dispatch_apply_offset_pl(const uint8_t *pc)
   case ISA_OPCODE_WRITE_32_D: pc += control_dispatch_write_32_d(pc); break; \
   case ISA_OPCODE_READ_32: pc += control_dispatch_read_32(pc); break; \
   case ISA_OPCODE_READ_32_D: pc += control_dispatch_read_32_d(pc); break; \
+  case ISA_OPCODE_APPLY_OFFSET_SRAM: pc += control_dispatch_apply_offset_sram(pc); break; \
   case ISA_OPCODE_APPLY_OFFSET_57: pc += control_dispatch_apply_offset_57(pc); break; \
   case ISA_OPCODE_ADD: pc += control_dispatch_add(pc); break; \
   case ISA_OPCODE_MOV: pc += control_dispatch_mov(pc); break; \

@@ -3601,8 +3601,10 @@ AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u16 Arg_Index, u8 Num_BDs
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
-		
+
+		/* Reserve APPLY_OFFSET_SRAM on the same page as the shim BD table. */
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_APPLY_OFFSET_57 + OpSize +
+			ISA_OPSIZE_APPLY_OFFSET_SRAM +
 			(UC_DMA_BD_SIZE + (Num_BDs * UC_DMA_WORD_LEN * SHIM_BD_NUM_REGS)) + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -3715,6 +3717,96 @@ AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_APPLY_OFFSET_PL;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_APPLY_OFFSET_PL;
 		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+	}
+
+	if(ControlCodeInst->ScrachpadName != NULL) {
+		free(ControlCodeInst->ScrachpadName);
+		ControlCodeInst->ScrachpadName = NULL;
+	}
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
+* This is the memory IO function to emit APPLY_OFFSET_SRAM (opcode 0x24,
+* opsize 0x0c) in the control code. Call after APPLY_OFFSET_57 and before
+* shim BD emission; both ops reference the same @DMAWRITE_data_N label.
+*
+* @param	IOInst:       IO instance pointer
+* @param	SramAddress:  Offset within MemTile data memory (patched with
+*			MemMod base before emit)
+* @param	Num_BDs:      Number of shim DMA BDs in the table to patch
+*
+* @return	XAIE_OK on success.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_AddressPatching_SRAM(void *IOInst, u32 SramAddress, u8 Num_BDs)
+{
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	XAie_DevInst *DevInst;
+	const XAie_MemMod *MemMod;
+	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
+	CHECK_ERROR_STATE(ControlCodeInst);
+
+	/* Same @DMAWRITE_data_N as APPLY_OFFSET_57; UcDmaDataNum is not advanced yet. */
+	u32 TableLabel = ControlCodeInst->UcDmaDataNum;
+
+	ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
+		((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_APPLY_OFFSET_SRAM) % DATA_SECTION_ALIGNMENT));
+
+	if (ControlCodeInst->DataAligner == DATA_SECTION_ALIGNMENT) {
+		ControlCodeInst->DataAligner = 0U;
+	}
+
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
+
+		if (!ControlCodeInst->IsJobOpen) {
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+		}
+
+		/* Patch caller offset with MemTile data-memory module base. */
+		DevInst = ControlCodeInst->DevInst;
+		if (DevInst == NULL) {
+			XAIE_ERROR("Invalid Device Instance\n");
+			return XAIE_INVALID_ARGS;
+		}
+		MemMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].MemMod;
+		if (MemMod != NULL) {
+			SramAddress = MemMod->MemAddr + SramAddress;
+		}
+
+		/* Same page as shim BD table; page space reserved in AddressPatching(). */
+		if(ControlCodeInst->ScrachpadName == NULL) {
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
+					"APPLY_OFFSET_SRAM\t @DMAWRITE_data_%d, %d, 0x%x\n",
+					TableLabel,
+					Num_BDs, SramAddress);
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
+					"APPLY_OFFSET_SRAM\t @DMAWRITE_data_%d, %d, 0x%x\n",
+					TableLabel,
+					Num_BDs, SramAddress);
+		}
+		else {
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
+					"APPLY_OFFSET_SRAM\t @DMAWRITE_data_%d, %d, 0x%x, @%s\n",
+					TableLabel,
+					Num_BDs, SramAddress, ControlCodeInst->ScrachpadName);
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
+					"APPLY_OFFSET_SRAM\t @DMAWRITE_data_%d, %d, 0x%x, @%s\n",
+					TableLabel,
+					Num_BDs, SramAddress, ControlCodeInst->ScrachpadName);
+		}
+
+		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_APPLY_OFFSET_SRAM;
+		ControlCodeInst->UcPageSize += ISA_OPSIZE_APPLY_OFFSET_SRAM;
+		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+
+		/* Do not fold later writes above this op. */
+		ControlCodeInst->CombineCommands = 0;
 	}
 
 	if(ControlCodeInst->ScrachpadName != NULL) {
@@ -5867,6 +5959,7 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	memset(ControlCodeInst, 0, sizeof(XAie_ControlCodeIO));
 
 	ControlCodeInst->DisableDebugAsm = (DevInst->DisableDebugAsm != 0U) ? 1U : 0U;
+	ControlCodeInst->DevInst = DevInst;
 	
 	ControlCodeInst->ScrachpadName = NULL;
 	ControlCodeInst->Mode = (u8)XAIE_INVALID_MODE;
@@ -6728,6 +6821,17 @@ AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
 	return XAIE_INVALID_BACKEND;
 }
 
+AieRC XAie_ControlCodeIO_AddressPatching_SRAM(void *IOInst, u32 SramAddress, u8 Num_BDs)
+{
+	/* no-op */
+	(void)IOInst;
+	(void)SramAddress;
+	(void)Num_BDs;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
 AieRC XAie_ControlCodeAddComment(XAie_DevInst *DevInst, const char *Comment)
 {
         (void)DevInst;
@@ -7000,6 +7104,7 @@ const XAie_Backend ControlCodeBackend =
 	.Ops.RunOp = XAie_ControlCodeIO_RunOp,
 	.Ops.AddressPatching = XAie_ControlCodeIO_AddressPatching,
 	.Ops.AddressPatchingPL = XAie_ControlCodeIO_AddressPatching_PL,
+	.Ops.AddressPatchingSRAM = XAie_ControlCodeIO_AddressPatching_SRAM,
 	.Ops.MaskPollExt = XAie_ControlCodeIO_MaskPoll_Ext,
 	.Ops.WaitTaskCompleteToken = XAie_WaitTaskCompleteToken,
 	.Ops.MemAllocate = XAie_ControlCodeMemAllocate,

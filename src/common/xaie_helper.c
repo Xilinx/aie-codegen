@@ -553,8 +553,7 @@ void _XAie_ClrBitInBitmap(u32 *Bitmap, u32 StartBit, u32 NumBit)
 static AieRC _XAie_ValidateRegOff(const XAie_DevInst *DevInst, u64 RegOff)
 {
 	u8 ColShift = DevInst->DevProp.ColShift;
-	u64 TotalCols;
-	u64 MinRegOff;
+	u64 NumCols;
 	u64 MaxRegOff;
 
 	if(ColShift >= 64U) {
@@ -568,24 +567,22 @@ static AieRC _XAie_ValidateRegOff(const XAie_DevInst *DevInst, u64 RegOff)
 		return XAIE_INVALID_ARGS;
 	}
 
-	TotalCols = (u64)DevInst->StartCol + (u64)DevInst->NumCols;
+	NumCols = (u64)DevInst->NumCols;
 
 	/* Check that the shift won't overflow u64 */
-	if(TotalCols > (U64_MAX >> ColShift)) {
-		XAIE_ERROR("Address range overflow: TotalCols=%llu"
-			" ColShift=%u\n", (unsigned long long)TotalCols,
+	if(NumCols > (U64_MAX >> ColShift)) {
+		XAIE_ERROR("Address range overflow: NumCols=%llu"
+			" ColShift=%u\n", (unsigned long long)NumCols,
 			(unsigned)ColShift);
 		return XAIE_INVALID_ARGS;
 	}
 
-	MinRegOff = (u64)DevInst->StartCol << ColShift;
-	MaxRegOff = TotalCols << ColShift;
+	MaxRegOff = NumCols << ColShift;
 
-	if(RegOff < MinRegOff || RegOff >= MaxRegOff) {
+	if(RegOff >= MaxRegOff) {
 		XAIE_ERROR("Register offset 0x%llx out of range "
-			"[0x%llx, 0x%llx)\n",
+			"[0x0, 0x%llx)\n",
 			(unsigned long long)RegOff,
-			(unsigned long long)MinRegOff,
 			(unsigned long long)MaxRegOff);
 		return XAIE_INVALID_ARGS;
 	}

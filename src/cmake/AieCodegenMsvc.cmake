@@ -24,6 +24,7 @@ function(aie_codegen_apply_msvc_options target)
     /wd4710
     /wd4711
     /wd4324
+    /wd4255
   )
   if(AIE_CODEGEN_ENABLE_WERROR)
     list(APPEND _msvc_compile_opts /WX)

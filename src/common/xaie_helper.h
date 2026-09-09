@@ -238,6 +238,7 @@ XAIE_AIG_EXPORT AieRC XAie_CmdWrite(XAie_DevInst *DevInst, u8 Col, u8 Row, u8 Co
 XAIE_AIG_EXPORT AieRC XAie_Write32(XAie_DevInst *DevInst, u64 RegOff, u32 Value);
 XAIE_AIG_EXPORT AieRC XAie_AddressPatching(XAie_DevInst *DevInst, u16 Arg_Offset, u8 Num_BDs);
 XAIE_AIG_EXPORT AieRC XAie_AddressPatching_PL(XAie_DevInst *DevInst, u16 Arg_Offset);
+XAIE_AIG_EXPORT AieRC XAie_AddressPatching_SRAM(XAie_DevInst *DevInst, u32 SramAddress, u8 Num_BDs);
 XAIE_AIG_EXPORT AieRC XAie_MaskPoll_Ext(XAie_DevInst *DevInst, u64 RegOff, u32 Mask, u32 Value,
 			u32 TimeOutUs);
 XAIE_AIG_EXPORT AieRC XAie_WaitTct(XAie_DevInst *DevInst, uint16_t Column, uint16_t Row, uint32_t Channel, uint8_t NumTokens);

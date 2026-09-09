@@ -261,6 +261,26 @@ AieRC _XAie_Txn_Start(XAie_DevInst *DevInst, u32 Flags)
 
 /*****************************************************************************/
 /**
+* This helper determines if a transaction command owns its DataPtr payload
+* and must deep-copy on export / free on cleanup.
+*
+* @param	Cmd: Pointer to transaction command
+*
+* @return	true if command owns DataPtr, false otherwise
+*
+* @note		Internal only. Used by export and cleanup to maintain consistency.
+*		Centralized predicate prevents export/cleanup divergence (CR-1278678).
+*
+******************************************************************************/
+static inline bool _XAie_TxnCmdOwnsPayload(const XAie_TxnCmd *Cmd)
+{
+	return (Cmd->Opcode == XAIE_IO_BLOCKWRITE ||
+		(Cmd->Opcode >= XAIE_IO_CUSTOM_OP_BEGIN &&
+		 Cmd->Opcode < XAIE_IO_CUSTOM_OP_NEXT));
+}
+
+/*****************************************************************************/
+/**
 *
 * This api copies an existing transaction instance and returns a copy of the
 * instance with all the commands for users to save the commands and use them
@@ -310,19 +330,33 @@ XAie_TxnInst* _XAie_TxnExport(XAie_DevInst *DevInst)
 #if UINTPTR_MAX == U64_MAX  // 64-bit system
     if (TmpCmd->DataPtr > UINTPTR_MAX){
     	XAIE_ERROR("DataPtr cannot be represented in 64bit system\n");
+		free(Inst->CmdBuf);
 		free(Inst);
     	return NULL;
     }
 #endif
-		if(TmpCmd->Opcode == XAIE_IO_BLOCKWRITE) {
-			Cmd->DataPtr = (u64)(uintptr_t)malloc(
-					sizeof(u32) * TmpCmd->Size);
+		/* Deep-copy payload for all payload-bearing opcodes (CR-1278678) */
+		if(_XAie_TxnCmdOwnsPayload(TmpCmd) &&
+		   (void *)(uintptr_t)TmpCmd->DataPtr != NULL) {
+			u32 PayloadSize;
+
+			/* Calculate payload size based on opcode */
+			if(TmpCmd->Opcode == XAIE_IO_BLOCKWRITE) {
+				/* BLOCKWRITE: Size field is word count */
+				PayloadSize = sizeof(u32) * TmpCmd->Size;
+			} else {
+				/* CUSTOM_OP: Size field is byte count */
+				PayloadSize = TmpCmd->Size;
+			}
+
+			Cmd->DataPtr = (u64)(uintptr_t)malloc(PayloadSize);
 			if((void *)(uintptr_t)Cmd->DataPtr == NULL) {
 				XAIE_ERROR("Failed to allocate memory to copy "
 						"command %d\n", i);
 				/* Free previously allocated DataPtr memory to prevent leak */
 				for(u32 j = 0U; j < i; j++) {
-					if(Inst->CmdBuf[j].Opcode == XAIE_IO_BLOCKWRITE) {
+					if(_XAie_TxnCmdOwnsPayload(&Inst->CmdBuf[j]) &&
+					   (void *)(uintptr_t)Inst->CmdBuf[j].DataPtr != NULL) {
 						free((void *)(uintptr_t)Inst->CmdBuf[j].DataPtr);
 					}
 				}
@@ -334,7 +368,7 @@ XAie_TxnInst* _XAie_TxnExport(XAie_DevInst *DevInst)
 			Cmd->DataPtr = (u64)(uintptr_t)memcpy(
 					(void *)(uintptr_t)Cmd->DataPtr,
 					(const void *)(uintptr_t)TmpCmd->DataPtr,
-					sizeof(u32) * TmpCmd->Size);
+					PayloadSize);
 		}
 	}
 
@@ -581,6 +615,7 @@ AieRC _XAie_ClearTransaction(XAie_DevInst* DevInst)
 			((void *)(uintptr_t)Cmd->DataPtr != NULL)) {
 			XAIE_DBG("free DataPtr %p\n", Cmd->DataPtr);
 			free((void *)(uintptr_t)Cmd->DataPtr);
+			Cmd->DataPtr = 0U;  /* Defensive NULL-set (CR-1278678) */
 		}
 	}
 
@@ -651,6 +686,7 @@ AieRC _XAie_Txn_Submit(XAie_DevInst *DevInst, XAie_TxnInst *TxnInst)
 			(Cmd->Opcode >= XAIE_IO_CUSTOM_OP_BEGIN && Cmd->Opcode < XAIE_IO_CUSTOM_OP_NEXT)) &&
 			((void *)(uintptr_t)Cmd->DataPtr != NULL)) {
 			free((void *)(uintptr_t)Cmd->DataPtr);
+			Cmd->DataPtr = 0U;  /* Defensive NULL-set (CR-1278678) */
 		}
 	}
 

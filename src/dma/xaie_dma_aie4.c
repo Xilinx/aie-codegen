@@ -99,7 +99,7 @@ AieRC _XAie4_DmaMemTileCheckPaddingConfig(XAie_DmaDesc *DmaDesc)
 					PadDim++) {
 				if((PDesc[PadDim].After != 0U) ||
 						(PDesc[PadDim].Before != 0U)) {
-					XAIE_ERROR("After and Before pading "
+					XAIE_ERROR("After and Before padding "
 							"for dimension %u must "
 							"be 0 when wrap for "
 							"dimension %u is 0\n",

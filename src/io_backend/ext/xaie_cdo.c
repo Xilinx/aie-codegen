@@ -566,6 +566,7 @@ const XAie_Backend CdoBackend =
 	.Ops.SubmitTxn = NULL,
 	.Ops.AddressPatching = NULL,
 	.Ops.AddressPatchingPL = NULL,
+	.Ops.AddressPatchingSRAM = NULL,
 	.Ops.MaskPollExt = NULL,
 	.Ops.BlockWrite32Ext = NULL,
 	.Ops.ConfigMode = NULL,

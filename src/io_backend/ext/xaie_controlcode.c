@@ -22,6 +22,9 @@
 *
 ******************************************************************************/
 /***************************** Include Files *********************************/
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -36,6 +39,27 @@
 #include "xaie_locks.h"
 #include "xaie_helper_internal.h"
 #include "xaie_secure_io_internal.h"
+
+#ifdef XAIE_BACKTRACE_ENABLED
+#include <dlfcn.h>
+#include <execinfo.h>
+#include <elfutils/libdwfl.h>
+#include <dwarf.h>
+#include <unistd.h>
+#include <pthread.h>
+#endif /* XAIE_BACKTRACE_ENABLED */
+
+/* XAIE_BACKTRACE_MODE/DEPTH are normally defined by
+ * aie_codegen_apply_backtrace_options() in AieCodegenBacktrace.cmake, but
+ * xaie_controlcode.c reads them unconditionally outside any
+ * XAIE_BACKTRACE_ENABLED guard, so fall back to "disabled" here in case this
+ * file is ever compiled by a build system that doesn't define them. */
+#ifndef XAIE_BACKTRACE_MODE
+#define XAIE_BACKTRACE_MODE 0
+#endif
+#ifndef XAIE_BACKTRACE_DEPTH
+#define XAIE_BACKTRACE_DEPTH 0
+#endif
 
 #ifdef __AIECONTROLCODE__
 
@@ -352,6 +376,8 @@ typedef struct {
 	u32 CurrentDataBWLabel;
 	u8 LabelMatchFound;
 	int PrevMemWriteType;
+	/* Set after async UC_DMA_WRITE_DES; cleared by WAIT_UC_DMA. */
+	u8 PendingAsyncDmaWait;
 	u64 BarrierId;
 	u32 HintMapId;
 	char* LoadCoresLabel;
@@ -370,6 +396,7 @@ typedef struct {
 	 * START_COND_JOB_PREEMPT jobs so that no .eop ever lands inside a PCJ. */
 	u8 IsCondJobPreemptActive;
 	XAie_DeferredEmitContext* CondJobPreemptContext;
+	u8 IsPrintingPageInfo;         /* re-entrancy guard for _XAie_ControlCodePageInfoPrintf */
 	/* Split points recorded whenever a page-overflow would have fired during
 	 * PCJ buffering. Each entry captures the InstructionBuffer offset, the
 	 * parallel DebugInstructionBuffer offset, and the slice's accumulated
@@ -401,6 +428,8 @@ static inline AieRC _XAie_PCJContextInit(XAie_ControlCodeIO *ControlCodeInst);
 static inline void  _XAie_PCJStateFree(XAie_ControlCodeIO *ControlCodeInst);
 static inline AieRC _XAie_PCJRecordSplitPoint(XAie_ControlCodeIO *ControlCodeInst);
 static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeInst);
+static void _XAie_StartNewPage(XAie_ControlCodeIO *ControlCodeInst);
+static void _XAie_StartNewJob(XAie_ControlCodeIO *ControlCodeInst, XAie_CertStartJobType JobType);
 
 /*****************************************************************************/
 /**
@@ -425,6 +454,460 @@ static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeIns
 *******************************************************************************/
 static int _XAie_ControlCodePrintf(XAie_ControlCodeIO *ControlCodeInst, XAie_FileTarget FileTarget,
 						   const char *fmt, ...);
+
+
+#ifdef XAIE_BACKTRACE_ENABLED
+/* Backtrace subsystem. XAIE_BACKTRACE_MODE/XAIE_BACKTRACE_DEPTH are fixed at
+ * compile time -- see src/cmake/AieCodegenBacktrace.cmake. Written as
+ * comments above each ;Page#: line in .DEBUG files. */
+
+/* __cxa_demangle is resolved via dlsym rather than a bare extern C
+ * declaration: its exact prototype/linkage can vary subtly across
+ * libstdc++/libc++ builds, and a mismatched hard extern risks link-time or
+ * LTO failures. Resolved lazily and cached; never unloaded, so no dlclose. */
+typedef char *(*_XAie_DemangleFn)(const char *, char *, size_t *, int *);
+
+static _XAie_DemangleFn _XAie_GetDemangleFn(void) {
+    static _XAie_DemangleFn fn = NULL;
+    static int resolved = 0;
+    if (!resolved) {
+        fn = (_XAie_DemangleFn)(void *)dlsym(RTLD_DEFAULT, "__cxa_demangle");
+        resolved = 1;
+    }
+    return fn;
+}
+
+/* Returns a heap-allocated demangled string. Caller must free() the result. */
+static char *_XAie_Demangle(const char *name) {
+    _XAie_DemangleFn demangle_fn = _XAie_GetDemangleFn();
+    if (!demangle_fn) return strdup(name ? name : "??");
+
+    int status;
+    char *demangled = demangle_fn(name, NULL, NULL, &status);
+    if (status == 0 && demangled != NULL) return demangled;
+    return strdup(name ? name : "??");
+}
+
+/* Write a GDB-style backtrace as asm comments into the .DEBUG file.
+ * Called from _XAie_ControlCodePageInfoPrintf so it appears above each ;Page#: line. */
+static void _XAie_BacktraceToDebug(XAie_ControlCodeIO *ControlCodeInst, XAie_FileTarget DebugTarget)
+{
+    u32 maxFrames = (XAIE_BACKTRACE_DEPTH > 64) ? 64 : XAIE_BACKTRACE_DEPTH;
+    void *buffer[64];
+    int frames = backtrace(buffer, (int)maxFrames);
+    int count = 1;
+
+    _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "; --- Backtrace ---\n");
+    for (int i = 0; i < frames; i++) {
+        Dl_info info;
+        if (dladdr(buffer[i], &info) && info.dli_sname != NULL) {
+            char *name = _XAie_Demangle(info.dli_sname);
+            if (strncmp(name, "_XAie_", 6) == 0) { free(name); continue; }
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "; #%d in %s () from %s\n", count, name, info.dli_fname);
+            free(name);
+            count++;
+        }
+		
+    }
+    _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, ";\n");
+}
+
+/* Raw frame-pointer walking for _XAie_BacktraceWithArgsToDebug (mode 1).
+ * Both x86-64 and AArch64 use the same two-word frame-chain layout at
+ * [fp+0]=saved fp, [fp+8]=return address -- only the register holding the
+ * frame pointer, and whether the return address needs unsigning, differ. */
+#if defined(__x86_64__) || defined(__amd64__)
+#define XAIE_HAS_FP_BACKTRACE 1
+static inline uintptr_t *_XAie_ReadFramePointer(void) {
+    uintptr_t *fp;
+    __asm__ volatile ("mov %%rbp, %0" : "=r"(fp));
+    return fp;
+}
+static inline uintptr_t _XAie_StripPacBits(uintptr_t addr) { return addr; }
+#elif defined(__aarch64__)
+#define XAIE_HAS_FP_BACKTRACE 1
+static inline uintptr_t *_XAie_ReadFramePointer(void) {
+    uintptr_t *fp;
+    __asm__ volatile ("mov %0, x29" : "=r"(fp));
+    return fp;
+}
+/* Strips ARMv8.3 pointer-authentication bits from a return address loaded
+ * from the frame chain (the LR value the callee's prologue stored via
+ * `stp x29, x30, ...`). Uses XPACLRI specifically because -- unlike the
+ * general-register XPACI/XPACD, which require FEAT_PAuth and SIGILL
+ * otherwise -- XPACLRI lives in the HINT instruction space and is
+ * guaranteed to execute as a NOP on any ARMv8-A core, whether or not it
+ * implements PAC or the binary was built with return-address signing. It
+ * operates implicitly on x30, so the value is round-tripped through a
+ * register pinned to x30. */
+static inline uintptr_t _XAie_StripPacBits(uintptr_t addr) {
+    register uintptr_t lr __asm__("x30") = addr;
+    __asm__ volatile ("xpaclri" : "+r"(lr));
+    return lr;
+}
+#else
+#define XAIE_HAS_FP_BACKTRACE 0
+#endif
+
+/* ── libdwfl helpers ─────────────────────────────────────────────────────── */
+/* Used only by _XAie_BacktraceWithArgsToDebug (mode 1); excluded on
+ * architectures without frame-pointer-chain support to avoid
+ * unused-function warnings. */
+#if XAIE_HAS_FP_BACKTRACE
+
+static Dwfl *_XAie_DwflOpen(void) {
+    static const Dwfl_Callbacks cb = {
+        .find_elf       = dwfl_linux_proc_find_elf,
+        .find_debuginfo = dwfl_standard_find_debuginfo,
+        .debuginfo_path = NULL,
+    };
+    Dwfl *d = dwfl_begin(&cb);
+    if (d) {
+        dwfl_linux_proc_report(d, getpid());
+        dwfl_report_end(d, NULL, NULL);
+    }
+    return d;
+}
+
+static int _XAie_ResolveType(Dwarf_Die *die, Dwarf_Die *out) {
+    for (;;) {
+        int tag = dwarf_tag(die);
+        if (tag == DW_TAG_typedef       || tag == DW_TAG_const_type ||
+            tag == DW_TAG_volatile_type || tag == DW_TAG_restrict_type) {
+            Dwarf_Attribute attr;
+            Dwarf_Die inner;
+            if (!dwarf_attr(die, DW_AT_type, &attr) ||
+                !dwarf_formref_die(&attr, &inner))
+                return 0;
+            *die = inner;
+        } else {
+            *out = *die;
+            return 1;
+        }
+    }
+}
+
+static void _XAie_PrintValue(XAie_ControlCodeIO *ControlCodeInst,
+                              XAie_FileTarget DebugTarget,
+                              void *addr, Dwarf_Die *type_die,
+                              uintptr_t stack_lo, uintptr_t stack_hi) {
+    if (!addr) {
+        _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "<?>"); return;
+    }
+    if (stack_lo && ((uintptr_t)addr < stack_lo || (uintptr_t)addr >= stack_hi)) {
+        _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "<?>"); return;
+    }
+    Dwarf_Die base = *type_die;
+    if (!_XAie_ResolveType(&base, &base)) {
+        _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "<?>"); return;
+    }
+    if (dwarf_tag(&base) != DW_TAG_base_type) {
+        if (stack_lo && (uintptr_t)addr + sizeof(uintptr_t) > stack_hi) {
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "<?>"); return;
+        }
+        _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "0x%llx",
+                                (unsigned long long)*(uintptr_t *)addr);
+        return;
+    }
+    Dwarf_Attribute attr;
+    Dwarf_Word encoding = DW_ATE_signed, byte_size = 4;
+    if (dwarf_attr(&base, DW_AT_encoding,  &attr)) dwarf_formudata(&attr, &encoding);
+    if (dwarf_attr(&base, DW_AT_byte_size, &attr)) dwarf_formudata(&attr, &byte_size);
+
+    /* Ensure the full [addr, addr+byte_size) read window is in bounds --
+     * checking only the start address (above) isn't enough for multi-byte
+     * reads near the top of the stack. */
+    if (stack_lo && (uintptr_t)addr + byte_size > stack_hi) {
+        _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "<?>"); return;
+    }
+
+    switch (encoding) {
+    case DW_ATE_signed:
+        if (byte_size == 1) {
+            int8_t v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "%d", (int)v);
+        } else if (byte_size == 2) {
+            int16_t v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "%d", (int)v);
+        } else if (byte_size == 4) {
+            int32_t v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "%d", v);
+        } else {
+            int64_t v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "%" PRId64, v);
+        }
+        break;
+    case DW_ATE_unsigned:
+        if (byte_size == 1) {
+            uint8_t v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "0x%x", (unsigned)v);
+        } else if (byte_size == 2) {
+            uint16_t v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "0x%x", (unsigned)v);
+        } else if (byte_size == 4) {
+            uint32_t v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "0x%x", v);
+        } else {
+            uint64_t v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "0x%" PRIx64, v);
+        }
+        break;
+    case DW_ATE_float:
+        if (byte_size == 4) {
+            float v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "%.6g", (double)v);
+        } else {
+            double v; memcpy(&v, addr, sizeof(v));
+            _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "%.6g", v);
+        }
+        break;
+    case DW_ATE_signed_char:
+    case DW_ATE_unsigned_char: {
+        char v; memcpy(&v, addr, sizeof(v));
+        _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "'%c'", v);
+        break;
+    }
+    default: {
+        uintptr_t v; memcpy(&v, addr, sizeof(v));
+        _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "0x%llx", (unsigned long long)v);
+    }
+    }
+}
+
+static void _XAie_PrintFrameWithArgs(XAie_ControlCodeIO *ControlCodeInst,
+                                      XAie_FileTarget DebugTarget,
+                                      Dwfl *dwfl, uintptr_t pc, uintptr_t cfa,
+                                      int depth,
+                                      uintptr_t stack_lo, uintptr_t stack_hi) {
+    Dwarf_Addr   bias = 0;
+    Dwfl_Module *mod  = dwfl_addrmodule(dwfl, pc);
+    if (!mod) {
+        Dl_info info;
+        if (dladdr((void *)pc, &info) && info.dli_sname) {
+            char *n = _XAie_Demangle(info.dli_sname);
+            if (strncmp(n, "_XAie_", 6) != 0)
+                _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget,
+                    "; #%d  %s()\n", depth, n);
+            free(n);
+        }
+        return;
+    }
+
+    Dwarf_Die *cudie = dwfl_module_addrdie(mod, pc, &bias);
+    if (!cudie) {
+        Dl_info info;
+        if (dladdr((void *)pc, &info) && info.dli_sname) {
+            char *n = _XAie_Demangle(info.dli_sname);
+            if (strncmp(n, "_XAie_", 6) != 0)
+                _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget,
+                    "; #%d  %s()\n", depth, n);
+            free(n);
+        }
+        return;
+    }
+
+    Dwarf_Die *scopes = NULL;
+    char *func = NULL;
+    int nscopes = dwarf_getscopes(cudie, pc - bias, &scopes);
+
+    /* Find the innermost scope that represents a callable: either a real
+     * DW_TAG_subprogram, or a DW_TAG_inlined_subroutine left behind where
+     * the compiler inlined a (typically static inline) function -- e.g.
+     * _XAie_ControlCodePageInfoPrintf inlined into its many call sites.
+     * Without also matching the latter, an inlined internal frame's PC
+     * resolves to no name at all ("??") instead of being correctly
+     * filtered out below. */
+    Dwarf_Die *sp = NULL;
+    int sp_is_inlined = 0;
+    for (int i = 0; i < nscopes; i++) {
+        int tag = dwarf_tag(&scopes[i]);
+        if (tag == DW_TAG_subprogram || tag == DW_TAG_inlined_subroutine) {
+            sp = &scopes[i];
+            sp_is_inlined = (tag == DW_TAG_inlined_subroutine);
+            break;
+        }
+    }
+
+    /* An inlined_subroutine DIE has no DW_AT_name of its own -- the name
+     * lives on the abstract-origin subprogram it was inlined from. */
+    const char *raw = "??";
+    Dwarf_Die origin_die;
+    if (sp) {
+        if (sp_is_inlined) {
+            Dwarf_Attribute origin_attr;
+            if (dwarf_attr(sp, DW_AT_abstract_origin, &origin_attr) &&
+                dwarf_formref_die(&origin_attr, &origin_die) &&
+                dwarf_diename(&origin_die)) {
+                raw = dwarf_diename(&origin_die);
+            }
+        } else if (dwarf_diename(sp)) {
+            raw = dwarf_diename(sp);
+        }
+    }
+    func = _XAie_Demangle(raw);
+
+    /* Skip internal _XAie_ frames */
+    if (strncmp(func, "_XAie_", 6) == 0) goto cleanup;
+
+    /* Retrieve source file:line for this PC */
+    const char *srcfile = NULL;
+    int         srcline = 0;
+    Dwfl_Line  *dline   = dwfl_module_getsrc(mod, pc);
+    if (dline) {
+        int lineno = 0;
+        const char *fname = dwfl_lineinfo(dline, NULL, &lineno, NULL, NULL, NULL);
+        if (fname) { srcfile = fname; srcline = lineno; }
+    }
+
+    _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "; #%d  %s(", depth, func);
+
+    if (sp) {
+        Dwarf_Die child;
+        if (dwarf_child(sp, &child) == 0) {
+            int first = 1;
+            do {
+                if (dwarf_tag(&child) != DW_TAG_formal_parameter) continue;
+                const char *pname = dwarf_diename(&child);
+                Dwarf_Attribute loc_attr;
+                if (!dwarf_attr(&child, DW_AT_location, &loc_attr)) continue;
+                Dwarf_Op *ops = NULL;
+                size_t    nops = 0;
+                if (dwarf_getlocation_addr(&loc_attr, pc - bias, &ops, &nops, 1) <= 0 || nops == 0)
+                    continue;
+                if (!first) _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, ", ");
+                first = 0;
+                if (pname) _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "%s=", pname);
+                void *addr = NULL;
+                if (ops[0].atom == DW_OP_fbreg)
+                    addr = (void *)(cfa + (intptr_t)(int64_t)ops[0].number);
+                else if (ops[0].atom == DW_OP_addr)
+                    addr = (void *)(uintptr_t)ops[0].number;
+                else {
+                    _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "<reg>");
+                    continue;
+                }
+                /* validate addr is within the current thread's stack bounds */
+                if (stack_lo && ((uintptr_t)addr < stack_lo || (uintptr_t)addr >= stack_hi)) {
+                    _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "<?>");
+                    continue;
+                }
+                Dwarf_Attribute type_attr;
+                Dwarf_Die       type_die;
+                if (dwarf_attr(&child, DW_AT_type, &type_attr) &&
+                    dwarf_formref_die(&type_attr, &type_die))
+                    _XAie_PrintValue(ControlCodeInst, DebugTarget, addr, &type_die, stack_lo, stack_hi);
+                else
+                    _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "<no-type>");
+            } while (dwarf_siblingof(&child, &child) == 0);
+        }
+    }
+
+    if (srcfile)
+        _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, ") at %s:%d\n", srcfile, srcline);
+    else
+        _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, ")\n");
+
+cleanup:
+    free(func);
+    free(scopes);
+}
+
+#endif /* XAIE_HAS_FP_BACKTRACE (libdwfl helpers) */
+
+/* Write a backtrace with argument values into the .DEBUG file.
+ * Requires -g and -fno-omit-frame-pointer on the library and caller.
+ * Supported on x86-64 and AArch64 via raw frame-pointer-chain walking;
+ * a no-op elsewhere. */
+static void _XAie_BacktraceWithArgsToDebug(XAie_ControlCodeIO *ControlCodeInst,
+                                            XAie_FileTarget DebugTarget)
+{
+#if XAIE_HAS_FP_BACKTRACE
+    Dwfl *local_dwfl = _XAie_DwflOpen();
+    if (!local_dwfl) return;
+
+    /* Compute stack bounds first. Without them, a corrupted or
+     * uninitialised frame-pointer chain can't be told apart from a valid
+     * one, so refuse to walk at all rather than risk dereferencing garbage. */
+    uintptr_t stack_lo = 0, stack_hi = 0;
+    {
+        pthread_attr_t attr;
+        void *stack_base = NULL;
+        size_t stack_size = 0;
+        if (pthread_getattr_np(pthread_self(), &attr) == 0) {
+            pthread_attr_getstack(&attr, &stack_base, &stack_size);
+            pthread_attr_destroy(&attr);
+        }
+        stack_lo = (uintptr_t)stack_base;
+        stack_hi = stack_lo + stack_size;
+    }
+    if (!stack_lo || stack_hi <= stack_lo) {
+        dwfl_end(local_dwfl);
+        return;
+    }
+
+    /* fp must be 8-byte aligned and leave room for both fp[0] (saved fp)
+     * and fp[1] (return address) inside the stack before it is safe to
+     * dereference. */
+#define XAIE_FP_VALID(p) \
+    ((uintptr_t)(p) >= stack_lo && (uintptr_t)(p) + 16 < stack_hi && \
+     (((uintptr_t)(p)) & 0x7) == 0)
+
+    uintptr_t *fp = _XAie_ReadFramePointer();
+
+    if (!fp || !XAIE_FP_VALID(fp)) { dwfl_end(local_dwfl); return; }
+
+    /* step up one frame so we skip _XAie_BacktraceWithArgsToDebug itself */
+    uintptr_t prev_ret = _XAie_StripPacBits(fp[1]);
+    fp = (uintptr_t *)fp[0];
+
+    if (!fp || !XAIE_FP_VALID(fp)) { dwfl_end(local_dwfl); return; }
+
+    _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, "; --- Backtrace (with args) ---\n");
+
+    u32 maxFrames = (XAIE_BACKTRACE_DEPTH > 64) ? 64 : XAIE_BACKTRACE_DEPTH;
+
+    int depth = 1;
+    for (u32 i = 0; fp && i < maxFrames; i++) {
+        if (!XAIE_FP_VALID(fp)) break;
+        uintptr_t cfa = (uintptr_t)fp + 16;
+        _XAie_PrintFrameWithArgs(ControlCodeInst, DebugTarget, local_dwfl,
+                                 prev_ret - 1, cfa, depth, stack_lo, stack_hi);
+        depth++;
+        prev_ret       = _XAie_StripPacBits(fp[1]);
+        uintptr_t *next = (uintptr_t *)fp[0];
+        if (!next || next <= fp || !XAIE_FP_VALID(next)) break;
+        fp = next;
+    }
+
+    _XAie_ControlCodePrintf(ControlCodeInst, DebugTarget, ";\n");
+    dwfl_end(local_dwfl);
+#undef XAIE_FP_VALID
+#else
+    (void)ControlCodeInst;
+    (void)DebugTarget;
+#endif /* XAIE_HAS_FP_BACKTRACE */
+}
+
+/* ========================================================================== */
+/* End Backtrace Subsystem                                                    */
+/* ========================================================================== */
+#else /* !XAIE_BACKTRACE_ENABLED */
+/* _XAie_ControlCodePageInfoPrintf() below calls these unconditionally in
+ * source (its XAIE_BACKTRACE_MODE guard is a runtime `if`, not a
+ * preprocessor check), so they must exist even on builds that never define
+ * XAIE_BACKTRACE_ENABLED (MSVC -- aie_codegen_apply_backtrace_options() is
+ * only wired into the non-MSVC branch of CMakeLists.txt -- or Linux without
+ * libdw). XAIE_BACKTRACE_MODE is guaranteed 0 in that case, so these are
+ * never actually invoked; they only need to satisfy the compiler. */
+static inline void _XAie_BacktraceToDebug(XAie_ControlCodeIO *ControlCodeInst, XAie_FileTarget DebugTarget) {
+    (void)ControlCodeInst;
+    (void)DebugTarget;
+}
+static inline void _XAie_BacktraceWithArgsToDebug(XAie_ControlCodeIO *ControlCodeInst, XAie_FileTarget DebugTarget) {
+    (void)ControlCodeInst;
+    (void)DebugTarget;
+}
+#endif /* XAIE_BACKTRACE_ENABLED */
 
 /*****************************************************************************/
 /**
@@ -1000,7 +1483,17 @@ static inline void _XAie_ControlCodePageInfoPrintf(
 	 * The correct page info is emitted by LoadCoresCPEnd / PCJ EndJob
 	 * after the outer page state is restored. */
 	if (ControlCodeInst->IsLoadCoresCPActive ||
-	    ControlCodeInst->IsCondJobPreemptActive) return;
+	    ControlCodeInst->IsCondJobPreemptActive ||
+	    ControlCodeInst->IsPrintingPageInfo) return;
+
+	if (XAIE_BACKTRACE_MODE != 0) {
+		ControlCodeInst->IsPrintingPageInfo = 1;
+		if (XAIE_BACKTRACE_MODE == 1)
+			_XAie_BacktraceWithArgsToDebug(ControlCodeInst, DebugTarget);
+		else
+			_XAie_BacktraceToDebug(ControlCodeInst, DebugTarget);
+		ControlCodeInst->IsPrintingPageInfo = 0;
+	}
 
 	_XAie_ControlCodePrintf(ControlCodeInst, DebugTarget,
 		";Page#: %d, PageSize: %d, TextSecSize: %d, DataAligner: %d\n",
@@ -1141,6 +1634,9 @@ AieRC XAie_ControlCodeAddComment(XAie_DevInst *DevInst, const char *Comment)
 	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "; %s\n", Comment);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "; %s\n", Comment);
+		if (XAIE_BACKTRACE_MODE != 0) {
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		}
 		return XAIE_OK;
 	}
 	else {
@@ -1182,6 +1678,9 @@ AieRC XAie_ControlCodeAddAnnotation(XAie_DevInst *DevInst,
                 CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "id: %d\n", Id);
                 CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "name: %s\n", Name);
                 CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "description: %s\n", Description);
+                if (XAIE_BACKTRACE_MODE != 0) {
+                        _XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+                }
                 CHECK_ERROR_STATE(ControlCodeInst);
                 return XAIE_OK;
         }
@@ -1475,9 +1974,8 @@ static void _XAie_FlushShimBdChain(XAie_ControlCodeIO *ControlCodeInst) {
 			"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
 			ControlCodeInst->UcbdLabelNum);
 	ControlCodeInst->UcPageSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
-	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
-
 	ControlCodeInst->UcPageTextSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
+	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 	ControlCodeInst->NumShimBDsChained = 0;
 	ControlCodeInst->CombineCommands = 0;
 	ControlCodeInst->UcbdLabelNum++;
@@ -1509,16 +2007,36 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 		return;
 	}
 
-	if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE)
+	if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE && ControlCodeInst->PendingAsyncDmaWait)
 	{
+		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_UC_DMA) > ControlCodeInst->PageSizeMax) {
+			/* Clear before StartNewPage to avoid reentrant EndJob loop. */
+			ControlCodeInst->PendingAsyncDmaWait = 0;
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+		}
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "WAIT_UC_DMA\t $r0\n");
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "WAIT_UC_DMA\t $r0\n");
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_WAIT_UC_DMA;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_WAIT_UC_DMA;
+		ControlCodeInst->PendingAsyncDmaWait = 0;
 		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 
 	}
 	else if(ControlCodeInst->NumShimBDsChained > 0) {
+		/* The flush emits a SYNC (ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC bytes)
+		 * whose cost is never reserved in UcPageSize while the chain is
+		 * open (each per-BD-add check only defends its own instant, then
+		 * the reservation evaporates uncommitted). Check for page overflow
+		 * before flushing, same as _XAie_IsolateCombineGroup does. */
+		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
+				ControlCodeInst->PageSizeMax) {
+			/* Avoids StartNewPage->EndPage->EndJob re-entering this branch. */
+			ControlCodeInst->NumShimBDsChained = 0;
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+			ControlCodeInst->NumShimBDsChained = 1;
+		}
 		_XAie_FlushShimBdChain(ControlCodeInst);
 	}
 
@@ -1537,7 +2055,12 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 	if(ControlCodeInst->IsPageOpen && ControlCodeInst->IsJobOpen) {
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "END_JOB\n\n");
 		XAIE_DBG("Writing END_JOB to DebugAsmFile (fp=%p)\n", (void*)ControlCodeInst->DebugAsmFile);
-		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "END_JOB\n\n");
+		if (XAIE_BACKTRACE_MODE != 0) {
+			CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "END_JOB\n");
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		} else {
+			CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "END_JOB\n\n");
+		}
 		if (ControlCodeInst->DebugAsmFile) {
 			fflush(ControlCodeInst->DebugAsmFile);
 		}
@@ -1589,7 +2112,12 @@ static void _XAie_EndPage(XAie_ControlCodeIO  *ControlCodeInst) {
 		}
 
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".eop\n\n");
-		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".eop\n\n");
+		if (XAIE_BACKTRACE_MODE != 0) {
+			CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".eop\n");
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		} else {
+			CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".eop\n\n");
+		}
 
 		ControlCodeInst->UcPageSize 	= 0;
 		ControlCodeInst->UcPageTextSize = 0;
@@ -1634,6 +2162,25 @@ static void _XAie_StartNewPage(XAie_ControlCodeIO  *ControlCodeInst) {
 	}
 
 	ControlCodeInst->CombineCommands = 0;
+
+	/* A control-code page is a self-contained image: every BD on a page must
+	 * reference data that is resident on that same page. Reset the cross-write
+	 * combine/adjacency tracking and the data-dedup comparison windows at the
+	 * page boundary so the first write on the new page starts a fresh
+	 * descriptor and defines its own (page-resident) data label instead of
+	 * extending a descriptor from -- or reusing a WRITE_data / DMAWRITE_data
+	 * label defined on -- the previous page. Without this, a page's BD can
+	 * point at a data label physically emitted on the previous page; the
+	 * assembler must then make that data resident on this page too, inflating
+	 * the page beyond what the running UcPageSize accounting predicted and
+	 * overflowing PAGE_SIZE_MAX (aiebu then rejects it). */
+	ControlCodeInst->CalculatedNextRegOff  = UINT64_MAX;
+	ControlCodeInst->PrevMemWriteType      = -1;
+	ControlCodeInst->CombinedMemWriteSize  = 0;
+	ControlCodeInst->IsAdjacentMemWrite    = 0;
+	ControlCodeInst->CompareLabelUpto      = ControlCodeInst->CurrentDataBWLabel;
+	ControlCodeInst->CompareLabelUptoWrite = ControlCodeInst->CurrentDataLabel;
+
 	ControlCodeInst->IsPageOpen 	 = 1;
 	ControlCodeInst->LabelMatchFound = 0;
 }
@@ -1826,6 +2373,15 @@ AieRC XAie_ConfigMode(void *IOInst, XAie_ModeSelect Mode)
 			}
 			break;
 		case XAIE_SHIM_BD_CHAINING_DISABLE:
+			if((ControlCodeInst->NumShimBDsChained > 0) &&
+					((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
+					 ControlCodeInst->PageSizeMax)) {
+				/* Same reentrancy hazard/fix as _XAie_EndJob's flush branch. */
+				ControlCodeInst->NumShimBDsChained = 0;
+				_XAie_StartNewPage(ControlCodeInst);
+				_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+				ControlCodeInst->NumShimBDsChained = 1;
+			}
 			_XAie_FlushShimBdChain(ControlCodeInst);
 			CHECK_ERROR_STATE(ControlCodeInst);
 			break;
@@ -1886,8 +2442,11 @@ static inline void _XAie_IsolateCombineGroup(XAie_ControlCodeIO *ControlCodeInst
 		if ((ControlCodeInst->NumShimBDsChained > 0) &&
 				((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
 				 ControlCodeInst->PageSizeMax)) {
+			/* Same reentrancy hazard/fix as the other ShimBD-flush checks. */
+			ControlCodeInst->NumShimBDsChained = 0;
 			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+			ControlCodeInst->NumShimBDsChained = 1;
 		}
 		_XAie_FlushShimBdChain(ControlCodeInst);
 		ControlCodeInst->CombineCommands = 0;
@@ -1947,6 +2506,8 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
 	u32 OpSize;
+	/* Defer page-info print until OpSize and UC_DMA BD/data sizes are applied. */
+	u8 needPageInfoPrint = 0;
 
 	XAie_LabelMap* Map = ControlCodeInst->LabelMap;
 
@@ -2077,15 +2638,19 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 					CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
 							"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
 							ControlCodeInst->UcbdLabelNum);
-					
-				}
-				else {		
-					if((ControlCodeInst->UcPageSize + OpSize +
-						UC_DMA_BD_SIZE + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
-						_XAie_StartNewPage(ControlCodeInst);
-						_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
-					}
+					ControlCodeInst->PendingAsyncDmaWait = 1;
 
+				}
+				else {
+					/*
+					 * AIESW-33681: The SYNC page-boundary check here is
+					 * dead code. It uses the identical formula and the
+					 * identical (unmodified) inputs as the check performed
+					 * unconditionally on entry to the IsAdjacentMemWrite==0
+					 * branch above, so it can never fire. Removed. (The
+					 * ASYNC arm is NOT redundant: it adds
+					 * ISA_OPSIZE_WAIT_UC_DMA for the WAIT_UC_DMA suffix.)
+					 */
 					CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
 							"UC_DMA_WRITE_DES_SYNC\t @UCBD_label_%d\n",
 							ControlCodeInst->UcbdLabelNum);
@@ -2095,7 +2660,7 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 				}
 				ControlCodeInst->UcPageTextSize += OpSize;
 				ControlCodeInst->UcPageSize += OpSize;
-				_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+				needPageInfoPrint = 1;
 
 				CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA, "UCBD_label_%d:\n",
 						ControlCodeInst->UcbdLabelNum);
@@ -2111,6 +2676,9 @@ CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA,
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA0,
 			"\t UC_DMA_BD\t 0, 0x%x, @WRITE_data_%d, 1, 0, 0\n",
 			EXTRACT_LOWER_FOUR_BYTES(RegOff),  ControlCodeInst->UcbdDataNum);
+		if (XAIE_BACKTRACE_MODE != 0) {
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA0);
+		}
 
 		ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
 
@@ -2130,6 +2698,10 @@ CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA,
 			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA2, "\t.long 0x%08x\n", Value);
 			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA1, "\t.long 0x%08x\n", Value);
 			ControlCodeInst->UcPageSize += UC_DMA_WORD_LEN;
+		}
+
+		if (needPageInfoPrint) {
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 		}
 	}
 
@@ -2426,6 +2998,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
 								"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
 								ControlCodeInst->UcbdLabelNum);
+						ControlCodeInst->PendingAsyncDmaWait = 1;
 						}
 						else {
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
@@ -2437,6 +3010,9 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 						}
 						ControlCodeInst->UcPageSize += OpSize;
 						ControlCodeInst->UcPageTextSize += OpSize;
+						if (XAIE_BACKTRACE_MODE != 0) {
+							_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+						}
 						ControlCodeInst->CombineCommands = 1;
 
 					}
@@ -2728,6 +3304,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
 								"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
 								ControlCodeInst->UcbdLabelNum);
+						ControlCodeInst->PendingAsyncDmaWait = 1;
 						}
 						else {
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
@@ -2945,6 +3522,9 @@ AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u32 Size
 				ControlCodeInst->UcbdLabelNum++;
 				ControlCodeInst->UcPageSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
 				ControlCodeInst->UcPageTextSize += ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
+				if (XAIE_BACKTRACE_MODE != 0) {
+					_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+				}
 			}
 
 			ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
@@ -3021,8 +3601,10 @@ AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u16 Arg_Index, u8 Num_BDs
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
-		
+
+		/* Reserve APPLY_OFFSET_SRAM on the same page as the shim BD table. */
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_APPLY_OFFSET_57 + OpSize +
+			ISA_OPSIZE_APPLY_OFFSET_SRAM +
 			(UC_DMA_BD_SIZE + (Num_BDs * UC_DMA_WORD_LEN * SHIM_BD_NUM_REGS)) + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -3148,6 +3730,96 @@ AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
 /*****************************************************************************/
 /**
 *
+* This is the memory IO function to emit APPLY_OFFSET_SRAM (opcode 0x24,
+* opsize 0x0c) in the control code. Call after APPLY_OFFSET_57 and before
+* shim BD emission; both ops reference the same @DMAWRITE_data_N label.
+*
+* @param	IOInst:       IO instance pointer
+* @param	SramAddress:  Offset within MemTile data memory (patched with
+*			MemMod base before emit)
+* @param	Num_BDs:      Number of shim DMA BDs in the table to patch
+*
+* @return	XAIE_OK on success.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_AddressPatching_SRAM(void *IOInst, u32 SramAddress, u8 Num_BDs)
+{
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	XAie_DevInst *DevInst;
+	const XAie_MemMod *MemMod;
+	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
+	CHECK_ERROR_STATE(ControlCodeInst);
+
+	/* Same @DMAWRITE_data_N as APPLY_OFFSET_57; UcDmaDataNum is not advanced yet. */
+	u32 TableLabel = ControlCodeInst->UcDmaDataNum;
+
+	ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
+		((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_APPLY_OFFSET_SRAM) % DATA_SECTION_ALIGNMENT));
+
+	if (ControlCodeInst->DataAligner == DATA_SECTION_ALIGNMENT) {
+		ControlCodeInst->DataAligner = 0U;
+	}
+
+	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
+
+		if (!ControlCodeInst->IsJobOpen) {
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+		}
+
+		/* Patch caller offset with MemTile data-memory module base. */
+		DevInst = ControlCodeInst->DevInst;
+		if (DevInst == NULL) {
+			XAIE_ERROR("Invalid Device Instance\n");
+			return XAIE_INVALID_ARGS;
+		}
+		MemMod = DevInst->DevProp.DevMod[XAIEGBL_TILE_TYPE_MEMTILE].MemMod;
+		if (MemMod != NULL) {
+			SramAddress = MemMod->MemAddr + SramAddress;
+		}
+
+		/* Same page as shim BD table; page space reserved in AddressPatching(). */
+		if(ControlCodeInst->ScrachpadName == NULL) {
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
+					"APPLY_OFFSET_SRAM\t @DMAWRITE_data_%d, %d, 0x%x\n",
+					TableLabel,
+					Num_BDs, SramAddress);
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
+					"APPLY_OFFSET_SRAM\t @DMAWRITE_data_%d, %d, 0x%x\n",
+					TableLabel,
+					Num_BDs, SramAddress);
+		}
+		else {
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
+					"APPLY_OFFSET_SRAM\t @DMAWRITE_data_%d, %d, 0x%x, @%s\n",
+					TableLabel,
+					Num_BDs, SramAddress, ControlCodeInst->ScrachpadName);
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
+					"APPLY_OFFSET_SRAM\t @DMAWRITE_data_%d, %d, 0x%x, @%s\n",
+					TableLabel,
+					Num_BDs, SramAddress, ControlCodeInst->ScrachpadName);
+		}
+
+		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_APPLY_OFFSET_SRAM;
+		ControlCodeInst->UcPageSize += ISA_OPSIZE_APPLY_OFFSET_SRAM;
+		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+
+		/* Do not fold later writes above this op. */
+		ControlCodeInst->CombineCommands = 0;
+	}
+
+	if(ControlCodeInst->ScrachpadName != NULL) {
+		free(ControlCodeInst->ScrachpadName);
+		ControlCodeInst->ScrachpadName = NULL;
+	}
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
 * This fuction inserts WAIT_UC_DMA instruction in the control code.
 * @param	IOInst:    IO instance pointer
 * 
@@ -3179,6 +3851,7 @@ AieRC XAie_ControlCodeIO_WaitUcDMA(void *IOInst)
 	CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "WAIT_UC_DMA\t $r0\n");
 	ControlCodeInst->UcPageTextSize += ISA_OPSIZE_WAIT_UC_DMA;
 	ControlCodeInst->UcPageSize += ISA_OPSIZE_WAIT_UC_DMA;
+	ControlCodeInst->PendingAsyncDmaWait = 0;
 	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 
 	return XAIE_OK;
@@ -3470,6 +4143,9 @@ AieRC XAie_ControlCodeIO_Preempt(void *IOInst, u16 PreemptId, char* SaveLabel, c
 		else {
 			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "PREEMPT\t0x%x, @%s, @%s\n",PreemptId, SaveLabel, RestoreLabel);
 			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "PREEMPT\t0x%x, @%s, @%s\n",PreemptId, SaveLabel, RestoreLabel);
+			if (XAIE_BACKTRACE_MODE != 0) {
+				_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+			}
 			ControlCodeInst->UcPageSize += ISA_OPSIZE_PREEMPT;
 		}
 		_XAie_EndJob(ControlCodeInst);
@@ -3509,6 +4185,9 @@ AieRC XAie_ControlCodeIO_SetPadInteger(void *IOInst, char* BuffName, u32 BuffSiz
 	if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".setpad\t %s, 0x%x\n",BuffName, BuffSize);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".setpad\t %s, 0x%x\n",BuffName, BuffSize);
+		if (XAIE_BACKTRACE_MODE != 0) {
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		}
 		ControlCodeInst->CombineCommands = 0;
 		return XAIE_OK;
 	}
@@ -3546,6 +4225,9 @@ AieRC XAie_ControlCodeIO_SetPadString(void *IOInst, char* BuffName, char* BuffBl
 	if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".setpad\t %s, %s\n",BuffName, BuffBlobPath);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".setpad\t %s, %s\n",BuffName, BuffBlobPath);
+		if (XAIE_BACKTRACE_MODE != 0) {
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		}
 		ControlCodeInst->CombineCommands = 0;
 		return XAIE_OK;
 	}
@@ -3585,6 +4267,9 @@ AieRC XAie_ControlCodeIO_AttachToGroup(void *IOInst, uint8_t UcIndex)
 	if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".attach_to_group\t %d\n",UcIndex);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".attach_to_group\t %d\n",UcIndex);
+		if (XAIE_BACKTRACE_MODE != 0) {
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		}
 		ControlCodeInst->CombineCommands = 0;
 		return XAIE_OK;
 	}
@@ -3952,9 +4637,15 @@ static inline AieRC _XAie_EmitLoadCoresBuffer(XAie_ControlCodeIO *ControlCodeIns
                                                FILE *TargetFile,
                                                XAie_MemBuffer *TargetMemBuf,
                                                const char *ErrorMsg) {
+	/*
+	 * An empty LoadCores body is legal: the LOAD_CORES opcode and its label
+	 * are already emitted by LoadCoresStart, so a Start immediately followed
+	 * by End (no Write32/BlockWrite32 in between) does not corrupt any
+	 * downstream state. Treat it as a no-op returning XAIE_OK instead of the
+	 * spurious "No instructions for LoadCores" error (AIESW-33683).
+	 */
 	if (!SrcBuffer || SrcBuffer->Size == 0) {
-		XAIE_ERROR("No instructions for LoadCores\n");
-		return XAIE_ERR;
+		return XAIE_OK;
 	}
 	return _XAie_EmitLoadCoresBufferSlice(ControlCodeInst, SrcBuffer->Data,
 	                                       SrcBuffer->Size, TargetFile,
@@ -4209,9 +4900,21 @@ static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeIns
 			: lastSliceTotalContent;
 
 		/* Skip an empty continuation slice. This can occur if a forced
-		 * page split lands at the very end of the buffered stream — the
-		 * trailing slice would otherwise emit a stub PCJ with no body. */
-		if (i > 0 && sliceInstrLen == 0 && sliceTotalContent == 0) {
+		 * page split lands at the very end of the buffered stream (e.g. a
+		 * BlockWrite32 + XAie_EndPage + EndJob sequence) — the trailing
+		 * slice would otherwise emit a stub PCJ with no body.
+		 *
+		 * The emit loop only ever produces a body via
+		 * _XAie_EmitLoadCoresBufferSlice, which is gated purely on the
+		 * instruction-buffer slice lengths.  Therefore a slice with no
+		 * instruction *and* no debug-instruction bytes is guaranteed to
+		 * emit an empty START_COND_JOB_PREEMPT/END_JOB pair regardless of
+		 * sliceTotalContent.  The previous predicate also required
+		 * sliceTotalContent == 0, which for the trailing slice equals
+		 * (UcPageSize - PCJ_SLICE_OVERHEAD_TOTAL) and is essentially never
+		 * zero at EndJob time — making the skip unreachable and letting a
+		 * stub PCJ through.  Gate solely on the slice body being empty. */
+		if (i > 0 && sliceInstrLen == 0 && sliceDebugInstrLen == 0) {
 			continue;
 		}
 
@@ -4276,7 +4979,12 @@ static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeIns
 		}
 
 		_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "END_JOB\n\n");
-		_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "END_JOB\n\n");
+		if (XAIE_BACKTRACE_MODE != 0) {
+			_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "END_JOB\n");
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		} else {
+			_XAie_ControlCodePrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "END_JOB\n\n");
+		}
 		if (ControlCodeInst->ErrorState) { RC = XAIE_ERR; goto cleanup; }
 		if (ControlCodeInst->DebugAsmFile) {
 			fflush(ControlCodeInst->DebugAsmFile);
@@ -4463,6 +5171,9 @@ AieRC XAie_ControlCodeIO_LoadCoresStart(void *IOInst, u32 UniqueCoreElfId, const
 		 * so it is not captured by the buffer redirection in _XAie_ControlCodePrintf.
 		 */
 		EMIT_TO_CONTROL_CODE_AND_DEBUG_FILE(ControlCodeInst, "%s:\n", Label);
+		if (XAIE_BACKTRACE_MODE != 0) {
+			_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+		}
 
 		AieRC RC = _XAie_SetLoadCoresLabel(ControlCodeInst, Label);
 		if (RC != XAIE_OK) return RC;
@@ -4556,7 +5267,13 @@ AieRC XAie_ControlCodeIO_LoadCoresEnd(void *IOInst) {
 
 		/* Emit EOF between instructions and data sections (only if there were instructions) */
 		if (ControlCodeInst->LoadCoresContext->InstructionBuffer->Size > 0) {
-			EMIT_TO_CONTROL_CODE_AND_DEBUG_FILE(ControlCodeInst, "EOF\n\n");
+			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "EOF\n\n");
+			if (XAIE_BACKTRACE_MODE != 0) {
+				CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "EOF\n");
+				_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+			} else {
+				CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "EOF\n\n");
+			}
 		}
 
 		/* Emit buffered data sections to main asm and debug files */
@@ -4604,6 +5321,9 @@ cleanup_context:
 
 			EMIT_TO_CONTROL_CODE_AND_DEBUG_FILE(ControlCodeInst, ".endl %s\n",
 			                                    ControlCodeInst->LoadCoresLabel);
+			if (XAIE_BACKTRACE_MODE != 0) {
+				_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
+			}
 
 			/* Restore outer page tracking state */
 			_XAie_RestorePageState(ControlCodeInst, &saved);
@@ -5239,6 +5959,7 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	memset(ControlCodeInst, 0, sizeof(XAie_ControlCodeIO));
 
 	ControlCodeInst->DisableDebugAsm = (DevInst->DisableDebugAsm != 0U) ? 1U : 0U;
+	ControlCodeInst->DevInst = DevInst;
 	
 	ControlCodeInst->ScrachpadName = NULL;
 	ControlCodeInst->Mode = (u8)XAIE_INVALID_MODE;
@@ -5402,9 +6123,15 @@ static AieRC _XAie_MergeMemBuffers(XAie_MemBuffer *SrcBuf, XAie_MemBuffer *DesBu
 	if (needed_capacity > DesBuf->Capacity) {
 		size_t new_capacity = DesBuf->Capacity;
 		while (new_capacity < needed_capacity) {
+			size_t prev_capacity = new_capacity;
 			new_capacity *= BUFFER_GROWTH_FACTOR;
+			/* Detect size_t wraparound: growth must be strictly increasing. */
+			if (new_capacity <= prev_capacity) {
+				XAIE_ERROR("Buffer capacity overflow\n");
+				return XAIE_ERR;
+			}
 		}
-		
+
 		char *new_data = (char*)realloc(DesBuf->Data, new_capacity);
 		if (!new_data) {
 			return XAIE_ERR;
@@ -5575,7 +6302,7 @@ AieRC XAie_GetDebugAsmBuffer(XAie_DevInst *DevInst, const char **Buffer, size_t 
 	
 	/* Finalize the debug buffer by adding EOF (only to buffer, not file) */
 	CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "EOF\n\n");
-	
+
 	/* Restore debug file pointer */
 	if (saved_debug_fp) {
 		ControlCodeInst->DebugAsmFile = saved_debug_fp;
@@ -6094,6 +6821,17 @@ AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
 	return XAIE_INVALID_BACKEND;
 }
 
+AieRC XAie_ControlCodeIO_AddressPatching_SRAM(void *IOInst, u32 SramAddress, u8 Num_BDs)
+{
+	/* no-op */
+	(void)IOInst;
+	(void)SramAddress;
+	(void)Num_BDs;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
 AieRC XAie_ControlCodeAddComment(XAie_DevInst *DevInst, const char *Comment)
 {
         (void)DevInst;
@@ -6366,6 +7104,7 @@ const XAie_Backend ControlCodeBackend =
 	.Ops.RunOp = XAie_ControlCodeIO_RunOp,
 	.Ops.AddressPatching = XAie_ControlCodeIO_AddressPatching,
 	.Ops.AddressPatchingPL = XAie_ControlCodeIO_AddressPatching_PL,
+	.Ops.AddressPatchingSRAM = XAie_ControlCodeIO_AddressPatching_SRAM,
 	.Ops.MaskPollExt = XAie_ControlCodeIO_MaskPoll_Ext,
 	.Ops.WaitTaskCompleteToken = XAie_WaitTaskCompleteToken,
 	.Ops.MemAllocate = XAie_ControlCodeMemAllocate,

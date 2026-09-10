@@ -17,11 +17,25 @@ foreach(_var SRC_DIR REGDB_DIR DST_DIR)
   endif()
 endforeach()
 
-file(GLOB_RECURSE _hdrs
-  "${SRC_DIR}/*/*.h"
-  "${SRC_DIR}/*/*/*.h"
-  "${REGDB_DIR}/*.h"
-)
+foreach(_dir SRC_DIR REGDB_DIR)
+  if(NOT IS_DIRECTORY "${${_dir}}")
+    message(WARNING "CopyHeaders.cmake: ${_dir}=\"${${_dir}}\" is not a directory; "
+                    "headers from this location will be missing. "
+                    "Is the submodule initialized?")
+  endif()
+endforeach()
+
+# Reuse the canonical header-dir list from AieCodegenHeaders.cmake so that
+# build-time copies and install-time copies always cover exactly the same set.
+include("${CMAKE_CURRENT_LIST_DIR}/AieCodegenHeaders.cmake")
+
+set(_hdrs "")
+foreach(_dir IN LISTS _AIE_CODEGEN_HEADER_DIRS)
+  file(GLOB _dir_hdrs "${SRC_DIR}/${_dir}/*.h")
+  list(APPEND _hdrs ${_dir_hdrs})
+endforeach()
+file(GLOB _regdb_hdrs "${REGDB_DIR}/*.h")
+list(APPEND _hdrs ${_regdb_hdrs})
 
 foreach(_hdr IN LISTS _hdrs)
   get_filename_component(_name "${_hdr}" NAME)

@@ -85,6 +85,9 @@ typedef SSIZE_T ssize_t;
 	(ISA_OPSIZE_EOF + ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB)
 #define PCJ_SPLIT_INITIAL_CAPACITY 4U
 #define SHIM_BD_NUM_REGS  9
+/* Words in the PL IP wts_params block that APPLY_OFFSET_PL patches; it patches
+ * words 8 and 9, the 64-bit DDR address. */
+#define PL_BD_NUM_WORDS 10U
 #define MAX_LABELS_PER_ASM_FILE 1000
 #define HASH_INVALID -1
 #define MAX_REMOTE_BARRIER_ID 7
@@ -3666,6 +3669,8 @@ AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
 	u32 OpSize;
+	u32 PlipTextSize;
+	u32 PlipDataSize;
 
 	if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE) {
 		OpSize = ISA_OPSIZE_UC_DMA_WRITE_DES + ISA_OPSIZE_WAIT_UC_DMA;
@@ -3674,6 +3679,23 @@ AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
 		OpSize = ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC;
 	}
 
+	/*
+	 * A PL IP write is one transaction: APPLY_OFFSET_PL, the argument block
+	 * write, the ap_start write and the ap_done poll. Size the page check
+	 * against all of it so the transaction is not split across a page
+	 * boundary. A chain flush ahead of the argument block write also emits
+	 * a SYNC, which the slack here covers.
+	 */
+	PlipTextSize = ISA_OPSIZE_APPLY_OFFSET_PL +
+			OpSize +                        /* argument block write  */
+			OpSize +                        /* ap_start write        */
+			ISA_OPSIZE_UC_DMA_MASK_POLL_EXT;/* ap_done poll          */
+
+	PlipDataSize = (UC_DMA_BD_SIZE + (UC_DMA_WORD_LEN * PL_BD_NUM_WORDS)) +
+			(UC_DMA_BD_SIZE + UC_DMA_WORD_LEN);
+
+	/* Alignment padding for the data section covers only the text this op
+	 * and the write that follows it contribute, not the whole transaction. */
 	ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
 		((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_APPLY_OFFSET_PL + OpSize) % DATA_SECTION_ALIGNMENT));
 
@@ -3687,8 +3709,8 @@ AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
 
-		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_APPLY_OFFSET_PL + OpSize +
-			(UC_DMA_BD_SIZE + (UC_DMA_WORD_LEN * SHIM_BD_NUM_REGS)) + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
+		if((ControlCodeInst->UcPageSize + PlipTextSize + PlipDataSize +
+			ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}

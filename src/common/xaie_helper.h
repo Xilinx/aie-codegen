@@ -245,6 +245,7 @@ XAIE_AIG_EXPORT AieRC XAie_WaitTct(XAie_DevInst *DevInst, uint16_t Column, uint1
 XAIE_AIG_EXPORT AieRC XAie_WaitUCDMA(XAie_DevInst *DevInst);
 XAIE_AIG_EXPORT AieRC XAie_ModeConfig(XAie_DevInst *DevInst, XAie_ModeSelect Mode);
 XAIE_AIG_EXPORT XAie_ModeSelect XAie_GetModeConfig(XAie_DevInst *DevInst);
+XAIE_AIG_EXPORT AieRC XAie_SplitWriteGroup(XAie_DevInst *DevInst);
 
 /*HintMap is a pointer to the structure containing the hint map for preemption. We expect this to be u32 HintMap[5], total 144 bits.
   Since L2 in only 9MB of memory with 64Kb of chunks, we can support max 144 chunks.*/

@@ -1158,6 +1158,38 @@ AieRC XAie_SimIOSetAttr(void *IOInst, XAie_BackendAttrType Attr, u64 AttrVal) {
 	}
 }
 
+/*
+ * LoadCores* emits LOAD_CORES for control-code generation only. CRTS/ESS
+ * loads ELFs through the sim path, but ADF still calls loadPmStart.
+ */
+static AieRC XAie_SimIO_LoadCoresStart(void *IOInst, u32 UniqueCoreElfId,
+		const char *Label)
+{
+	(void)IOInst;
+	(void)UniqueCoreElfId;
+	(void)Label;
+	return XAIE_OK;
+}
+
+static AieRC XAie_SimIO_LoadCoresEnd(void *IOInst)
+{
+	(void)IOInst;
+	return XAIE_OK;
+}
+
+static AieRC XAie_SimIO_LoadCoresCPStart(void *IOInst, u32 UniqueCoreElfId)
+{
+	(void)IOInst;
+	(void)UniqueCoreElfId;
+	return XAIE_OK;
+}
+
+static AieRC XAie_SimIO_LoadCoresCPEnd(void *IOInst)
+{
+	(void)IOInst;
+	return XAIE_OK;
+}
+
 const XAie_Backend SimBackend =
 {
 	.Type = XAIE_IO_BACKEND_SIM,
@@ -1202,6 +1234,10 @@ const XAie_Backend SimBackend =
 	.Ops.RemoteBarrier = NULL,
 	.Ops.SaveRegister = NULL,
 	.Ops.Nop = NULL,
+	.Ops.LoadCoresStart = XAie_SimIO_LoadCoresStart,
+	.Ops.LoadCoresEnd = XAie_SimIO_LoadCoresEnd,
+	.Ops.LoadCoresCPStart = XAie_SimIO_LoadCoresCPStart,
+	.Ops.LoadCoresCPEnd = XAie_SimIO_LoadCoresCPEnd,
 };
 
 /** @} */

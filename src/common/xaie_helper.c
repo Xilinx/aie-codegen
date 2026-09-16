@@ -1196,6 +1196,24 @@ AieRC XAie_RemoteBarrier(XAie_DevInst *DevInst,  uint8_t RbId, uint32_t UcMask)
 	}
 }
 
+AieRC XAie_SplitWriteGroup(XAie_DevInst *DevInst)
+{
+	if((DevInst == XAIE_NULL) ||
+			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
+		XAIE_ERROR("Invalid Device Instance\n");
+		return XAIE_INVALID_ARGS;
+	}
+
+	const XAie_Backend *Backend = DevInst->Backend;
+
+	if (Backend->Ops.SplitWriteGroup != NULL) {
+		return Backend->Ops.SplitWriteGroup((void *)DevInst->IOInst);
+	} else {
+		XAIE_ERROR("SplitWriteGroup function pointer points to NULL\n");
+		return XAIE_NOT_SUPPORTED;
+	}
+}
+
 AieRC XAie_SaveRegister(XAie_DevInst *DevInst, u32 RegOff, u32 Id)
 {
 	if((DevInst == XAIE_NULL) ||

@@ -4373,6 +4373,64 @@ AieRC XAie_ControlCodeIO_RemoteBarrier(void *IOInst, uint8_t RbId, uint32_t UcMa
 /*****************************************************************************/
 /**
 *
+* This function closes any UC-DMA write-combine group that is currently open,
+* without emitting an instruction of its own. If a ShimBD chain is open, its
+* deferred UC_DMA_WRITE_DES_SYNC is flushed first, the same as
+* XAie_ConfigMode(XAIE_SHIM_BD_CHAINING_DISABLE) does.
+*
+* The write immediately following this call starts a brand new group under
+* whatever Mode is current at that point. Toggling
+* XAIE_WRITE_DES_ASYNC_ENABLE/DISABLE mid-stream has no effect on an
+* already-open group, since neither case resets this tracking state -- callers
+* that need a subset of writes to a tile emitted under a different mode than
+* their neighbors must call this to force the boundary.
+*
+* @param	IOInst: IO instance pointer
+*
+* @return	XAIE_OK or XAIE_ERR.
+*
+* @note		None.
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeIO_SplitWriteGroup(void *IOInst)
+{
+	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
+
+	if (ControlCodeInst->NumShimBDsChained > 0) {
+		/* The flush emits a SYNC, so check for page overflow first, same as
+		 * every other ShimBD-flush site. */
+		if ((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
+				ControlCodeInst->PageSizeMax) {
+			/* Same reentrancy hazard/fix as the other ShimBD-flush checks. */
+			ControlCodeInst->NumShimBDsChained = 0;
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+			ControlCodeInst->NumShimBDsChained = 1;
+		}
+		_XAie_FlushShimBdChain(ControlCodeInst);
+		CHECK_ERROR_STATE(ControlCodeInst);
+	}
+
+	ControlCodeInst->CombinedMemWriteSize = 0;
+	/* UINT64_MAX, not 0, for the same reason the page boundary reset uses it:
+	 * it is an offset no write can land on. PrevMemWriteType == -1 already
+	 * blocks the adjacency check, but leaving a reachable offset here would
+	 * make a write to 0x0 look adjacent if that guard ever changes. */
+	ControlCodeInst->CalculatedNextRegOff = UINT64_MAX;
+	ControlCodeInst->PrevMemWriteType     = -1;
+	ControlCodeInst->CombineCommands      = 0;
+	ControlCodeInst->IsShimBd             = 0;
+	ControlCodeInst->IsExtGroup           = 0;
+	ControlCodeInst->IsAdjacentMemWrite   = 0;
+	ControlCodeInst->LabelMatchFound      = 0;
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
 * This function is used to add Save Register opcode to asm file.
 *
 * @param        IOInst: IO instance pointer
@@ -6988,6 +7046,15 @@ AieRC XAie_ControlCodeIO_RemoteBarrier(void *IOInst, uint8_t RbId, uint32_t UcMa
 	return XAIE_INVALID_BACKEND;
 }
 
+AieRC XAie_ControlCodeIO_SplitWriteGroup(void *IOInst)
+{
+	/* no-op */
+	(void)IOInst;
+	XAIE_ERROR("Driver is not compiled with ControlCode generation "
+			"backend (__AIECONTROLCODE__)\n");
+	return XAIE_INVALID_BACKEND;
+}
+
 AieRC XAie_ControlCodeIO_SaveRegister(void *IOInst, u32 RegOff, u32 Id)
 {
 	/* no-op */
@@ -7144,6 +7211,7 @@ const XAie_Backend ControlCodeBackend =
 	.Ops.SetPadString = XAie_ControlCodeIO_SetPadString,
 	.Ops.AttachToGroup = XAie_ControlCodeIO_AttachToGroup,
 	.Ops.RemoteBarrier = XAie_ControlCodeIO_RemoteBarrier,
+	.Ops.SplitWriteGroup = XAie_ControlCodeIO_SplitWriteGroup,
 	.Ops.SaveRegister = XAie_ControlCodeIO_SaveRegister,
 	.Ops.Nop = XAie_ControlCodeIO_Nop,
 	.Ops.LoadCoresStart = XAie_ControlCodeIO_LoadCoresStart,

@@ -1603,6 +1603,54 @@ static inline void _XAie_RestorePageState(XAie_ControlCodeIO *ControlCodeInst,
 /*****************************************************************************/
 /**
 *
+* Restores page/job tracking from a snapshot, but keeps the monotonic counters
+* for labels already emitted to the global data sections while buffering
+* (LoadCoresCP). Plain _XAie_RestorePageState would roll those back and hand
+* the same UCBD_label_* / data label names out twice, which aiebu rejects with
+* "label present multiple time in asm".
+*
+* @param	ControlCodeInst: ControlCode instance pointer
+* @param	s: Source snapshot struct
+*
+* @return	None.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static inline void _XAie_RestorePageStatePreservingGlobalLabels(
+		XAie_ControlCodeIO *ControlCodeInst,
+		const XAie_SavedPageState *s)
+{
+	const u32 preservedUcbdLabelNum            = ControlCodeInst->UcbdLabelNum;
+	const u32 preservedUcbdDataNum             = ControlCodeInst->UcbdDataNum;
+	const u32 preservedUcDmaDataNum            = ControlCodeInst->UcDmaDataNum;
+	const u64 preservedTotalLabelsAllocated    = ControlCodeInst->TotalLabelsAllocated;
+	const u64 preservedTotalLabelsAllocatedW   = ControlCodeInst->TotalLabelsAllocatedWrite;
+	const u64 preservedBarrierId               = ControlCodeInst->BarrierId;
+	const u32 preservedHintMapId               = ControlCodeInst->HintMapId;
+	const u32 preservedCurrentDataLabel        = ControlCodeInst->CurrentDataLabel;
+	const u32 preservedCurrentDataBWLabel      = ControlCodeInst->CurrentDataBWLabel;
+	const int preservedCompareLabelUpto        = ControlCodeInst->CompareLabelUpto;
+	const int preservedCompareLabelUptoWrite   = ControlCodeInst->CompareLabelUptoWrite;
+
+	_XAie_RestorePageState(ControlCodeInst, s);
+
+	ControlCodeInst->UcbdLabelNum              = preservedUcbdLabelNum;
+	ControlCodeInst->UcbdDataNum               = preservedUcbdDataNum;
+	ControlCodeInst->UcDmaDataNum              = preservedUcDmaDataNum;
+	ControlCodeInst->TotalLabelsAllocated      = preservedTotalLabelsAllocated;
+	ControlCodeInst->TotalLabelsAllocatedWrite = preservedTotalLabelsAllocatedW;
+	ControlCodeInst->BarrierId                 = preservedBarrierId;
+	ControlCodeInst->HintMapId                 = preservedHintMapId;
+	ControlCodeInst->CurrentDataLabel          = preservedCurrentDataLabel;
+	ControlCodeInst->CurrentDataBWLabel        = preservedCurrentDataBWLabel;
+	ControlCodeInst->CompareLabelUpto          = preservedCompareLabelUpto;
+	ControlCodeInst->CompareLabelUptoWrite     = preservedCompareLabelUptoWrite;
+}
+
+/*****************************************************************************/
+/**
+*
 * This function is used to add a custom comment in the control code ASM file.
 *
 * @param        DevInst: Device instance pointer
@@ -5542,7 +5590,9 @@ AieRC XAie_ControlCodeIO_LoadCoresCPEnd(void *IOInst) {
 	if (ControlCodeInst->ErrorState) {
 		XAIE_ERROR("LoadCoresCPEnd: aborting due to previous critical error\n");
 		ControlCodeInst->IsLoadCoresCPActive = 0;
-		_XAie_RestorePageState(ControlCodeInst, &ControlCodeInst->LoadCoresCPContext->SavedState);
+		/* BD labels may already be in the global data section. */
+		_XAie_RestorePageStatePreservingGlobalLabels(ControlCodeInst,
+				&ControlCodeInst->LoadCoresCPContext->SavedState);
 		_XAie_FreeDeferredEmitContext(ControlCodeInst->LoadCoresCPContext);
 		ControlCodeInst->LoadCoresCPContext = NULL;
 		return XAIE_ERR;
@@ -5557,8 +5607,9 @@ AieRC XAie_ControlCodeIO_LoadCoresCPEnd(void *IOInst) {
 		XAIE_ERROR("LoadCoresCP control packet loading exceeded page size — "
 		           "content must fit within a single page\n");
 		ControlCodeInst->IsLoadCoresCPActive = 0;
-		_XAie_RestorePageState(ControlCodeInst,
-		                       &ControlCodeInst->LoadCoresCPContext->SavedState);
+		/* BD labels may already be in the global data section. */
+		_XAie_RestorePageStatePreservingGlobalLabels(ControlCodeInst,
+				&ControlCodeInst->LoadCoresCPContext->SavedState);
 		_XAie_FreeDeferredEmitContext(ControlCodeInst->LoadCoresCPContext);
 		ControlCodeInst->LoadCoresCPContext = NULL;
 		return XAIE_ERR;
@@ -5576,9 +5627,11 @@ AieRC XAie_ControlCodeIO_LoadCoresCPEnd(void *IOInst) {
 	/* 3. Deactivate LoadCoresCP so subsequent emits go to main output */
 	ControlCodeInst->IsLoadCoresCPActive = 0;
 
-	/* 4. Restore outer page state from SavedState */
+	/* 4. Restore outer page/job size bookkeeping, but keep the global label
+	 * counters: the buffered writes already emitted labels with them, and
+	 * rolling them back reuses those names. */
 	XAie_SavedPageState saved = ControlCodeInst->LoadCoresCPContext->SavedState;
-	_XAie_RestorePageState(ControlCodeInst, &saved);
+	_XAie_RestorePageStatePreservingGlobalLabels(ControlCodeInst, &saved);
 
 	/* 5. Calculate total LoadCoresCP job size.
 	 *    For the page-fit check we need the full size (text + data).

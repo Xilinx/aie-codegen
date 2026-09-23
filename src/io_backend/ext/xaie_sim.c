@@ -864,8 +864,12 @@ static AieRC XAie_SimMemGetDevAddrFromVAddr(XAie_DevInst *DevInst, void *VAddr,
 static AieRC XAie_SimIO_BlockWrite32_Ext(void *IOInst, u64 RegOff, const u32 *Data,
 		u32 Size)
 {
+	(void)IOInst;
+
+	/* RegOff is already an absolute address, so call ess_Write32 directly
+	 * rather than XAie_SimIO_Write32, which adds the AIE array base. */
 	for (u32 i = 0U; i < Size; i++) {
-		XAie_SimIO_Write32(IOInst, RegOff + i * 4U, *Data);
+		ess_Write32(RegOff + i * 4U, *Data);
 		Data++;
 	}
 
@@ -877,14 +881,26 @@ static AieRC XAie_SimIO_MaskPoll_Ext(void *IOInst, u64 RegOff, u32 Mask, u32 Val
 {
 	u32 RegVal;
 
-	(void)TimeOutUs;
+	(void)IOInst;
 
-	while (1) {
-		XAie_SimIO_Read32(IOInst, RegOff, &RegVal);
-		if ((RegVal & Mask) == Value)
+	/* RegOff is already an absolute address, so call ess_Read32 directly
+	 * rather than XAie_SimIO_Read32, which adds the AIE array base. */
+
+	/* Increment Timeout value to 1 if user passed value is 0 */
+	if(TimeOutUs == 0U)
+		TimeOutUs++;
+
+	while(TimeOutUs > 0U) {
+		RegVal = ess_Read32(RegOff);
+		if((RegVal & Mask) == Value)
 			return XAIE_OK;
 		usleep(1);
+		TimeOutUs--;
 	}
+
+	XAIE_ERROR("MaskPoll on external address timed out\n");
+
+	return XAIE_ERR;
 }
 
 static AieRC XAie_SimIO_AddressPatchingPL(void *IOInst, u16 Arg_Index)

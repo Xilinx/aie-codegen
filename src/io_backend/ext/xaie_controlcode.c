@@ -86,8 +86,9 @@ typedef SSIZE_T ssize_t;
 #define PCJ_SPLIT_INITIAL_CAPACITY 4U
 #define SHIM_BD_NUM_REGS  9
 /* Words in the PL IP wts_params block that APPLY_OFFSET_PL patches; it patches
- * words 8 and 9, the 64-bit DDR address. */
-#define PL_BD_NUM_WORDS 10U
+ * words 8 and 9, the 64-bit DDR address. Word 0 is the auto-restart counter and
+ * word 11 the DDR source offset, both added for tiling repetition. */
+#define PL_BD_NUM_WORDS 12U
 #define MAX_LABELS_PER_ASM_FILE 1000
 #define HASH_INVALID -1
 #define MAX_REMOTE_BARRIER_ID 7

@@ -106,15 +106,15 @@ FILE *_XAie_SecureFopen(const char *Path, const char *Mode)
 		return NULL;
 	}
 
-	int Fd;
+	int Fd = -1;
 #ifdef _WIN32
 	OFlags |= _O_NOINHERIT;
 	OFlags |= (strchr(Mode, 't') != NULL) ? _O_TEXT : _O_BINARY;
 
 	errno_t Rc = _sopen_s(&Fd, Path, OFlags,
 			      _SH_DENYNO, _S_IREAD | _S_IWRITE);
-	if (Rc != 0) {
-		errno = Rc;
+	if (Rc != 0 || Fd < 0) {
+		errno = (Rc != 0) ? Rc : EBADF;
 		return NULL;
 	}
 #else

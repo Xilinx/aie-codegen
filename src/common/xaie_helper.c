@@ -994,7 +994,7 @@ AieRC XAie_AddressPatching(XAie_DevInst *DevInst, u16 Arg_Offset, u8 Num_BDs)
 	}
 }
 
-AieRC XAie_AddressPatching_PL(XAie_DevInst *DevInst, u16 Arg_Offset)
+AieRC XAie_AddressPatching_PL(XAie_DevInst *DevInst, u16 Arg_Offset, u8 NumWords)
 {
 	if((DevInst == XAIE_NULL) ||
 			(DevInst->IsReady != XAIE_COMPONENT_IS_READY)) {
@@ -1002,10 +1002,16 @@ AieRC XAie_AddressPatching_PL(XAie_DevInst *DevInst, u16 Arg_Offset)
 		return XAIE_INVALID_ARGS;
 	}
 
+	if(NumWords == 0U) {
+		XAIE_ERROR("PL Address Patching: block size must be non-zero\n");
+		return XAIE_INVALID_ARGS;
+	}
+
 	const XAie_Backend *Backend = DevInst->Backend;
 
 	if (Backend->Ops.AddressPatchingPL != NULL) {
-		return Backend->Ops.AddressPatchingPL((void *)DevInst->IOInst, Arg_Offset);
+		return Backend->Ops.AddressPatchingPL((void *)DevInst->IOInst, Arg_Offset,
+				NumWords);
 	} else {
 		XAIE_ERROR("PL Address Patching function pointer points to NULL\n");
 		return XAIE_NOT_SUPPORTED;

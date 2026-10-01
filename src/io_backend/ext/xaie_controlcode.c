@@ -85,10 +85,6 @@ typedef SSIZE_T ssize_t;
 	(ISA_OPSIZE_EOF + ISA_OPSIZE_START_JOB + ISA_OPSIZE_END_JOB)
 #define PCJ_SPLIT_INITIAL_CAPACITY 4U
 #define SHIM_BD_NUM_REGS  9
-/* Words in the PL IP wts_params block that APPLY_OFFSET_PL patches; it patches
- * words 8 and 9, the 64-bit DDR address. Word 0 is the auto-restart counter and
- * word 11 the DDR source offset, both added for tiling repetition. */
-#define PL_BD_NUM_WORDS 12U
 #define MAX_LABELS_PER_ASM_FILE 1000
 #define HASH_INVALID -1
 #define MAX_REMOTE_BARRIER_ID 7
@@ -3713,7 +3709,7 @@ AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u16 Arg_Index, u8 Num_BDs
 * @note		Internal only.
 *
 *******************************************************************************/
-AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
+AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index, u8 NumWords)
 {
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
@@ -3740,7 +3736,7 @@ AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
 			OpSize +                        /* ap_start write        */
 			ISA_OPSIZE_UC_DMA_MASK_POLL_EXT;/* ap_done poll          */
 
-	PlipDataSize = (UC_DMA_BD_SIZE + (UC_DMA_WORD_LEN * PL_BD_NUM_WORDS)) +
+	PlipDataSize = (UC_DMA_BD_SIZE + (UC_DMA_WORD_LEN * (u32)NumWords)) +
 			(UC_DMA_BD_SIZE + UC_DMA_WORD_LEN);
 
 	/* Alignment padding for the data section covers only the text this op
@@ -6945,11 +6941,12 @@ AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u16 Arg_Index, u8 Num_BDs
 	return XAIE_INVALID_BACKEND;
 }
 
-AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index)
+AieRC XAie_ControlCodeIO_AddressPatching_PL(void *IOInst, u16 Arg_Index, u8 NumWords)
 {
 	/* no-op */
 	(void)IOInst;
 	(void)Arg_Index;
+	(void)NumWords;
 	XAIE_ERROR("Driver is not compiled with ControlCode generation "
 			"backend (__AIECONTROLCODE__)\n");
 	return XAIE_INVALID_BACKEND;

@@ -903,10 +903,11 @@ static AieRC XAie_SimIO_MaskPoll_Ext(void *IOInst, u64 RegOff, u32 Mask, u32 Val
 	return XAIE_ERR;
 }
 
-static AieRC XAie_SimIO_AddressPatchingPL(void *IOInst, u16 Arg_Index)
+static AieRC XAie_SimIO_AddressPatchingPL(void *IOInst, u16 Arg_Index, u8 NumWords)
 {
 	(void)IOInst;
 	(void)Arg_Index;
+	(void)NumWords;
 	return XAIE_OK;
 }
 
@@ -1125,10 +1126,11 @@ static AieRC XAie_SimIO_MaskPoll_Ext(void *IOInst, u64 RegOff, u32 Mask, u32 Val
 	return XAIE_ERR;
 }
 
-static AieRC XAie_SimIO_AddressPatchingPL(void *IOInst, u16 Arg_Index)
+static AieRC XAie_SimIO_AddressPatchingPL(void *IOInst, u16 Arg_Index, u8 NumWords)
 {
 	(void)IOInst;
 	(void)Arg_Index;
+	(void)NumWords;
 
 	return XAIE_ERR;
 }

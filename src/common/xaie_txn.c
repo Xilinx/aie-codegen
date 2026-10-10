@@ -2121,7 +2121,13 @@ u8* _XAie_TxnExportSerialized(XAie_DevInst *DevInst, u8 NumConsumers,
 		}
 		else if (Cmd->Opcode >= XAIE_IO_CUSTOM_OP_TCT) {
 
-			if(Cmd->Opcode == XAIE_IO_CUSTOM_OP_DDR_PATCH)
+			/*
+			 * Count only patches emitted while a BLOCKWRITE is being
+			 * coalesced; those are the ones _XAie_AppendBWToTxnBuff
+			 * moves behind the flushed BLOCKWRITE.
+			 */
+			if((Cmd->Opcode == XAIE_IO_CUSTOM_OP_DDR_PATCH) &&
+			   (FirstBlockwriteProcessed != 0))
 			{
 				++PatchCmdCount;
 			}
@@ -2730,7 +2736,13 @@ u8* _XAie_TxnExportSerialized_opt(XAie_DevInst *DevInst, u8 NumConsumers,
 		}
 		else if (Cmd->Opcode >= XAIE_IO_CUSTOM_OP_TCT) {
 
-			if(Cmd->Opcode == XAIE_IO_CUSTOM_OP_DDR_PATCH)
+			/*
+			 * Count only patches emitted while a BLOCKWRITE is being
+			 * coalesced; those are the ones _XAie_AppendBWToTxnBuff
+			 * moves behind the flushed BLOCKWRITE.
+			 */
+			if((Cmd->Opcode == XAIE_IO_CUSTOM_OP_DDR_PATCH) &&
+			   (FirstBlockwriteProcessed != 0))
 			{
 				++PatchCmdCount;
 			}

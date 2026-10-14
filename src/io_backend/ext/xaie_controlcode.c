@@ -87,6 +87,8 @@ typedef SSIZE_T ssize_t;
 #define SHIM_BD_NUM_REGS  9
 #define MAX_LABELS_PER_ASM_FILE 1000
 #define HASH_INVALID -1
+/* Sentinel: no uC-DMA BD has been emitted on the current page yet. */
+#define XAIE_INVALID_COMBINE_PAGE_ID 0xFFFFFFFFU
 #define MAX_REMOTE_BARRIER_ID 7
 #define MAX_COMMENT_LENGTH 128
 #define BLOCKWRITE32 0
@@ -272,6 +274,7 @@ typedef struct {
 	u32 NumShimBDsChained;
 	u32 CombinedMemWriteSize;
 	u32 PageId;
+	u32 CombineBdPageId;
 	u32 CurrentDataLabel;
 	u32 CurrentDataBWLabel;
 	u32 HintMapId;
@@ -372,6 +375,7 @@ typedef struct {
 	u64 TotalLabelsAllocated;
 	u64 TotalLabelsAllocatedWrite;
 	u32 PageId;
+	u32 CombineBdPageId; /* PageId of the BD the open adjacent combine is extending */
 	u32 CurrentDataLabel;
 	u32 CurrentDataBWLabel;
 	u8 LabelMatchFound;
@@ -1528,6 +1532,7 @@ static inline void _XAie_SavePageState(XAie_ControlCodeIO *ControlCodeInst,
 	s->NumShimBDsChained       = ControlCodeInst->NumShimBDsChained;
 	s->CombinedMemWriteSize    = ControlCodeInst->CombinedMemWriteSize;
 	s->PageId                  = ControlCodeInst->PageId;
+	s->CombineBdPageId         = ControlCodeInst->CombineBdPageId;
 	s->CurrentDataLabel        = ControlCodeInst->CurrentDataLabel;
 	s->CurrentDataBWLabel      = ControlCodeInst->CurrentDataBWLabel;
 	s->HintMapId               = ControlCodeInst->HintMapId;
@@ -1576,6 +1581,7 @@ static inline void _XAie_RestorePageState(XAie_ControlCodeIO *ControlCodeInst,
 	ControlCodeInst->NumShimBDsChained       = s->NumShimBDsChained;
 	ControlCodeInst->CombinedMemWriteSize    = s->CombinedMemWriteSize;
 	ControlCodeInst->PageId                  = s->PageId;
+	ControlCodeInst->CombineBdPageId         = s->CombineBdPageId;
 	ControlCodeInst->CurrentDataLabel        = s->CurrentDataLabel;
 	ControlCodeInst->CurrentDataBWLabel      = s->CurrentDataBWLabel;
 	ControlCodeInst->HintMapId               = s->HintMapId;
@@ -2226,6 +2232,7 @@ static void _XAie_StartNewPage(XAie_ControlCodeIO  *ControlCodeInst) {
 	ControlCodeInst->PrevMemWriteType      = -1;
 	ControlCodeInst->CombinedMemWriteSize  = 0;
 	ControlCodeInst->IsAdjacentMemWrite    = 0;
+	ControlCodeInst->CombineBdPageId       = XAIE_INVALID_COMBINE_PAGE_ID;
 	ControlCodeInst->CompareLabelUpto      = ControlCodeInst->CurrentDataBWLabel;
 	ControlCodeInst->CompareLabelUptoWrite = ControlCodeInst->CurrentDataLabel;
 
@@ -2303,6 +2310,7 @@ static void _XAie_StartNewJob(XAie_ControlCodeIO  *ControlCodeInst,
 		ControlCodeInst->IsExtGroup           = 0;
 		ControlCodeInst->Mode                 = 0;
 		ControlCodeInst->IsAdjacentMemWrite   = 0;
+		ControlCodeInst->CombineBdPageId      = XAIE_INVALID_COMBINE_PAGE_ID;
 		ControlCodeInst->PageBreak            = 0;
 		ControlCodeInst->LabelMatchFound      = 0;
 		ControlCodeInst->IsJobOpen            = 1;
@@ -2536,6 +2544,42 @@ static inline u8 _XAie_ShimBdChainDefersTrigger(XAie_ControlCodeIO *ControlCodeI
 /*****************************************************************************/
 /**
 *
+* AIESW-47022: adjacent Write32/BlockWrite32 must not grow a BD whose SYNC
+* already closed on a previous page. MaskWrite32 leaves CalculatedNextRegOff
+* intact so Event Broadcast 8-14 can merge across in-page mask writes; if
+* that mask then trips StartNewPage, a stale adjacent match would still
+* call UpdateDataLengthDmaBd on the previous page's BD. AIEBU bills that
+* payload to the page that holds the SYNC, which is how a job assembled
+* to 8212 against the 8192 CERT page size.
+*
+* Drop the adjacent flag when the open BD lives on another page so the
+* write starts a fresh descriptor on this page instead.
+*
+* @param	ControlCodeInst: ControlCode instance pointer
+*
+* @return	None.
+*
+* @note		Internal only. Call after computing IsAdjacentMemWrite and
+*		after IsolateCombineGroup (which may start a new page), and
+*		before DataAligner is derived from IsAdjacentMemWrite.
+*
+*******************************************************************************/
+static inline void _XAie_DropStaleAdjacentMemWrite(XAie_ControlCodeIO *ControlCodeInst)
+{
+	if (ControlCodeInst->IsAdjacentMemWrite &&
+			(ControlCodeInst->CombineBdPageId != ControlCodeInst->PageId)) {
+		ControlCodeInst->IsAdjacentMemWrite = 0;
+	}
+}
+
+static inline void _XAie_MarkBdCombinePage(XAie_ControlCodeIO *ControlCodeInst)
+{
+	ControlCodeInst->CombineBdPageId = ControlCodeInst->PageId;
+}
+
+/*****************************************************************************/
+/**
+*
 * This is the memory IO function to write 32bit data to the specified address.
 *
 * @param	IOInst: IO instance pointer
@@ -2576,6 +2620,7 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 
 	_XAie_IsolateCombineGroup(ControlCodeInst, IsExtWrite);
 	CHECK_ERROR_STATE(ControlCodeInst);
+	_XAie_DropStaleAdjacentMemWrite(ControlCodeInst);
 
 	ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
 		((ControlCodeInst->UcPageTextSize + (ControlCodeInst->IsAdjacentMemWrite ? 0:OpSize)) % DATA_SECTION_ALIGNMENT));
@@ -2729,6 +2774,7 @@ CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA,
 		}
 
 		ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
+		_XAie_MarkBdCombinePage(ControlCodeInst);
 
 		ControlCodeInst->UcbdDataNum = ControlCodeInst->CurrentDataLabel;
 		
@@ -2963,6 +3009,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 			 * iteration flips IsExtGroup; later iterations are a no-op. */
 			_XAie_IsolateCombineGroup(ControlCodeInst, IsExtWrite);
 			CHECK_ERROR_STATE(ControlCodeInst);
+			_XAie_DropStaleAdjacentMemWrite(ControlCodeInst);
 
 			if(ControlCodeInst->PageBreak == 0) {
 				ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
@@ -3111,6 +3158,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
                     	EXTRACT_LOWER_FOUR_BYTES(RegOff),  ControlCodeInst->UcDmaDataNum,
 						Size);
 					ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
+					_XAie_MarkBdCombinePage(ControlCodeInst);
 					ControlCodeInst->UcDmaDataNum = ControlCodeInst->CurrentDataBWLabel;
 					_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA0);
 					break;
@@ -3125,8 +3173,10 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 
 			NewPagePayloadSize = Size - TempItrSize;
 
-			if (ControlCodeInst->IsAdjacentMemWrite == 0)
+			if (ControlCodeInst->IsAdjacentMemWrite == 0) {
 				ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
+				_XAie_MarkBdCombinePage(ControlCodeInst);
+			}
 			for (IterationSize = TempItrSize; IterationSize < Size; IterationSize++) {
 				 if( (ControlCodeInst->UcPageSize + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax )
 				 {
@@ -3264,6 +3314,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 			 * iteration flips IsExtGroup; later iterations are a no-op. */
 			_XAie_IsolateCombineGroup(ControlCodeInst, IsExtWrite);
 			CHECK_ERROR_STATE(ControlCodeInst);
+			_XAie_DropStaleAdjacentMemWrite(ControlCodeInst);
 
 			if(ControlCodeInst->PageBreak == 0) {
 				ControlCodeInst->DataAligner = (DATA_SECTION_ALIGNMENT -
@@ -3414,6 +3465,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
                     	EXTRACT_HIGHER_FOUR_BYTES(RegOff), EXTRACT_LOWER_FOUR_BYTES(RegOff),  ControlCodeInst->UcDmaDataNum,
 						Size);
 					ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
+					_XAie_MarkBdCombinePage(ControlCodeInst);
 					ControlCodeInst->UcDmaDataNum = ControlCodeInst->CurrentDataBWLabel;
 					_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA0);
 					break;
@@ -3428,8 +3480,10 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 
 			NewPagePayloadSize = Size - TempItrSize;
 
-			if (ControlCodeInst->IsAdjacentMemWrite == 0)
+			if (ControlCodeInst->IsAdjacentMemWrite == 0) {
 				ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
+				_XAie_MarkBdCombinePage(ControlCodeInst);
+			}
 			for (IterationSize = TempItrSize; IterationSize < Size; IterationSize++) {
 				 if( (ControlCodeInst->UcPageSize + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax )
 				 {
@@ -3586,6 +3640,7 @@ AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u32 Size
 			CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASMDATA1, "DMAWRITE_data_%d:\n",
 					ControlCodeInst->UcDmaDataNum);
 			ControlCodeInst->UcPageSize += UC_DMA_BD_SIZE;
+			_XAie_MarkBdCombinePage(ControlCodeInst);
 			for(IterationSize = 0; (IterationSize + CompletedSize) < Size &&
 				(ControlCodeInst->UcPageSize + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner)
 				<= ControlCodeInst->PageSizeMax; IterationSize++)
@@ -4468,6 +4523,7 @@ AieRC XAie_ControlCodeIO_SplitWriteGroup(void *IOInst)
 	ControlCodeInst->IsShimBd             = 0;
 	ControlCodeInst->IsExtGroup           = 0;
 	ControlCodeInst->IsAdjacentMemWrite   = 0;
+	ControlCodeInst->CombineBdPageId      = XAIE_INVALID_COMBINE_PAGE_ID;
 	ControlCodeInst->LabelMatchFound      = 0;
 
 	return XAIE_OK;
@@ -5336,6 +5392,7 @@ AieRC XAie_ControlCodeIO_LoadCoresStart(void *IOInst, u32 UniqueCoreElfId, const
 		ControlCodeInst->IsExtGroup              = 0;
 		ControlCodeInst->Mode                    = 0;
 		ControlCodeInst->IsAdjacentMemWrite      = 0;
+		ControlCodeInst->CombineBdPageId         = XAIE_INVALID_COMBINE_PAGE_ID;
 		ControlCodeInst->PageBreak               = 0;
 		ControlCodeInst->LabelMatchFound         = 0;
 
@@ -5543,6 +5600,7 @@ AieRC XAie_ControlCodeIO_LoadCoresCPStart(void *IOInst, u32 UniqueCoreElfId)
 		ControlCodeInst->IsExtGroup           = 0;
 		ControlCodeInst->Mode                 = 0;
 		ControlCodeInst->IsAdjacentMemWrite   = 0;
+		ControlCodeInst->CombineBdPageId      = XAIE_INVALID_COMBINE_PAGE_ID;
 		ControlCodeInst->PageBreak            = 0;
 		ControlCodeInst->LabelMatchFound      = 0;
 		ControlCodeInst->IsJobOpen            = 1;
@@ -5995,6 +6053,7 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	ControlCodeInst->CurrentDataBWLabel = ControlCodeInst->UcDmaDataNum;
 	ControlCodeInst->LabelMap = (XAie_LabelMap*)calloc(1,sizeof(XAie_LabelMap));
 	ControlCodeInst->PrevMemWriteType = -1;
+	ControlCodeInst->CombineBdPageId = XAIE_INVALID_COMBINE_PAGE_ID;
 	ControlCodeInst->BarrierId = 0;
 
 	if(ControlCodeInst->LabelMap) {
@@ -6139,6 +6198,7 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	ControlCodeInst->CurrentDataBWLabel = ControlCodeInst->UcDmaDataNum;
 	ControlCodeInst->LabelMap = (XAie_LabelMap*)calloc(1,sizeof(XAie_LabelMap));
 	ControlCodeInst->PrevMemWriteType = -1;
+	ControlCodeInst->CombineBdPageId = XAIE_INVALID_COMBINE_PAGE_ID;
 	ControlCodeInst->BarrierId = 0;
 	
 	if(ControlCodeInst->LabelMap) {

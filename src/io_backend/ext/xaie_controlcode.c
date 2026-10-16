@@ -40,6 +40,10 @@
 #include "xaie_helper_internal.h"
 #include "xaie_secure_io_internal.h"
 
+/* Page bytes held back while ShimBD chaining defers uC-DMA triggers, so that a
+ * deferred UC_DMA_WRITE_DES_SYNC always fits on the page of its chain. */
+#define SHIM_BD_CHAIN_PAGE_MARGIN 64U
+
 #ifdef XAIE_BACKTRACE_ENABLED
 #include <dlfcn.h>
 #include <execinfo.h>
@@ -364,6 +368,7 @@ typedef struct {
 	u8   IsShimBd;
 	u8   IsExtGroup;          /* type of the currently-open uC-DMA combine group: 1 = BlockWrite32_Ext writes, 0 = ordinary writes. Only meaningful while CombineCommands == 1. */
 	u8   Mode;
+	u8   ShimBdChainMarginApplied; /* PageSizeMax reduced by SHIM_BD_CHAIN_PAGE_MARGIN */
 	u8   IsAdjacentMemWrite;
 	u32  CombinedMemWriteSize;
 	u64  CalculatedNextRegOff;
@@ -433,6 +438,7 @@ static inline void  _XAie_PCJStateFree(XAie_ControlCodeIO *ControlCodeInst);
 static inline AieRC _XAie_PCJRecordSplitPoint(XAie_ControlCodeIO *ControlCodeInst);
 static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeInst);
 static void _XAie_StartNewPage(XAie_ControlCodeIO *ControlCodeInst);
+static void _XAie_UpdateDataAligner(XAie_ControlCodeIO *ControlCodeInst, u32 jobSize);
 static void _XAie_StartNewJob(XAie_ControlCodeIO *ControlCodeInst, XAie_CertStartJobType JobType);
 
 /*****************************************************************************/
@@ -2001,9 +2007,8 @@ AieRC XAie_ControlCodeIO_Init(XAie_DevInst *DevInst)
 * heads an open uC-DMA ShimBD chain (XAIE_SHIM_BD_CHAINING_ENABLE), if one
 * is open, and resets the chain accounting. A ShimBD chain accumulates its
 * member BDs under NumShimBDsChained without emitting the WRITE_DES_SYNC
-* until the chain is closed, so any place that needs to force the chain
-* closed early (job end, mode change, or a combine-group kind switch) must
-* go through this to avoid leaving the chain silently open.
+* until the chain is closed. Callers close a chain through
+* _XAie_CloseShimBdChain, which also keeps the trigger on the chain's page.
 *
 * On a printf failure ErrorState is set and picked up by the next
 * CONTROLCODE_PRINTF_CHECK in the caller, same as _XAie_EndJob.
@@ -2033,6 +2038,66 @@ static void _XAie_FlushShimBdChain(XAie_ControlCodeIO *ControlCodeInst) {
 	ControlCodeInst->NumShimBDsChained = 0;
 	ControlCodeInst->CombineCommands = 0;
 	ControlCodeInst->UcbdLabelNum++;
+}
+
+/*****************************************************************************/
+/**
+*
+* This function closes an open uC-DMA ShimBD chain
+* (XAIE_SHIM_BD_CHAINING_ENABLE): it emits the chain's deferred
+* UC_DMA_WRITE_DES_SYNC on the current page. Every flush site goes through
+* here.
+*
+* A chain defers the trigger of its writes (the ShimBD writes and the ordinary
+* writes combined with them, such as task enqueues) until the chain is closed.
+* Any other instruction must close the chain first, or it runs before those
+* writes are issued: a MASK_POLL_32, UC_DMA_MASK_POLL_EXT or WAIT_TCTS could
+* wait for state the writes have not produced yet, a REMOTE_BARRIER or
+* REL_ACQ_SYNC could release other agents too early, and a MASK_WRITE_32 or
+* SAVE_REGISTER would be reordered with them. Only the chain's writes and
+* their address patches (APPLY_OFFSET_*) keep it open. Job end, a mode
+* change, a combine-group kind switch and XAie_SplitWriteGroup close it too.
+*
+* The trigger is never moved to a new page. The chain's BDs, their data and
+* the APPLY_OFFSET patches of that data are on the current page. The
+* assembler places a page's referenced BDs and data on the page that holds
+* the trigger, so a trigger on the next page would overflow that page, and
+* with CERT patching a patch updates only its own page's copy of the data, so
+* the triggered BDs would program unpatched DDR addresses. Enabling chaining
+* holds back SHIM_BD_CHAIN_PAGE_MARGIN bytes of the page (XAie_ConfigMode),
+* so every other instruction leaves room for the trigger and the data-section
+* alignment it can add.
+*
+* @param	ControlCodeInst: ControlCodeInst instance pointer.
+* @param	NextOpSize: Size of the instruction that follows, used to
+*		recompute its data-section alignment. 0 if the caller
+*		recomputes the alignment itself or none is needed.
+*
+* @return	void.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static void _XAie_CloseShimBdChain(XAie_ControlCodeIO *ControlCodeInst,
+		u32 NextOpSize)
+{
+	if (ControlCodeInst->NumShimBDsChained == 0) {
+		return;
+	}
+	/* Chaining is enabled only with the margin held back, so the trigger
+	 * always fits. A chain open without it is a bug: fail loudly rather
+	 * than emit a trigger the page cannot hold. */
+	if (!ControlCodeInst->ShimBdChainMarginApplied &&
+			((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
+			 ControlCodeInst->PageSizeMax)) {
+		XAIE_ERROR("ShimBD chain trigger does not fit on the page of its chain\n");
+		ControlCodeInst->ErrorState = 1;
+		return;
+	}
+	_XAie_FlushShimBdChain(ControlCodeInst);
+	if (NextOpSize != 0U) {
+		_XAie_UpdateDataAligner(ControlCodeInst, NextOpSize);
+	}
 }
 
 /*****************************************************************************/
@@ -2077,21 +2142,10 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 
 	}
-	else if(ControlCodeInst->NumShimBDsChained > 0) {
-		/* The flush emits a SYNC (ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC bytes)
-		 * whose cost is never reserved in UcPageSize while the chain is
-		 * open (each per-BD-add check only defends its own instant, then
-		 * the reservation evaporates uncommitted). Check for page overflow
-		 * before flushing, same as _XAie_IsolateCombineGroup does. */
-		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
-				ControlCodeInst->PageSizeMax) {
-			/* Avoids StartNewPage->EndPage->EndJob re-entering this branch. */
-			ControlCodeInst->NumShimBDsChained = 0;
-			_XAie_StartNewPage(ControlCodeInst);
-			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
-			ControlCodeInst->NumShimBDsChained = 1;
-		}
-		_XAie_FlushShimBdChain(ControlCodeInst);
+	else {
+		/* The trigger stays on this page, in front of END_JOB: the margin
+		 * held back while chaining is enabled always leaves room for it. */
+		_XAie_CloseShimBdChain(ControlCodeInst, 0U);
 	}
 
 	/* PCJ trigger point: the user has just called XAie_EndJob to terminate
@@ -2419,6 +2473,32 @@ AieRC XAie_ConfigMode(void *IOInst, XAie_ModeSelect Mode)
 		return XAIE_ERR;
 	}
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
+	/* Any mode change, including enabling chaining again, closes an open
+	 * chain first: its writes must not be dropped or reordered with the
+	 * writes issued under the new mode. */
+	_XAie_CloseShimBdChain(ControlCodeInst, 0U);
+	CHECK_ERROR_STATE(ControlCodeInst);
+	if (Mode == XAIE_SHIM_BD_CHAINING_ENABLE) {
+		/* Hold back SHIM_BD_CHAIN_PAGE_MARGIN bytes of the page while
+		 * chaining is enabled, so that every chain can close on the page
+		 * that holds its BDs, their data and the APPLY_OFFSET patches of
+		 * that data (_XAie_CloseShimBdChain). */
+		/* PageSizeMax is 0 until a control-code buffer or file is opened,
+		 * and opening one resets the mode, so no chain can be built then. */
+		if (!ControlCodeInst->ShimBdChainMarginApplied &&
+				(ControlCodeInst->PageSizeMax != 0U)) {
+			if (ControlCodeInst->PageSizeMax <= SHIM_BD_CHAIN_PAGE_MARGIN) {
+				XAIE_ERROR("Page size %u is too small for ShimBD chaining\n",
+						ControlCodeInst->PageSizeMax);
+				return XAIE_ERR;
+			}
+			ControlCodeInst->PageSizeMax -= SHIM_BD_CHAIN_PAGE_MARGIN;
+			ControlCodeInst->ShimBdChainMarginApplied = 1;
+		}
+	} else if (ControlCodeInst->ShimBdChainMarginApplied) {
+		ControlCodeInst->PageSizeMax += SHIM_BD_CHAIN_PAGE_MARGIN;
+		ControlCodeInst->ShimBdChainMarginApplied = 0;
+	}
 	ControlCodeInst->Mode = Mode;
 	switch (Mode)
 	{
@@ -2429,17 +2509,6 @@ AieRC XAie_ConfigMode(void *IOInst, XAie_ModeSelect Mode)
 			}
 			break;
 		case XAIE_SHIM_BD_CHAINING_DISABLE:
-			if((ControlCodeInst->NumShimBDsChained > 0) &&
-					((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
-					 ControlCodeInst->PageSizeMax)) {
-				/* Same reentrancy hazard/fix as _XAie_EndJob's flush branch. */
-				ControlCodeInst->NumShimBDsChained = 0;
-				_XAie_StartNewPage(ControlCodeInst);
-				_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
-				ControlCodeInst->NumShimBDsChained = 1;
-			}
-			_XAie_FlushShimBdChain(ControlCodeInst);
-			CHECK_ERROR_STATE(ControlCodeInst);
 			break;
 		case XAIE_WRITE_DES_ASYNC_ENABLE:
 			break;
@@ -2479,8 +2548,8 @@ XAie_ModeSelect XAie_GetConfigMode(void *IOInst)
 * CombineCommands would leave the open chain in place and let the incoming
 * write's descriptor be silently appended to it.
 *
-* The flush itself emits a SYNC, so check for page overflow before
-* flushing too, same as every other emission site in this file.
+* The flush keeps the trigger on the chain's page
+* (_XAie_CloseShimBdChain).
 *
 * @param	ControlCodeInst: ControlCode instance pointer
 * @param	IsExtWrite: 1 if the incoming write is BlockWrite32_Ext, 0
@@ -2495,16 +2564,7 @@ static inline void _XAie_IsolateCombineGroup(XAie_ControlCodeIO *ControlCodeInst
 		u8 IsExtWrite)
 {
 	if (ControlCodeInst->IsExtGroup != IsExtWrite) {
-		if ((ControlCodeInst->NumShimBDsChained > 0) &&
-				((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
-				 ControlCodeInst->PageSizeMax)) {
-			/* Same reentrancy hazard/fix as the other ShimBD-flush checks. */
-			ControlCodeInst->NumShimBDsChained = 0;
-			_XAie_StartNewPage(ControlCodeInst);
-			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
-			ControlCodeInst->NumShimBDsChained = 1;
-		}
-		_XAie_FlushShimBdChain(ControlCodeInst);
+		_XAie_CloseShimBdChain(ControlCodeInst, 0U);
 		ControlCodeInst->CombineCommands = 0;
 		ControlCodeInst->IsAdjacentMemWrite = 0;
 	}
@@ -2873,6 +2933,8 @@ AieRC XAie_ControlCodeIO_MaskWrite32(void *IOInst, u64 RegOff, u32 Mask,
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
+		_XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_MASK_WRITE_32);
+		CHECK_ERROR_STATE(ControlCodeInst);
 
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_MASK_WRITE_32 +
 			ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
@@ -2927,6 +2989,8 @@ AieRC XAie_ControlCodeIO_MaskPoll(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
+		_XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_MASK_POLL_32);
+		CHECK_ERROR_STATE(ControlCodeInst);
 
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_MASK_POLL_32 +
 			ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
@@ -3964,6 +4028,9 @@ AieRC XAie_ControlCodeIO_WaitUcDMA(void *IOInst)
 		ControlCodeInst->DataAligner = 0U;
 	}
 
+	_XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_WAIT_UC_DMA);
+	CHECK_ERROR_STATE(ControlCodeInst);
+
 	if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_UC_DMA + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 			XAIE_ERROR("ISA_OPSIZE_WAIT_UC_DMA opcode should in the same page as ISA_UC_DMA_WRITE_DES Opcode\n");
 			return XAIE_ERR;
@@ -4016,6 +4083,8 @@ AieRC XAie_WaitTaskCompleteToken(XAie_DevInst *DevInst,
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
+		_XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_WAIT_TCTS);
+		CHECK_ERROR_STATE(ControlCodeInst);
 
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_TCTS +
 			ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
@@ -4069,6 +4138,8 @@ AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
                 if (!ControlCodeInst->IsJobOpen) {
                         _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
                 }
+                _XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_SAVE_TIMESTAMPS);
+                CHECK_ERROR_STATE(ControlCodeInst);
 
                 if((ControlCodeInst->UcPageSize + ISA_OPSIZE_SAVE_TIMESTAMPS +
                         ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
@@ -4132,6 +4203,9 @@ AieRC XAie_ControlCodeIO_MaskPoll_Ext(void *IOInst, u64 RegOff,
                 if (!ControlCodeInst->IsJobOpen) {
                         _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
                 }
+                _XAie_CloseShimBdChain(ControlCodeInst,
+                                ISA_OPSIZE_UC_DMA_MASK_POLL_EXT);
+                CHECK_ERROR_STATE(ControlCodeInst);
 
                 if((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_MASK_POLL_EXT +
                         ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
@@ -4188,6 +4262,8 @@ AieRC XAie_ControlCodeIO_Nop(void *IOInst)
                 if (!ControlCodeInst->IsJobOpen) {
                         _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
                 }
+                _XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_NOP);
+                CHECK_ERROR_STATE(ControlCodeInst);
 
                 if((ControlCodeInst->UcPageSize + ISA_OPSIZE_NOP +
                         ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
@@ -4387,6 +4463,8 @@ AieRC XAie_ControlCodeIO_AttachToGroup(void *IOInst, uint8_t UcIndex)
 	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
 
 	if(ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
+		_XAie_CloseShimBdChain(ControlCodeInst, 0U);
+		CHECK_ERROR_STATE(ControlCodeInst);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, ".attach_to_group\t %d\n",UcIndex);
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, ".attach_to_group\t %d\n",UcIndex);
 		if (XAIE_BACKTRACE_MODE != 0) {
@@ -4449,6 +4527,8 @@ AieRC XAie_ControlCodeIO_RemoteBarrier(void *IOInst, uint8_t RbId, uint32_t UcMa
         if (!ControlCodeInst->IsJobOpen) {
             _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
         }
+        _XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_REMOTE_BARRIER);
+        CHECK_ERROR_STATE(ControlCodeInst);
 
         if((ControlCodeInst->UcPageSize + ISA_OPSIZE_REMOTE_BARRIER +
             ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
@@ -4497,20 +4577,8 @@ AieRC XAie_ControlCodeIO_SplitWriteGroup(void *IOInst)
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
 
-	if (ControlCodeInst->NumShimBDsChained > 0) {
-		/* The flush emits a SYNC, so check for page overflow first, same as
-		 * every other ShimBD-flush site. */
-		if ((ControlCodeInst->UcPageSize + ISA_OPSIZE_UC_DMA_WRITE_DES_SYNC) >
-				ControlCodeInst->PageSizeMax) {
-			/* Same reentrancy hazard/fix as the other ShimBD-flush checks. */
-			ControlCodeInst->NumShimBDsChained = 0;
-			_XAie_StartNewPage(ControlCodeInst);
-			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
-			ControlCodeInst->NumShimBDsChained = 1;
-		}
-		_XAie_FlushShimBdChain(ControlCodeInst);
-		CHECK_ERROR_STATE(ControlCodeInst);
-	}
+	_XAie_CloseShimBdChain(ControlCodeInst, 0U);
+	CHECK_ERROR_STATE(ControlCodeInst);
 
 	ControlCodeInst->CombinedMemWriteSize = 0;
 	/* UINT64_MAX, not 0, for the same reason the page boundary reset uses it:
@@ -4556,6 +4624,8 @@ AieRC XAie_ControlCodeIO_SaveRegister(void *IOInst, u32 RegOff, u32 Id)
 		if (!ControlCodeInst->IsJobOpen) {
     		_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
    	 	}
+		_XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_SAVE_REGISTER);
+		CHECK_ERROR_STATE(ControlCodeInst);
 
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_SAVE_REGISTER +
         	ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
@@ -4635,6 +4705,8 @@ AieRC XAie_ControlCodeRelAcqSync(XAie_DevInst *DevInst, const XAie_LockMod *Lock
 		if (!ControlCodeInst->IsJobOpen) {
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
+		_XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_REL_ACQ_SYNC);
+		CHECK_ERROR_STATE(ControlCodeInst);
 
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_REL_ACQ_SYNC +
 			ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
@@ -5563,6 +5635,11 @@ AieRC XAie_ControlCodeIO_LoadCoresCPStart(void *IOInst, u32 UniqueCoreElfId)
 	}
 
 	if (ControlCodeInst->ControlCodefp || ControlCodeInst->UseInMemoryBuffers) {
+		/* The LOAD_CORES_CP job runs before anything emitted after it in
+		 * this job: issue an open chain's writes first. */
+		_XAie_CloseShimBdChain(ControlCodeInst, 0U);
+		CHECK_ERROR_STATE(ControlCodeInst);
+
 		/* Initialize LoadCoresCP context to capture instructions and data */
 		AieRC RC = _XAie_LoadCoresContextInit(ControlCodeInst);
 		if (RC != XAIE_OK) return RC;
@@ -6047,6 +6124,7 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	}
 
 	ControlCodeInst->PageSizeMax = PageSize;
+	ControlCodeInst->ShimBdChainMarginApplied = 0;
 	ControlCodeInst->TotalLabelsAllocated = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->TotalLabelsAllocatedWrite = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->CurrentDataLabel = ControlCodeInst->UcbdDataNum;
@@ -6192,6 +6270,7 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	}
 	
 	ControlCodeInst->PageSizeMax = PageSize;
+	ControlCodeInst->ShimBdChainMarginApplied = 0;
 	ControlCodeInst->TotalLabelsAllocated = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->TotalLabelsAllocatedWrite = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->CurrentDataLabel = ControlCodeInst->UcbdDataNum;

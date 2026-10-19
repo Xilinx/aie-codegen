@@ -3137,9 +3137,13 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 					}
 				}
 
-				if( (ControlCodeInst->IsShimBd) &&
-					(ControlCodeInst->NumShimBDsChained == 0) ) {
-					ControlCodeInst->CombineCommands = 0;
+				if(ControlCodeInst->IsShimBd) {
+					if(ControlCodeInst->NumShimBDsChained == 0) {
+						ControlCodeInst->CombineCommands = 0;
+					}
+					/* APPLY_OFFSET_57 patches each shim BD payload independently.
+					 * Equal templates can refer to different BOs, so every member
+					 * of a chain must keep its own patch target. */
 					ControlCodeInst->LabelMatchFound = 0;
 					ControlCodeInst->UcDmaDataNum = ControlCodeInst->CurrentDataBWLabel;
 				}

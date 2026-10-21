@@ -77,6 +77,10 @@ typedef SSIZE_T ssize_t;
 
 #define PAGE_SIZE_MAX	  8192
 
+/* Poll page break (XAie_ControlCodeSetPollPageBreak): number of recent
+ * timestamp blocks whose largest size predicts the next block. */
+#define POLL_PAGE_BREAK_WINDOW 8U
+
 /* Per-slice overhead pre-charged to UcPageSize / UcPageTextSize during PCJ
  * buffering. Each slice will eventually be emitted as a START_COND_JOB_PREEMPT
  * job on its own page, so it consumes page-header + EOF + START_JOB + END_JOB
@@ -298,6 +302,13 @@ typedef struct {
 	u8  IsAdjacentMemWrite;
 	u8  PageBreak;
 	u8  LabelMatchFound;
+	/* Poll page break tracking, so a scope neither inherits nor leaks it. */
+	u32 PageIdAtTimestamp;
+	u32 BlockBytesCarry;
+	u32 BlockFillMark;
+	u32 BlockBytes[POLL_PAGE_BREAK_WINDOW];
+	u32 NumBlocks;
+	u8  PolledSinceTimestamp;
 } XAie_SavedPageState;
 
 /**
@@ -417,6 +428,15 @@ typedef struct {
 	u32*    CondJobPreemptSplitTotalSizes;
 	u32     CondJobPreemptSplitCount;
 	u32     CondJobPreemptSplitCapacity;
+	/* Poll page break state. A block is the code between two
+	 * SAVE_TIMESTAMPS; BlockBytes holds the sizes of the last blocks. */
+	u8      PollPageBreak;
+	u8      PolledSinceTimestamp;
+	u32     PageIdAtTimestamp;
+	u32     BlockBytesCarry;
+	u32     BlockFillMark;
+	u32     BlockBytes[POLL_PAGE_BREAK_WINDOW];
+	u32     NumBlocks;
 } XAie_ControlCodeIO;
 
 /************************** Function Definitions *****************************/
@@ -1558,6 +1578,12 @@ static inline void _XAie_SavePageState(XAie_ControlCodeIO *ControlCodeInst,
 	s->IsAdjacentMemWrite      = ControlCodeInst->IsAdjacentMemWrite;
 	s->PageBreak               = ControlCodeInst->PageBreak;
 	s->LabelMatchFound         = ControlCodeInst->LabelMatchFound;
+	s->PageIdAtTimestamp       = ControlCodeInst->PageIdAtTimestamp;
+	s->BlockBytesCarry         = ControlCodeInst->BlockBytesCarry;
+	s->BlockFillMark           = ControlCodeInst->BlockFillMark;
+	memcpy(s->BlockBytes, ControlCodeInst->BlockBytes, sizeof(s->BlockBytes));
+	s->NumBlocks               = ControlCodeInst->NumBlocks;
+	s->PolledSinceTimestamp    = ControlCodeInst->PolledSinceTimestamp;
 }
 
 /*****************************************************************************/
@@ -1607,6 +1633,36 @@ static inline void _XAie_RestorePageState(XAie_ControlCodeIO *ControlCodeInst,
 	ControlCodeInst->IsAdjacentMemWrite      = s->IsAdjacentMemWrite;
 	ControlCodeInst->PageBreak               = s->PageBreak;
 	ControlCodeInst->LabelMatchFound         = s->LabelMatchFound;
+	ControlCodeInst->PageIdAtTimestamp       = s->PageIdAtTimestamp;
+	ControlCodeInst->BlockBytesCarry         = s->BlockBytesCarry;
+	ControlCodeInst->BlockFillMark           = s->BlockFillMark;
+	memcpy(ControlCodeInst->BlockBytes, s->BlockBytes, sizeof(s->BlockBytes));
+	ControlCodeInst->NumBlocks               = s->NumBlocks;
+	ControlCodeInst->PolledSinceTimestamp    = s->PolledSinceTimestamp;
+}
+
+/*****************************************************************************/
+/**
+*
+* Clears the poll page break tracking at the start of a LoadCores, LoadCoresCP
+* or PCJ scope. Without block history no poll inside the scope starts a page,
+* unless the scope has its own SAVE_TIMESTAMPS. The outer tracking is saved
+* with the page state and restored when the scope ends.
+*
+* @param	ControlCodeInst: ControlCode instance pointer
+*
+* @return	None
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static inline void _XAie_ResetPollPageBreakTracking(XAie_ControlCodeIO *ControlCodeInst)
+{
+	ControlCodeInst->PageIdAtTimestamp       = 0U;
+	ControlCodeInst->BlockBytesCarry         = 0U;
+	ControlCodeInst->BlockFillMark           = 0U;
+	ControlCodeInst->NumBlocks               = 0U;
+	ControlCodeInst->PolledSinceTimestamp    = 0U;
 }
 
 /*****************************************************************************/
@@ -2192,6 +2248,10 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 static void _XAie_EndPage(XAie_ControlCodeIO  *ControlCodeInst) {
 
 	if(ControlCodeInst->IsPageOpen) {
+		/* Bytes of the current block left on the closing page. */
+		if (ControlCodeInst->UcPageSize > ControlCodeInst->BlockFillMark)
+			ControlCodeInst->BlockBytesCarry += ControlCodeInst->UcPageSize -
+				ControlCodeInst->BlockFillMark;
 		/* During PCJ buffering, an opcode handler reached the page
 		 * boundary. Don't end the (buffered) job and don't emit `.eop`
 		 * — the buffer must remain a clean stream of opcodes that we
@@ -2258,6 +2318,7 @@ static void _XAie_StartNewPage(XAie_ControlCodeIO  *ControlCodeInst) {
 
 	ControlCodeInst->UcPageTextSize	 = ISA_OPSIZE_EOF;
 	ControlCodeInst->UcPageSize 	 = PAGE_HEADER_SIZE + ISA_OPSIZE_EOF;
+	ControlCodeInst->BlockFillMark	 = ControlCodeInst->UcPageSize;
 
 	/* During PCJ buffering each "page" represents one slice that will
 	 * eventually be wrapped in START_JOB/END_JOB framing at emission time.
@@ -2369,6 +2430,7 @@ static void _XAie_StartNewJob(XAie_ControlCodeIO  *ControlCodeInst,
 		ControlCodeInst->LabelMatchFound      = 0;
 		ControlCodeInst->IsJobOpen            = 1;
 		ControlCodeInst->IsPageOpen           = 1;
+		_XAie_ResetPollPageBreakTracking(ControlCodeInst);
 
 		ControlCodeInst->IsCondJobPreemptActive = 1;
 		return;
@@ -2959,6 +3021,55 @@ AieRC XAie_ControlCodeIO_MaskWrite32(void *IOInst, u64 RegOff, u32 Mask,
 /*****************************************************************************/
 /**
 *
+* This function decides whether a poll starts a new control-code page. The
+* runtime pages control code into the controller data memory, and a page switch
+* costs the controller about a microsecond. In front of the first poll after a
+* SAVE_TIMESTAMPS the switch overlaps the wait for the running layer, while an
+* overflow switch elsewhere delays BD writes or the layer-end barrier. The page
+* is therefore closed here when it could not hold another block (code between
+* two SAVE_TIMESTAMPS) as large as the largest of the last
+* POLL_PAGE_BREAK_WINDOW blocks. A block larger than an empty page spills onto
+* the next page wherever it starts, so in front of it a break would only leave
+* the end of the current page empty; then the page is not closed.
+*
+* @param	ControlCodeInst: ControlCodeInst instance pointer.
+*
+* @return	1 to start a new page before the poll, 0 otherwise.
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static u8 _XAie_PollPageBreakDue(const XAie_ControlCodeIO *ControlCodeInst)
+{
+	u32 Largest = 0U;
+	u32 Count;
+
+	if (!ControlCodeInst->PollPageBreak ||
+	    ControlCodeInst->PolledSinceTimestamp ||
+	    ControlCodeInst->IsCondJobPreemptActive ||
+	    ControlCodeInst->IsLoadCoresCPActive ||
+	    ControlCodeInst->NumBlocks == 0U ||
+	    ControlCodeInst->PageId != ControlCodeInst->PageIdAtTimestamp) {
+		return 0U;
+	}
+	Count = (ControlCodeInst->NumBlocks < POLL_PAGE_BREAK_WINDOW) ?
+		ControlCodeInst->NumBlocks : POLL_PAGE_BREAK_WINDOW;
+	for (u32 i = 0U; i < Count; i++) {
+		if (ControlCodeInst->BlockBytes[i] > Largest) {
+			Largest = ControlCodeInst->BlockBytes[i];
+		}
+	}
+	/* Room for blocks on an empty page (see _XAie_StartNewPage). */
+	if ((ControlCodeInst->PageSizeMax <= (PAGE_HEADER_SIZE + ISA_OPSIZE_EOF)) ||
+	    (Largest > (ControlCodeInst->PageSizeMax - (PAGE_HEADER_SIZE + ISA_OPSIZE_EOF)))) {
+		return 0U;
+	}
+	return (ControlCodeInst->UcPageSize + Largest) > ControlCodeInst->PageSizeMax;
+}
+
+/*****************************************************************************/
+/**
+*
 * This is the memory IO function to mask poll an address for a value.
 *
 * @param	IOInst: IO instance pointer
@@ -2996,7 +3107,11 @@ AieRC XAie_ControlCodeIO_MaskPoll(void *IOInst, u64 RegOff, u32 Mask, u32 Value,
 			ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
+		} else if (_XAie_PollPageBreakDue(ControlCodeInst)) {
+			_XAie_StartNewPage(ControlCodeInst);
+			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
+		ControlCodeInst->PolledSinceTimestamp = 1U;
 
 		CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "MASK_POLL_32\t 0x%x, 0x%x, 0x%x\n",
 				(u32)(EXTRACT_LOWER_FOUR_BYTES(RegOff)), Mask, Value );
@@ -4151,6 +4266,17 @@ AieRC XAie_ControlCodeSaveTimestamp(XAie_DevInst *DevInst, u32 Timestamp)
                         _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
                 }
 
+                /* Close the block for the poll page break. */
+                ControlCodeInst->BlockBytes[ControlCodeInst->NumBlocks % POLL_PAGE_BREAK_WINDOW] =
+                        ControlCodeInst->BlockBytesCarry +
+                        ((ControlCodeInst->UcPageSize > ControlCodeInst->BlockFillMark) ?
+                         (ControlCodeInst->UcPageSize - ControlCodeInst->BlockFillMark) : 0U);
+                ControlCodeInst->NumBlocks++;
+                ControlCodeInst->BlockBytesCarry = 0U;
+                ControlCodeInst->BlockFillMark = ControlCodeInst->UcPageSize;
+                ControlCodeInst->PageIdAtTimestamp = ControlCodeInst->PageId;
+                ControlCodeInst->PolledSinceTimestamp = 0U;
+
                 CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE, "SAVE_TIMESTAMPS\t %d\n",
                                 Timestamp );
 				CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "SAVE_TIMESTAMPS\t %d\n",
@@ -4216,6 +4342,12 @@ AieRC XAie_ControlCodeIO_MaskPoll_Ext(void *IOInst, u64 RegOff,
                         _XAie_StartNewPage(ControlCodeInst);
                         _XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
                 }
+                /* An external poll is a block's poll too, so the poll page
+                 * break cannot move past it to a later poll of the block. It
+                 * takes no break itself: it closes a PL IP transaction
+                 * (XAie_ControlCodeIO_AddressPatching_PL), which stays on one
+                 * page. */
+                ControlCodeInst->PolledSinceTimestamp = 1U;
 
                 CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
                                 "UC_DMA_MASK_POLL_EXT\t 0x%x, 0x%x, 0x%x, 0x%x\n",
@@ -5471,6 +5603,7 @@ AieRC XAie_ControlCodeIO_LoadCoresStart(void *IOInst, u32 UniqueCoreElfId, const
 		ControlCodeInst->CombineBdPageId         = XAIE_INVALID_COMBINE_PAGE_ID;
 		ControlCodeInst->PageBreak               = 0;
 		ControlCodeInst->LabelMatchFound         = 0;
+		_XAie_ResetPollPageBreakTracking(ControlCodeInst);
 
 		RC = _XAie_LoadCoresCacheAdd(ControlCodeInst->LoadCoresCache, UniqueCoreElfId, Label);
 		if (RC != XAIE_OK) return RC;
@@ -5686,6 +5819,7 @@ AieRC XAie_ControlCodeIO_LoadCoresCPStart(void *IOInst, u32 UniqueCoreElfId)
 		ControlCodeInst->LabelMatchFound      = 0;
 		ControlCodeInst->IsJobOpen            = 1;
 		ControlCodeInst->IsPageOpen           = 1;
+		_XAie_ResetPollPageBreakTracking(ControlCodeInst);
 
 		ControlCodeInst->IsLoadCoresCPActive = 1;
 
@@ -6137,6 +6271,12 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 	ControlCodeInst->PrevMemWriteType = -1;
 	ControlCodeInst->CombineBdPageId = XAIE_INVALID_COMBINE_PAGE_ID;
 	ControlCodeInst->BarrierId = 0;
+	ControlCodeInst->PollPageBreak = 0U;
+	ControlCodeInst->PolledSinceTimestamp = 0U;
+	ControlCodeInst->PageIdAtTimestamp = 0U;
+	ControlCodeInst->BlockBytesCarry = 0U;
+	ControlCodeInst->BlockFillMark = 0U;
+	ControlCodeInst->NumBlocks = 0U;
 
 	if(ControlCodeInst->LabelMap) {
 		if(_XAie_LabelMapSetup(ControlCodeInst->LabelMap, ControlCodeInst) == XAIE_OK) {
@@ -6283,6 +6423,12 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	ControlCodeInst->PrevMemWriteType = -1;
 	ControlCodeInst->CombineBdPageId = XAIE_INVALID_COMBINE_PAGE_ID;
 	ControlCodeInst->BarrierId = 0;
+	ControlCodeInst->PollPageBreak = 0U;
+	ControlCodeInst->PolledSinceTimestamp = 0U;
+	ControlCodeInst->PageIdAtTimestamp = 0U;
+	ControlCodeInst->BlockBytesCarry = 0U;
+	ControlCodeInst->BlockFillMark = 0U;
+	ControlCodeInst->NumBlocks = 0U;
 	
 	if(ControlCodeInst->LabelMap) {
 		if(_XAie_LabelMapSetup(ControlCodeInst->LabelMap, ControlCodeInst) == XAIE_OK) {
@@ -6892,6 +7038,50 @@ AieRC XAie_ControlCodeSetScrachPad(XAie_DevInst *DevInst, const char *Scrachpad)
         }
 }
 
+/*****************************************************************************/
+/**
+*
+* This function enables or disables the poll page break: a new control-code
+* page starts right before the first poll after a SAVE_TIMESTAMPS when the
+* current page could not hold another block as large as the largest recent one
+* (see _XAie_PollPageBreakDue). XAie_OpenControlCodeFile and
+* XAie_AllocControlCodeBuffer turn it off, so call it after one of them; without
+* an open control-code file or buffer the call fails.
+*
+* @param        DevInst: Device instance pointer.
+* @param        Enable: 1 to enable, 0 to disable. Other values are rejected.
+* @return       XAIE_OK, XAIE_INVALID_ARGS, XAIE_INVALID_BACKEND or XAIE_ERR (no
+*               open control-code file or buffer).
+*
+*******************************************************************************/
+AieRC XAie_ControlCodeSetPollPageBreak(XAie_DevInst *DevInst, u8 Enable)
+{
+        if((DevInst == XAIE_NULL) || (DevInst->Backend == XAIE_NULL) ||
+                        (DevInst->IOInst == XAIE_NULL)) {
+                XAIE_ERROR("Invalid device instance\n");
+                return XAIE_INVALID_ARGS;
+        }
+
+        if(DevInst->Backend->Type != XAIE_IO_BACKEND_CONTROLCODE) {
+                XAIE_ERROR("This is supported only in Controlcode Backend %d \n", DevInst->Backend->Type);
+                return XAIE_INVALID_BACKEND;
+        }
+
+        if(Enable > 1U) {
+                XAIE_ERROR("Invalid poll page break setting %u (0 off, 1 on)\n", (unsigned int)Enable);
+                return XAIE_INVALID_ARGS;
+        }
+
+        XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)DevInst->IOInst;
+        if (!ControlCodeInst->ControlCodefp && !ControlCodeInst->UseInMemoryBuffers) {
+                XAIE_ERROR("No control code file or buffer is open; open one before setting the poll page break\n");
+                return XAIE_ERR;
+        }
+
+        ControlCodeInst->PollPageBreak = Enable;
+        return XAIE_OK;
+}
+
 #else
 
 AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 PageSize)
@@ -7141,6 +7331,15 @@ AieRC XAie_ControlCodeSetScrachPad(XAie_DevInst *DevInst, const char *Scrachpad)
 {
         (void)DevInst;
         (void)Scrachpad;
+        XAIE_ERROR("Driver is not compiled with ControlCode generation "
+                        "backend (__AIECONTROLCODE__)\n");
+        return XAIE_INVALID_BACKEND;
+}
+
+AieRC XAie_ControlCodeSetPollPageBreak(XAie_DevInst *DevInst, u8 Enable)
+{
+        (void)DevInst;
+        (void)Enable;
         XAIE_ERROR("Driver is not compiled with ControlCode generation "
                         "backend (__AIECONTROLCODE__)\n");
         return XAIE_INVALID_BACKEND;

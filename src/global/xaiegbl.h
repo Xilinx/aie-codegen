@@ -720,6 +720,7 @@ XAIE_AIG_EXPORT AieRC XAie_ControlCodeAddAnnotation(XAie_DevInst *DevInst,
 XAIE_AIG_EXPORT AieRC XAie_ControlCodeAddComment(XAie_DevInst *DevInst, const char *Comment);
 XAIE_AIG_EXPORT AieRC XAie_ControlCodeSetScrachPad(XAie_DevInst *DevInst, const char *Scrachpad);
 XAIE_AIG_EXPORT AieRC XAie_ControlCodeSetPollPageBreak(XAie_DevInst *DevInst, u8 Enable);
+XAIE_AIG_EXPORT AieRC XAie_ControlCodeArmPollPageBreak(XAie_DevInst *DevInst, u32 BlocksAhead);
 XAIE_AIG_EXPORT AieRC XAie_PerfUtilization(XAie_DevInst *DevInst, XAie_PerfInst *PerfInst);
 XAIE_AIG_EXPORT AieRC XAie_ConfigMemInterleaving(XAie_DevInst *DevInst,
 		XAie_LocType *Locs, u32 NumTiles, u8 Enable);

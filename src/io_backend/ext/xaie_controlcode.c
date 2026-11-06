@@ -44,6 +44,10 @@
  * deferred UC_DMA_WRITE_DES_SYNC always fits on the page of its chain. */
 #define SHIM_BD_CHAIN_PAGE_MARGIN 64U
 
+/* Page bytes held back on a page that holds an APPLY_OFFSET_SRAM shim BD
+ * table: CERT requires the table to end before the end of its page. */
+#define SRAM_TABLE_PAGE_GAP UC_DMA_WORD_LEN
+
 #ifdef XAIE_BACKTRACE_ENABLED
 #include <dlfcn.h>
 #include <execinfo.h>
@@ -311,6 +315,7 @@ typedef struct {
 	u32 PollBreakBlocksAhead;
 	u8  PolledSinceTimestamp;
 	u8  PollBreakArmed;
+	u8  SramTableGapApplied;
 } XAie_SavedPageState;
 
 /**
@@ -382,6 +387,7 @@ typedef struct {
 	u8   IsExtGroup;          /* type of the currently-open uC-DMA combine group: 1 = BlockWrite32_Ext writes, 0 = ordinary writes. Only meaningful while CombineCommands == 1. */
 	u8   Mode;
 	u8   ShimBdChainMarginApplied; /* PageSizeMax reduced by SHIM_BD_CHAIN_PAGE_MARGIN */
+	u8   SramTableGapApplied; /* PageSizeMax reduced by SRAM_TABLE_PAGE_GAP */
 	u8   IsAdjacentMemWrite;
 	u32  CombinedMemWriteSize;
 	u64  CalculatedNextRegOff;
@@ -1540,6 +1546,32 @@ static inline void _XAie_ControlCodePageInfoPrintf(
 /*****************************************************************************/
 /**
 *
+* Holds back (Apply = 1) or returns (Apply = 0) SRAM_TABLE_PAGE_GAP bytes of
+* the current page, so that a page holding an APPLY_OFFSET_SRAM shim BD table
+* never fills up to its end.
+*
+* @param	ControlCodeInst: ControlCode instance pointer
+* @param	Apply: 1 to hold the gap back, 0 to return it
+*
+* @return	None
+*
+* @note		Internal only.
+*
+*******************************************************************************/
+static inline void _XAie_SetSramTableGap(XAie_ControlCodeIO *ControlCodeInst, u8 Apply)
+{
+	if (Apply && !ControlCodeInst->SramTableGapApplied) {
+		ControlCodeInst->PageSizeMax -= SRAM_TABLE_PAGE_GAP;
+		ControlCodeInst->SramTableGapApplied = 1;
+	} else if (!Apply && ControlCodeInst->SramTableGapApplied) {
+		ControlCodeInst->PageSizeMax += SRAM_TABLE_PAGE_GAP;
+		ControlCodeInst->SramTableGapApplied = 0;
+	}
+}
+
+/*****************************************************************************/
+/**
+*
 * Saves the current page/job tracking state from ControlCodeInst into the
 * provided XAie_SavedPageState snapshot.
 *
@@ -1592,6 +1624,7 @@ static inline void _XAie_SavePageState(XAie_ControlCodeIO *ControlCodeInst,
 	s->PolledSinceTimestamp    = ControlCodeInst->PolledSinceTimestamp;
 	s->PollBreakArmed          = ControlCodeInst->PollBreakArmed;
 	s->PollBreakBlocksAhead    = ControlCodeInst->PollBreakBlocksAhead;
+	s->SramTableGapApplied     = ControlCodeInst->SramTableGapApplied;
 }
 
 /*****************************************************************************/
@@ -1649,6 +1682,7 @@ static inline void _XAie_RestorePageState(XAie_ControlCodeIO *ControlCodeInst,
 	ControlCodeInst->PolledSinceTimestamp    = s->PolledSinceTimestamp;
 	ControlCodeInst->PollBreakArmed          = s->PollBreakArmed;
 	ControlCodeInst->PollBreakBlocksAhead    = s->PollBreakBlocksAhead;
+	_XAie_SetSramTableGap(ControlCodeInst, s->SramTableGapApplied);
 }
 
 /*****************************************************************************/
@@ -2331,6 +2365,7 @@ static void _XAie_StartNewPage(XAie_ControlCodeIO  *ControlCodeInst) {
 	ControlCodeInst->UcPageTextSize	 = ISA_OPSIZE_EOF;
 	ControlCodeInst->UcPageSize 	 = PAGE_HEADER_SIZE + ISA_OPSIZE_EOF;
 	ControlCodeInst->BlockFillMark	 = ControlCodeInst->UcPageSize;
+	_XAie_SetSramTableGap(ControlCodeInst, 0U);
 
 	/* During PCJ buffering each "page" represents one slice that will
 	 * eventually be wrapped in START_JOB/END_JOB framing at emission time.
@@ -2417,6 +2452,7 @@ static void _XAie_StartNewJob(XAie_ControlCodeIO  *ControlCodeInst,
 
 		_XAie_SavePageState(ControlCodeInst,
 		                    &ControlCodeInst->CondJobPreemptContext->SavedState);
+		_XAie_SetSramTableGap(ControlCodeInst, 0U);
 
 		/* Reset to clean tracking. UcPageSize/UcPageTextSize are pre-biased
 		 * with one slice's worth of overhead (page header + EOF + START/END_JOB
@@ -3911,10 +3947,18 @@ AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u16 Arg_Index, u8 Num_BDs
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
 
-		/* Reserve APPLY_OFFSET_SRAM on the same page as the shim BD table. */
+		/* Reserve APPLY_OFFSET_SRAM on the same page as the shim BD table,
+		 * with the data-section alignment the page has once it is emitted.
+		 * The table must end before the end of the page. */
+		u32 PatchAligner = (DATA_SECTION_ALIGNMENT -
+			((ControlCodeInst->UcPageTextSize + ISA_OPSIZE_APPLY_OFFSET_57 +
+			  ISA_OPSIZE_APPLY_OFFSET_SRAM + OpSize) % DATA_SECTION_ALIGNMENT)) %
+			DATA_SECTION_ALIGNMENT;
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_APPLY_OFFSET_57 + OpSize +
 			ISA_OPSIZE_APPLY_OFFSET_SRAM +
-			(UC_DMA_BD_SIZE + (Num_BDs * UC_DMA_WORD_LEN * SHIM_BD_NUM_REGS)) + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
+			(UC_DMA_BD_SIZE + (Num_BDs * UC_DMA_WORD_LEN * SHIM_BD_NUM_REGS)) + PatchAligner) >
+			(ControlCodeInst->PageSizeMax -
+			 (ControlCodeInst->SramTableGapApplied ? 0U : SRAM_TABLE_PAGE_GAP))) {
 			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
@@ -4131,6 +4175,8 @@ AieRC XAie_ControlCodeIO_AddressPatching_SRAM(void *IOInst, u32 SramAddress, u8 
 
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_APPLY_OFFSET_SRAM;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_APPLY_OFFSET_SRAM;
+		/* Keep the rest of the page from filling up to the table's end. */
+		_XAie_SetSramTableGap(ControlCodeInst, 1U);
 		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 
 		/* Do not fold later writes above this op. */
@@ -5817,6 +5863,7 @@ AieRC XAie_ControlCodeIO_LoadCoresCPStart(void *IOInst, u32 UniqueCoreElfId)
 		 * This lets the buffered writes track their own page size independently. */
 		_XAie_SavePageState(ControlCodeInst,
 		                    &ControlCodeInst->LoadCoresCPContext->SavedState);
+		_XAie_SetSramTableGap(ControlCodeInst, 0U);
 
 		/* Reset page/job counters so the buffered content starts with
 		 * clean tracking. The outer state is preserved in SavedState.
@@ -6290,6 +6337,7 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 
 	ControlCodeInst->PageSizeMax = PageSize;
 	ControlCodeInst->ShimBdChainMarginApplied = 0;
+	ControlCodeInst->SramTableGapApplied = 0;
 	ControlCodeInst->TotalLabelsAllocated = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->TotalLabelsAllocatedWrite = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->CurrentDataLabel = ControlCodeInst->UcbdDataNum;
@@ -6444,6 +6492,7 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	
 	ControlCodeInst->PageSizeMax = PageSize;
 	ControlCodeInst->ShimBdChainMarginApplied = 0;
+	ControlCodeInst->SramTableGapApplied = 0;
 	ControlCodeInst->TotalLabelsAllocated = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->TotalLabelsAllocatedWrite = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->CurrentDataLabel = ControlCodeInst->UcbdDataNum;

@@ -316,6 +316,7 @@ typedef struct {
 	u8  PolledSinceTimestamp;
 	u8  PollBreakArmed;
 	u8  SramTableGapApplied;
+	u8  PendingAsyncDmaWait;
 } XAie_SavedPageState;
 
 /**
@@ -471,6 +472,32 @@ static inline AieRC _XAie_PCJRecordSplitPoint(XAie_ControlCodeIO *ControlCodeIns
 static AieRC _XAie_EmitBufferedCondJobPreempt(XAie_ControlCodeIO *ControlCodeInst);
 static void _XAie_StartNewPage(XAie_ControlCodeIO *ControlCodeInst);
 static void _XAie_UpdateDataAligner(XAie_ControlCodeIO *ControlCodeInst, u32 jobSize);
+
+/* While an async write is outstanding, PageSizeMax holds back room for its
+ * WAIT_UC_DMA: the opcode plus the alignment padding it can add. */
+#define ASYNC_WAIT_RESERVE DATA_SECTION_ALIGNMENT
+
+static inline void _XAie_SetPendingAsyncWait(XAie_ControlCodeIO *ControlCodeInst)
+{
+	if (!ControlCodeInst->PendingAsyncDmaWait) {
+		ControlCodeInst->PendingAsyncDmaWait = 1;
+		ControlCodeInst->PageSizeMax -= ASYNC_WAIT_RESERVE;
+	}
+}
+
+static inline void _XAie_ClearPendingAsyncWait(XAie_ControlCodeIO *ControlCodeInst)
+{
+	if (ControlCodeInst->PendingAsyncDmaWait) {
+		ControlCodeInst->PendingAsyncDmaWait = 0;
+		ControlCodeInst->PageSizeMax += ASYNC_WAIT_RESERVE;
+	}
+}
+
+static inline u32 _XAie_AsyncWaitRoom(XAie_ControlCodeIO *ControlCodeInst)
+{
+	return (ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE &&
+		!ControlCodeInst->PendingAsyncDmaWait) ? ASYNC_WAIT_RESERVE : 0U;
+}
 static void _XAie_StartNewJob(XAie_ControlCodeIO *ControlCodeInst, XAie_CertStartJobType JobType);
 
 /*****************************************************************************/
@@ -1625,6 +1652,7 @@ static inline void _XAie_SavePageState(XAie_ControlCodeIO *ControlCodeInst,
 	s->PollBreakArmed          = ControlCodeInst->PollBreakArmed;
 	s->PollBreakBlocksAhead    = ControlCodeInst->PollBreakBlocksAhead;
 	s->SramTableGapApplied     = ControlCodeInst->SramTableGapApplied;
+	s->PendingAsyncDmaWait     = ControlCodeInst->PendingAsyncDmaWait;
 }
 
 /*****************************************************************************/
@@ -1683,6 +1711,11 @@ static inline void _XAie_RestorePageState(XAie_ControlCodeIO *ControlCodeInst,
 	ControlCodeInst->PollBreakArmed          = s->PollBreakArmed;
 	ControlCodeInst->PollBreakBlocksAhead    = s->PollBreakBlocksAhead;
 	_XAie_SetSramTableGap(ControlCodeInst, s->SramTableGapApplied);
+	/* Through the helpers, so the async WAIT_UC_DMA page reserve follows. */
+	if (s->PendingAsyncDmaWait)
+		_XAie_SetPendingAsyncWait(ControlCodeInst);
+	else
+		_XAie_ClearPendingAsyncWait(ControlCodeInst);
 }
 
 /*****************************************************************************/
@@ -2228,11 +2261,22 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 		return;
 	}
 
-	if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE && ControlCodeInst->PendingAsyncDmaWait)
+	/* The trigger stays on this page, in front of END_JOB: the margin
+	 * held back while chaining is enabled always leaves room for it. */
+	_XAie_CloseShimBdChain(ControlCodeInst, 0U);
+
+	/* A pending wait is emitted whatever the mode: async may have been
+	 * disabled after the write. */
+	if(ControlCodeInst->PendingAsyncDmaWait)
 	{
-		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_UC_DMA) > ControlCodeInst->PageSizeMax) {
-			/* Clear before StartNewPage to avoid reentrant EndJob loop. */
-			ControlCodeInst->PendingAsyncDmaWait = 0;
+		/* Clear before StartNewPage to avoid reentrant EndJob loop. */
+		_XAie_ClearPendingAsyncWait(ControlCodeInst);
+		u32 Aligner = (DATA_SECTION_ALIGNMENT - ((ControlCodeInst->UcPageTextSize +
+			ISA_OPSIZE_WAIT_UC_DMA) % DATA_SECTION_ALIGNMENT)) % DATA_SECTION_ALIGNMENT;
+		/* The chain closed above, so its margin is free for the wait. */
+		u32 Limit = ControlCodeInst->PageSizeMax +
+			(ControlCodeInst->ShimBdChainMarginApplied ? SHIM_BD_CHAIN_PAGE_MARGIN : 0U);
+		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_UC_DMA + Aligner) > Limit) {
 			_XAie_StartNewPage(ControlCodeInst);
 			_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
 		}
@@ -2240,14 +2284,8 @@ static void _XAie_EndJob(XAie_ControlCodeIO  *ControlCodeInst) {
 		CONTROLCODE_PRINTF_VOID(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "WAIT_UC_DMA\t $r0\n");
 		ControlCodeInst->UcPageTextSize += ISA_OPSIZE_WAIT_UC_DMA;
 		ControlCodeInst->UcPageSize += ISA_OPSIZE_WAIT_UC_DMA;
-		ControlCodeInst->PendingAsyncDmaWait = 0;
 		_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 
-	}
-	else {
-		/* The trigger stays on this page, in front of END_JOB: the margin
-		 * held back while chaining is enabled always leaves room for it. */
-		_XAie_CloseShimBdChain(ControlCodeInst, 0U);
 	}
 
 	/* PCJ trigger point: the user has just called XAie_EndJob to terminate
@@ -2889,7 +2927,7 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 			}
 			else {
 				if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE) {
-					if((ControlCodeInst->UcPageSize + OpSize + ISA_OPSIZE_WAIT_UC_DMA +
+					if((ControlCodeInst->UcPageSize + OpSize + _XAie_AsyncWaitRoom(ControlCodeInst) +
 						UC_DMA_BD_SIZE + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 						_XAie_StartNewPage(ControlCodeInst);
 						_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -2901,7 +2939,7 @@ AieRC XAie_ControlCodeIO_Write32(void *IOInst, u64 RegOff, u32 Value)
 					CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
 							"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
 							ControlCodeInst->UcbdLabelNum);
-					ControlCodeInst->PendingAsyncDmaWait = 1;
+					_XAie_SetPendingAsyncWait(ControlCodeInst);
 
 				}
 				else {
@@ -3272,7 +3310,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 			if((ControlCodeInst->IsAdjacentMemWrite == 0) || (ControlCodeInst->PageBreak == 1)) {
 
 				if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE) {
-					if((ControlCodeInst->UcPageSize + OpSize + ISA_OPSIZE_WAIT_UC_DMA +
+					if((ControlCodeInst->UcPageSize + OpSize + _XAie_AsyncWaitRoom(ControlCodeInst) +
 						UC_DMA_BD_SIZE + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 						_XAie_StartNewPage(ControlCodeInst);
 						_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -3335,7 +3373,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
 								"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
 								ControlCodeInst->UcbdLabelNum);
-						ControlCodeInst->PendingAsyncDmaWait = 1;
+						_XAie_SetPendingAsyncWait(ControlCodeInst);
 						}
 						else {
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
@@ -3581,7 +3619,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 			if((ControlCodeInst->IsAdjacentMemWrite == 0) || (ControlCodeInst->PageBreak == 1)) {
 
 				if(ControlCodeInst->Mode == XAIE_WRITE_DES_ASYNC_ENABLE) {
-					if((ControlCodeInst->UcPageSize + OpSize + ISA_OPSIZE_WAIT_UC_DMA +
+					if((ControlCodeInst->UcPageSize + OpSize + _XAie_AsyncWaitRoom(ControlCodeInst) +
 						UC_DMA_BD_SIZE + UC_DMA_WORD_LEN + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
 						_XAie_StartNewPage(ControlCodeInst);
 						_XAie_StartNewJob(ControlCodeInst, XAIE_START_JOB);
@@ -3645,7 +3683,7 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM,
 								"UC_DMA_WRITE_DES\t $r0, @UCBD_label_%d\n",
 								ControlCodeInst->UcbdLabelNum);
-						ControlCodeInst->PendingAsyncDmaWait = 1;
+						_XAie_SetPendingAsyncWait(ControlCodeInst);
 						}
 						else {
 							CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODE,
@@ -3955,7 +3993,7 @@ AieRC XAie_ControlCodeIO_AddressPatching(void *IOInst, u16 Arg_Index, u8 Num_BDs
 			  ISA_OPSIZE_APPLY_OFFSET_SRAM + OpSize) % DATA_SECTION_ALIGNMENT)) %
 			DATA_SECTION_ALIGNMENT;
 		if((ControlCodeInst->UcPageSize + ISA_OPSIZE_APPLY_OFFSET_57 + OpSize +
-			ISA_OPSIZE_APPLY_OFFSET_SRAM +
+			_XAie_AsyncWaitRoom(ControlCodeInst) + ISA_OPSIZE_APPLY_OFFSET_SRAM +
 			(UC_DMA_BD_SIZE + (Num_BDs * UC_DMA_WORD_LEN * SHIM_BD_NUM_REGS)) + PatchAligner) >
 			(ControlCodeInst->PageSizeMax -
 			 (ControlCodeInst->SramTableGapApplied ? 0U : SRAM_TABLE_PAGE_GAP))) {
@@ -4218,8 +4256,12 @@ AieRC XAie_ControlCodeIO_WaitUcDMA(void *IOInst)
 
 	_XAie_CloseShimBdChain(ControlCodeInst, ISA_OPSIZE_WAIT_UC_DMA);
 	CHECK_ERROR_STATE(ControlCodeInst);
+	_XAie_ClearPendingAsyncWait(ControlCodeInst);
 
-	if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_UC_DMA + ControlCodeInst->DataAligner) > ControlCodeInst->PageSizeMax) {
+	/* No chain is open here, so the chain margin is free for the wait. */
+	if((ControlCodeInst->UcPageSize + ISA_OPSIZE_WAIT_UC_DMA + ControlCodeInst->DataAligner) >
+		(ControlCodeInst->PageSizeMax +
+		 (ControlCodeInst->ShimBdChainMarginApplied ? SHIM_BD_CHAIN_PAGE_MARGIN : 0U))) {
 			XAIE_ERROR("ISA_OPSIZE_WAIT_UC_DMA opcode should in the same page as ISA_UC_DMA_WRITE_DES Opcode\n");
 			return XAIE_ERR;
 	}
@@ -4228,7 +4270,6 @@ AieRC XAie_ControlCodeIO_WaitUcDMA(void *IOInst)
 	CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM, "WAIT_UC_DMA\t $r0\n");
 	ControlCodeInst->UcPageTextSize += ISA_OPSIZE_WAIT_UC_DMA;
 	ControlCodeInst->UcPageSize += ISA_OPSIZE_WAIT_UC_DMA;
-	ControlCodeInst->PendingAsyncDmaWait = 0;
 	_XAie_ControlCodePageInfoPrintf(ControlCodeInst, XAIE_FILE_TARGET_DEBUGASM);
 
 	return XAIE_OK;
@@ -6337,6 +6378,7 @@ AieRC XAie_OpenControlCodeFile(XAie_DevInst *DevInst, const char *FileName, u32 
 
 	ControlCodeInst->PageSizeMax = PageSize;
 	ControlCodeInst->ShimBdChainMarginApplied = 0;
+	ControlCodeInst->PendingAsyncDmaWait = 0;
 	ControlCodeInst->SramTableGapApplied = 0;
 	ControlCodeInst->TotalLabelsAllocated = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->TotalLabelsAllocatedWrite = MAX_LABELS_PER_ASM_FILE;
@@ -6492,6 +6534,7 @@ AieRC XAie_AllocControlCodeBuffer(XAie_DevInst *DevInst, u32 PageSize)
 	
 	ControlCodeInst->PageSizeMax = PageSize;
 	ControlCodeInst->ShimBdChainMarginApplied = 0;
+	ControlCodeInst->PendingAsyncDmaWait = 0;
 	ControlCodeInst->SramTableGapApplied = 0;
 	ControlCodeInst->TotalLabelsAllocated = MAX_LABELS_PER_ASM_FILE;
 	ControlCodeInst->TotalLabelsAllocatedWrite = MAX_LABELS_PER_ASM_FILE;

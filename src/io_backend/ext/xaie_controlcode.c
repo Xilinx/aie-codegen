@@ -1195,6 +1195,46 @@ static AieRC _XAie_LabelMapTeardown(XAie_LabelMap *Map)
 /*****************************************************************************/
 /**
 *
+* This function grows the block-write label map so that it has an entry for
+* the given DMAWRITE_data label.
+*
+* @param        Map: XAie_LabelMap structure pointer
+* @param        ControlCodeInst: Control code instance
+* @param        Label: DMAWRITE_data label number
+*
+* @return       XAIE_OK on success, XAIE_ERR on allocation failure.
+*
+* @note         Internal only.
+*
+*******************************************************************************/
+static AieRC _XAie_LabelMapGrowBW(XAie_LabelMap *Map,
+		XAie_ControlCodeIO *ControlCodeInst, u32 Label)
+{
+	while (Label >= ControlCodeInst->TotalLabelsAllocated) {
+		u32 *Sizes = (u32 *)realloc(Map->BWDataSizes,
+				(ControlCodeInst->TotalLabelsAllocated * 2) * sizeof(u32));
+		if (Sizes == NULL) {
+			XAIE_ERROR("Memory allocation failed\n");
+			return XAIE_ERR;
+		}
+		Map->BWDataSizes = Sizes;
+
+		int *Hashes = (int *)realloc(Map->HashBW,
+				(ControlCodeInst->TotalLabelsAllocated * 2) * sizeof(int));
+		if (Hashes == NULL) {
+			XAIE_ERROR("Memory allocation failed\n");
+			return XAIE_ERR;
+		}
+		Map->HashBW = Hashes;
+		ControlCodeInst->TotalLabelsAllocated *= 2;
+	}
+
+	return XAIE_OK;
+}
+
+/*****************************************************************************/
+/**
+*
 * Helper function to write formatted output to either FILE or memory buffer
 *
 * @param        ControlCodeInst: Control code instance
@@ -3325,16 +3365,9 @@ AieRC XAie_ControlCodeIO_BlockWrite32(void *IOInst, u64 RegOff, const u32 *Data,
 				}
 
 				if(Map) {
-					if(ControlCodeInst->CurrentDataBWLabel == ControlCodeInst->TotalLabelsAllocated) {
-						Map->BWDataSizes = (u32*)realloc(Map->BWDataSizes, (ControlCodeInst->TotalLabelsAllocated*2)*(sizeof(u32)));
-						Map->HashBW = (int*)realloc(Map->HashBW, (ControlCodeInst->TotalLabelsAllocated*2)*sizeof(int));
-						if(Map->BWDataSizes && Map->HashBW) {
-						ControlCodeInst->TotalLabelsAllocated *= 2;
-						}
-						else {
-							XAIE_ERROR("Memory allocation failed\n");
-							return XAIE_ERR;
-						}
+					if(_XAie_LabelMapGrowBW(Map, ControlCodeInst,
+							ControlCodeInst->CurrentDataBWLabel) != XAIE_OK) {
+						return XAIE_ERR;
 					}
 
 					Hash = _XAie_ComputeHash(Data, Size);
@@ -3634,16 +3667,9 @@ AieRC XAie_ControlCodeIO_BlockWrite32_Ext(void *IOInst, u64 RegOff,
 				}
 
 				if(Map) {
-					if(ControlCodeInst->CurrentDataBWLabel == ControlCodeInst->TotalLabelsAllocated) {
-						Map->BWDataSizes = (u32*)realloc(Map->BWDataSizes, (ControlCodeInst->TotalLabelsAllocated*2)*(sizeof(u32)));
-						Map->HashBW = (int*)realloc(Map->HashBW, (ControlCodeInst->TotalLabelsAllocated*2)*sizeof(int));
-						if(Map->BWDataSizes && Map->HashBW) {
-						ControlCodeInst->TotalLabelsAllocated *= 2;
-						}
-						else {
-							XAIE_ERROR("Memory allocation failed\n");
-							return XAIE_ERR;
-						}
+					if(_XAie_LabelMapGrowBW(Map, ControlCodeInst,
+							ControlCodeInst->CurrentDataBWLabel) != XAIE_OK) {
+						return XAIE_ERR;
 					}
 
 					Hash = _XAie_ComputeHash(Data, Size);
@@ -3865,6 +3891,7 @@ AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u32 Size
 
 	XAie_ControlCodeIO  *ControlCodeInst = (XAie_ControlCodeIO *)IOInst;
 	CHECK_LOAD_CORES_NOT_ACTIVE(ControlCodeInst);
+	XAie_LabelMap* Map = ControlCodeInst->LabelMap;
 
 	CompletedSize = 0;
 	while (Size > CompletedSize) {
@@ -3931,15 +3958,33 @@ AieRC XAie_ControlCodeIO_BlockSet32(void *IOInst, u64 RegOff, u32 Data, u32 Size
 			}
 			CumilativeRegOff = RegOff + AdjustedOff;
             CONTROLCODE_PRINTF_CHECK(ControlCodeInst, XAIE_FILE_TARGET_CONTROLCODEDATA,
-                    "\t UC_DMA_BD\t 0, 0x%x, @DMAWRITE_data_%d, %d, 0, 0\n\n",
+                    "\t UC_DMA_BD\t 0, 0x%x, @DMAWRITE_data_%d, %d, 0, 0\n",
                     EXTRACT_LOWER_FOUR_BYTES(CumilativeRegOff),
                     ControlCodeInst->UcDmaDataNum, IterationSize);
+
+			/* Record the label like a block write, so the page-break reset and
+			 * later block writes continue after it, but never offer it as a
+			 * match for later block writes. */
+			if (Map) {
+				if (_XAie_LabelMapGrowBW(Map, ControlCodeInst,
+						ControlCodeInst->UcDmaDataNum) != XAIE_OK) {
+					return XAIE_ERR;
+				}
+				Map->BWDataSizes[ControlCodeInst->UcDmaDataNum] = IterationSize;
+				Map->HashBW[ControlCodeInst->UcDmaDataNum] = HASH_INVALID;
+			}
 
 			AdjustedOff += (IterationSize * UC_DMA_WORD_LEN);
 			CompletedSize += IterationSize;
 			ControlCodeInst->UcDmaDataNum++;
+			ControlCodeInst->CurrentDataBWLabel = ControlCodeInst->UcDmaDataNum;
 		}
 	}
+
+	/* The last BD written is this block's; a later write must not extend
+	 * an earlier one. */
+	ControlCodeInst->CombinedMemWriteSize = 0;
+	ControlCodeInst->CalculatedNextRegOff = UINT64_MAX;
 
 	return XAIE_OK;
 }

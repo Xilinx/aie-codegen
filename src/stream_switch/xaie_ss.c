@@ -1747,6 +1747,38 @@ static AieRC _XAie_StrmSwRegisterClear(XAie_DevInst *DevInst, u8 TileType, const
 }
 
 /**
+ * _XAie_StrmSwDetMergeArbitersClear - Clears the deterministic merge arbiter
+ * registers of one tile address space.
+ *
+ * @DevInst: Pointer to the AI Engine device instance.
+ * @DetMerge: Deterministic merge properties of the tile.
+ * @TileBase: Base address of the tile address space.
+ *
+ * Return: XAIE_OK on success, error code on failure.
+ */
+static AieRC _XAie_StrmSwDetMergeArbitersClear(XAie_DevInst *DevInst, const XAie_StrmSwDetMerge *DetMerge, u64 TileBase)
+{
+	AieRC RC;
+	/* Each arbiter has its slave select registers followed by its control
+	 * register; consecutive arbiters are ArbConfigOffset apart. */
+	u32 ArbRegs = ((DetMerge->EnableBase - DetMerge->ConfigBase) / 4U) + 1U;
+
+	if (DetMerge->ArbConfigOffset == (ArbRegs * 4U)) {
+		return XAie_BlockSet32(DevInst, TileBase + DetMerge->ConfigBase, 0,
+				(u32)DetMerge->NumArbitors * ArbRegs);
+	}
+
+	for (u8 Arb = 0U; Arb < DetMerge->NumArbitors; Arb++) {
+		RC = XAie_BlockSet32(DevInst, TileBase + DetMerge->ConfigBase +
+				((u64)DetMerge->ArbConfigOffset * Arb), 0, ArbRegs);
+		if (RC != XAIE_OK) {
+			return RC;
+		}
+	}
+	return XAIE_OK;
+}
+
+/**
  * _XAie_StrmSwDeterministicMergeRegisterClear - Clears the deterministic merge
  * register for the stream switch in the AI Engine.
  *
@@ -1768,8 +1800,12 @@ AieRC _XAie_StrmSwDeterministicMergeRegisterClear(XAie_DevInst *DevInst, const X
 	AieRC RC = 0;
 	u64 RegAddr = 0;
 
-	RegAddr |= XAie_GetTileAddr(DevInst, Row, Col) + StrmMod->DetMerge->ConfigBase;
-	RC |= XAie_BlockSet32(DevInst, RegAddr, 0, StrmMod->DetMerge->NumArbitors * 3);		//3 here is two arb sub registers and ctrl register for arbiter.
+	if (StrmMod->DetMergeFeature == XAIE_FEATURE_UNAVAILABLE) {
+		return XAIE_OK;
+	}
+
+	RegAddr |= XAie_GetTileAddr(DevInst, Row, Col);
+	RC |= _XAie_StrmSwDetMergeArbitersClear(DevInst, StrmMod->DetMerge, RegAddr);
 	if(RC != XAIE_OK) {
 		XAIE_ERROR("Failed to reset deterministic merge registers in row = %d : col = %d\n", Row, Col);
 		return RC;
@@ -1783,8 +1819,8 @@ AieRC _XAie_StrmSwDeterministicMergeRegisterClear(XAie_DevInst *DevInst, const X
 			RegAddr = XAIE4_MASK_VALUE_APP_B;
 			RC = 0;
 
-			RegAddr |= XAie_GetTileAddr(DevInst, Row, Col) + StrmMod->DetMerge->ConfigBase;
-			RC |= XAie_BlockSet32(DevInst, RegAddr, 0, StrmMod->DetMerge->NumArbitors * 3);
+			RegAddr |= XAie_GetTileAddr(DevInst, Row, Col);
+			RC |= _XAie_StrmSwDetMergeArbitersClear(DevInst, StrmMod->DetMerge, RegAddr);
 			if(RC != XAIE_OK) {
 				XAIE_ERROR("Failed to reset deterministic merge registers in row = %d : col = %d\n", Row, Col);
 				return RC;

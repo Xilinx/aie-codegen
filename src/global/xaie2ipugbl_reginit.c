@@ -1097,7 +1097,7 @@ static const  XAie_StrmPort AieMlShimStrmSlv[SS_PORT_TYPE_MAX] =
 		.PortBaseAddr = XAIEMLGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_EAST_0,
 	},
 	{	/* Trace */
-		.NumPorts = 2,
+		.NumPorts = 1,
 		.PortBaseAddr = XAIEMLGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_TRACE
 	}
 };
@@ -1273,7 +1273,7 @@ static const  XAie_StrmPort AieMlTileStrmSlaveSlot[SS_PORT_TYPE_MAX] =
 		.PortBaseAddr = XAIEMLGBL_CORE_MODULE_STREAM_SWITCH_SLAVE_EAST_0_SLOT0,
 	},
 	{	/* Trace */
-		.NumPorts = 1,
+		.NumPorts = 2,
 		.PortBaseAddr = XAIEMLGBL_CORE_MODULE_STREAM_SWITCH_SLAVE_AIE_TRACE_SLOT0
 	}
 };

@@ -511,7 +511,7 @@ static const XAie_StrmPort Aie2PShimStrmSlv[SS_PORT_TYPE_MAX] =
 		.PortBaseAddr = XAIE2PSGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_EAST_0,
 	},
 	{	/* Trace */
-		.NumPorts = 2,
+		.NumPorts = 1,
 		.PortBaseAddr = XAIE2PSGBL_PL_MODULE_STREAM_SWITCH_SLAVE_CONFIG_TRACE
 	},
 	{	/* UCTRLR */
@@ -649,6 +649,10 @@ static const XAie_StrmPort Aie2PShimStrmSlaveSlot[SS_PORT_TYPE_MAX] =
 	{	/* Trace */
 		.NumPorts = 1,
 		.PortBaseAddr = XAIE2PSGBL_PL_MODULE_STREAM_SWITCH_SLAVE_TRACE_SLOT0
+	},
+	{	/* UCTRLR */
+		.NumPorts = 1,
+		.PortBaseAddr = XAIE2PSGBL_PL_MODULE_STREAM_SWITCH_SLAVE_UCONTROLLER_SLOT0,
 	}
 };
 
@@ -691,7 +695,7 @@ static const XAie_StrmPort Aie2PSTileStrmSlaveSlot[SS_PORT_TYPE_MAX] =
 		.PortBaseAddr = XAIE2PSGBL_CORE_MODULE_STREAM_SWITCH_SLAVE_EAST_0_SLOT0,
 	},
 	{	/* Trace */
-		.NumPorts = 1,
+		.NumPorts = 2,
 		.PortBaseAddr = XAIE2PSGBL_CORE_MODULE_STREAM_SWITCH_SLAVE_AIE_TRACE_SLOT0
 	}
 };
